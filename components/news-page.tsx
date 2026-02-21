@@ -82,6 +82,17 @@ export function NewsPage() {
                         >
                           {article.category}
                         </span>
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  ["Roadmap", "Product", "Integration", "路線圖", "產品", "整合"].includes(article.category)
+                    ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                    : "bg-green-500/10 text-green-400 border border-green-500/20"
+                }`}>
+                  {["Roadmap", "Product", "Integration", "路線圖", "產品", "整合"].includes(article.category) ? (
+                    <>● In Progress</>
+                  ) : (
+                    <>✓ Launched</>
+                  )}
+                </span>
                         <time className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           {article.date}
