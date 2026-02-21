@@ -25,7 +25,7 @@ export function CompanyPage() {
         <div className="relative mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { icon: Shield, value: "100%", label: "IP Ownership" },
+              { icon: Shield, value: "100%", label: "Ownership" },
               { icon: Cpu, value: "AI", label: "Powered Engine" },
               { icon: Globe, value: "HK", label: "Headquartered" },
               { icon: Lock, value: "DLP", label: "Core Product" },
