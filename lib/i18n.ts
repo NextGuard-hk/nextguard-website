@@ -57,10 +57,10 @@ export const translations = {
       teamSubtitle: "Our core R&D team comprises former Skyguard R&D members, ensuring technology continuity and innovation capability.",
       teamTagline: "Independent \u00b7 Autonomous \u00b7 Global-Focused \u00b7 Not Constrained by Any Original Vendor",
       leaders: [
-        { name: "Peter", role: "Co-Founder", bio: "Former Skyguard Co-Founder, 20+ years experience" },
-        { name: "Harvey", role: "Co-Founder", bio: "Former Skyguard Regional Technical Director, 20+ years Network and Data Security experience" },
-        { name: "James", role: "Co-Founder", bio: "Former Skyguard Co-Founder, 25+ years architecture experience" },
-        { name: "Roscoe", role: "Co-Founder", bio: "Former Skyguard HK & Macau Technical Director, 25+ years project leadership experience" },
+        { name: "Peter Zeng", role: "Co-Founder", bio: "Former Skyguard Co-Founder, 20+ years experience" },
+        { name: "Harvey Huang", role: "Co-Founder", bio: "Former Skyguard Regional Technical Director, 20+ years Network and Data Security experience" },
+        { name: "James Yang", role: "Co-Founder", bio: "Former Skyguard Co-Founder, 25+ years architecture experience" },
+        { name: "Roscoe Cheung", role: "Co-Founder", bio: "Former Skyguard HK & Macau Technical Director, 25+ years project leadership experience" },
       ],
       advisorTitle: "Chief Advisor, AI & Intelligent Cybersecurity",
       advisor: {
@@ -263,10 +263,10 @@ export const translations = {
       teamSubtitle: "\u6211\u5011\u7684\u6838\u5fc3\u7814\u767c\u5718\u968a\u7531\u524d Skyguard R&D \u6210\u54e1\u7d44\u6210\uff0c\u78ba\u4fdd\u6280\u8853\u5ef6\u7e8c\u6027\u8207\u5275\u65b0\u80fd\u529b\u3002",
       teamTagline: "\u7368\u7acb\uff0e\u81ea\u4e3b\uff0e\u9762\u5411\u5168\u7403\uff0e\u4e0d\u53d7\u5236\u65bc\u4efb\u4f55\u539f\u5ee0",
       leaders: [
-        { name: "Peter", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u806f\u5408\u5275\u8fa6\u4eba\uff0c20+ \u5e74\u7d93\u9a57" },
-        { name: "Harvey", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u7522\u54c1\u53ca\u6280\u8853\u7e3d\u76e3\uff0c20+ \u5e74\u7db2\u7d61\u5b89\u5168\u53ca DLP \u67b6\u69cb\u8a2d\u8a08\u7d93\u9a57" },
-        { name: "James", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u806f\u5408\u5275\u8fa6\u4eba\uff0c25+ \u5e74\u7db2\u7d61\u5b89\u5168\u53ca DLP \u67b6\u69cb\u8a2d\u8a08\u7d93\u9a57" },
-        { name: "Roscoe", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u6e2f\u6fb3\u6280\u8853\u7e3d\u76e3\uff0c25+ \u5e74\u9805\u76ee\u9818\u5c0e\u7d93\u9a57" },
+        { name: "Peter Zeng", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u806f\u5408\u5275\u8fa6\u4eba\uff0c20+ \u5e74\u7d93\u9a57" },
+        { name: "Harvey Huang", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u7522\u54c1\u53ca\u6280\u8853\u7e3d\u76e3\uff0c20+ \u5e74\u7db2\u7d61\u5b89\u5168\u53ca DLP \u67b6\u69cb\u8a2d\u8a08\u7d93\u9a57" },
+        { name: "James Yang", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u806f\u5408\u5275\u8fa6\u4eba\uff0c25+ \u5e74\u7db2\u7d61\u5b89\u5168\u53ca DLP \u67b6\u69cb\u8a2d\u8a08\u7d93\u9a57" },
+        { name: "Roscoe Cheung", role: "\u806f\u5408\u5275\u8fa6\u4eba", bio: "\u524d Skyguard \u6e2f\u6fb3\u6280\u8853\u7e3d\u76e3\uff0c25+ \u5e74\u9805\u76ee\u9818\u5c0e\u7d93\u9a57" },
       ],
       advisorTitle: "AI \u8207\u667a\u80fd\u7db2\u7d61\u5b89\u5168\u9996\u5e2d\u9867\u554f",
       advisor: {
