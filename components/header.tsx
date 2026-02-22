@@ -30,7 +30,7 @@ export function Header() {
             alt="Nextguard Technology Limited"
             width={234}
             height={52}
-            className="h-[42px] w-auto"
+            className="h-[42px] w-auto mix-blend-screen"
             priority
           />
         </Link>
