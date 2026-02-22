@@ -3,11 +3,10 @@ export type Locale = "en" | "zh-TW" | "zh-CN"
 export const translations = {
   "en": {
     nav: {
-      home: "Home",
       products: "Products",
-      company: "Company",
+            aboutUs: "About Us",
       solutions: "New Features",
-      partners: "Partners",
+            becomePartner: "Become Partner",
       news: "News",
       contact: "Contact",
             kb: "Knowledge Base",
@@ -321,11 +320,10 @@ export const translations = {
   },
   "zh-TW": {
     nav: {
-      home: "首頁",
       products: "產品中心",
-      company: "關於我們",
+      aboutUs: "關於我們",
       solutions: "最新功能",
-      partners: "合作伙伴",
+            becomePartner: "成為合作伙伴",
       news: "最新消息",
       contact: "聯絡我們",
             kb: "知識庫",
@@ -639,11 +637,10 @@ export const translations = {
   },
   "zh-CN": {
     nav: {
-      home: "首页",
       products: "产品中心",
-      company: "关于我们",
+      aboutUs: "关于我们",
       solutions: "最新功能",
-      partners: "合作伙伴",
+            becomePartner: "成为合作伙伴",
       news: "最新动态",
       contact: "联系我们",
             kb: "知识库",
