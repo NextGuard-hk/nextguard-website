@@ -10,6 +10,7 @@ export const translations = {
       partners: "Partners",
       news: "News",
       contact: "Contact",
+            kb: "Knowledge Base",
     },
     home: {
       badge: "Goodbye · Rebuild · Expand",
@@ -327,6 +328,7 @@ export const translations = {
       partners: "合作伙伴",
       news: "最新消息",
       contact: "聯絡我們",
+            kb: "知識庫",
     },
     home: {
       badge: "告別 · 重建 · 出海",
@@ -644,6 +646,7 @@ export const translations = {
       partners: "合作伙伴",
       news: "最新动态",
       contact: "联系我们",
+            kb: "知识库",
     },
     home: {
       badge: "告别 · 重建 · 出海",
