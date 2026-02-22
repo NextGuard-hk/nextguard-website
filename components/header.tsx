@@ -5,7 +5,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useLanguage } from "@/lib/language-context"
-import { Menu, X, Globe } from "lucide-react"
+import { Menu, X } from "lucide-react"
+import type { Locale } from "@/lib/i18n"
 
 export function Header() {
   const { locale, setLocale, t } = useLanguage()
@@ -20,6 +21,12 @@ export function Header() {
     { href: "/partners", label: t.nav.partners },
     { href: "/news", label: t.nav.news },
     { href: "/contact", label: t.nav.contact },
+  ]
+
+  const languages: { code: Locale; label: string }[] = [
+    { code: "en", label: "EN" },
+    { code: "zh-TW", label: "中文" },
+    { code: "zh-CN", label: "简体" },
   ]
 
   return (
@@ -54,15 +61,23 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          {/* Language Switcher */}
-          <button
-            onClick={() => setLocale(locale === "en" ? "zh-TW" : locale === "zh-TW" ? "zh-CN" : "en")}
-            className="flex items-center gap-1.5 rounded-md border border-border/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:border-primary/50 hover:text-foreground"
-            aria-label="Switch language"
-          >
-            <Globe className="h-[18px] w-[18px]" />
-            {locale === "en" ? "中文" : locale === "zh-TW" ? "简体" : "EN"}
-          </button>
+          {/* Language Switcher - 3 options */}
+          <div className="hidden md:flex items-center rounded-md border border-border/50 overflow-hidden">
+            {languages.map((lang, i) => (
+              <button
+                key={lang.code}
+                onClick={() => setLocale(lang.code)}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                  locale === lang.code
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                } ${i !== 0 ? "border-l border-border/50" : ""}`}
+                aria-label={`Switch to ${lang.label}`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
 
           {/* Mobile Menu Toggle */}
           <button
@@ -70,31 +85,45 @@ export function Header() {
             className="text-muted-foreground transition-colors hover:text-foreground md:hidden"
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
       </div>
 
       {/* Mobile Navigation */}
       {mobileOpen && (
-        <nav className="border-t border-border/50 bg-background/95 backdrop-blur-xl md:hidden">
-          <div className="mx-auto flex max-w-6xl flex-col px-6 py-4">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={`py-3 text-[18px] transition-colors duration-200 ${
-                  pathname === link.href
-                    ? "text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground"
+        <div className="border-t border-border/50 bg-background/95 px-6 py-4 md:hidden">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMobileOpen(false)}
+              className={`block py-3 text-[18px] transition-colors duration-200 ${
+                pathname === link.href
+                  ? "text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+          {/* Mobile Language Switcher */}
+          <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-4">
+            {languages.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => { setLocale(lang.code); setMobileOpen(false) }}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-200 ${
+                  locale === lang.code
+                    ? "bg-primary/20 text-primary border border-primary/30"
+                    : "text-muted-foreground hover:text-foreground border border-border/50"
                 }`}
               >
-                {link.label}
-              </Link>
+                {lang.label}
+              </button>
             ))}
           </div>
-        </nav>
+        </div>
       )}
     </header>
   )
