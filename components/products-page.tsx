@@ -1,6 +1,6 @@
 "use client"
 import { useLanguage } from "@/lib/language-context"
-import { AnimateIn } from "./animate-in"
+import { AnimateFix ProductsPage: add missing React import and type safety
 import { Shield, Mail, Globe, Smartphone, Code2, Database, Zap, Cloud, Network, Lock, Eye, Brain, Server, Activity, BarChart3, CheckCircle, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
