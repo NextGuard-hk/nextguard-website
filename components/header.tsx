@@ -23,25 +23,25 @@ export function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
           <Image
             src="/images/nextguard-logo.png"
             alt="Nextguard Technology Limited"
-            width={180}
-            height={40}
-            className="h-8 w-auto"
+            width={234}
+            height={52}
+            className="h-[42px] w-auto"
             priority
           />
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-10 md:flex">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm transition-colors duration-200 ${
+              className={`text-[18px] transition-colors duration-200 ${
                 pathname === link.href
                   ? "text-primary font-medium"
                   : "text-muted-foreground hover:text-foreground"
@@ -56,10 +56,10 @@ export function Header() {
           {/* Language Switcher */}
           <button
             onClick={() => setLocale(locale === "en" ? "zh-TW" : "en")}
-            className="flex items-center gap-1.5 rounded-md border border-border/50 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors duration-200 hover:border-primary/50 hover:text-foreground"
+            className="flex items-center gap-1.5 rounded-md border border-border/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:border-primary/50 hover:text-foreground"
             aria-label="Switch language"
           >
-            <Globe className="h-3.5 w-3.5" />
+            <Globe className="h-[18px] w-[18px]" />
             {locale === "en" ? "中文" : "EN"}
           </button>
 
@@ -83,7 +83,7 @@ export function Header() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`py-3 text-sm transition-colors duration-200 ${
+                className={`py-3 text-[18px] transition-colors duration-200 ${
                   pathname === link.href
                     ? "text-primary font-medium"
                     : "text-muted-foreground hover:text-foreground"
