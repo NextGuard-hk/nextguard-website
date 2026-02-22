@@ -26,11 +26,10 @@ export function Header() {
   }, [])
 
   const links = [
-    { href: "/", label: t.nav.home },
     { href: "/products", label: t.nav.products },
-    { href: "/company", label: t.nav.company },
+    { href: "/company", label: t.nav.aboutUs },
     { href: "/solutions", label: t.nav.solutions },
-    { href: "/partners", label: t.nav.partners },
+    { href: "/partners", label: t.nav.becomePartner },
     { href: "/news", label: t.nav.news },
     { href: "/contact", label: t.nav.contact },
         { href: "https://nextguard-kb.vercel.app", label: t.nav.kb },
