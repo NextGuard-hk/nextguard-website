@@ -43,6 +43,7 @@ export function HomePage() {
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           animation: heroTextFlow 4s linear infinite;
+                    padding: 0 6px 4px 0;
         }
         .hero-main-visual {
           animation: heroGlow 3s ease-in-out infinite, heroFloat 6s ease-in-out infinite;
