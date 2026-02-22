@@ -540,7 +540,7 @@ export const translations = {
     solutions: {
       badge: "2026 路線圖",
       headline: "全新能力：2026 年 AI 驅動的數據安全",
-      subheadline: "從被動阻擋到主動智能——這是為 AI 時代重建的 DLP。",
+      subheadline: "从被动阻挡到主动智能——这是为 AI 时代重建的 DLP。",
       products: [
         {
           title: "AI DLP – 智能數據防洩",
@@ -554,7 +554,7 @@ export const translations = {
         },
         {
           title: "與 Microsoft MIP 深度整合",
-          description: "支持 Microsoft Purview、Copilot 與 Azure Information Protection。在本地 DLP 與雲端生態系統間實現統一策略。",
+          description: "支持 Microsoft Purview、Copilot 與 Azure Information Protection。在本地 DLP 和云端生态系统间实现统一策略。",
           features: ["Microsoft Purview 支持", "Copilot 整合", "Azure Information Protection", "統一本地與雲端策略"],
         },
       ],
@@ -589,7 +589,7 @@ export const translations = {
         { date: "2026", category: "路線圖", title: "2026 AI 驅動數據安全路線圖發佈", excerpt: "Nextguard 揭曉 2026 路線圖，包含 AI DLP、智能數據分類和深度 Microsoft MIP 整合。" },
         { date: "2026", category: "產品", title: "AI DLP：智能數據防洩正式推出", excerpt: "偵測異常用戶行為與可疑傳輸。預建策略阻止敏感數據上傳至 ChatGPT、Gemini 等雲端協作平台。" },
         { date: "2026", category: "產品", title: "AI 數據分類功能現已推出", excerpt: "自動發現與標記敏感數據。將數週的手動設定縮減為數小時的 AI 輔助設定。" },
-        { date: "2026", category: "整合", title: "與 Microsoft MIP 深度整合", excerpt: "完全支持 Microsoft Purview、Copilot 與 Azure Information Protection，實現本地與雲端統一策略。" },
+        { date: "2026", category: "整合", title: "與 Microsoft MIP 深度整合", excerpt: "完全支持 Microsoft Purview、Copilot 與 Azure Information Protection，实现本地与云端统一策略。" },
         { date: "2026", category: "公司", title: "Nextguard：擁有完整技術主權的獨立廠商", excerpt: "Nextguard 獲得永久完整源代碼所有權和開發權，確保完全技術自主。" },
         { date: "2026", category: "合作", title: "渠道優先合作伙伴計劃啟動", excerpt: "Nextguard 承諾 100% 渠道優先，絕不繞過合作伙伴，並提供獨家 Skyguard 支持能力。" },
       ],
@@ -871,7 +871,7 @@ export const translations = {
         },
         {
           title: "与 Microsoft MIP 深度整合",
-          description: "支持 Microsoft Purview、Copilot 与 Azure Information Protection。在本地 DLP 與雲端生態系統間實現統一策略。",
+          description: "支持 Microsoft Purview、Copilot 与 Azure Information Protection。在本地 DLP 和云端生态系统间实现统一策略。",
           features: ["Microsoft Purview 支持", "Copilot 整合", "Azure Information Protection", "统一本地与云端策略"],
         },
       ],
@@ -906,7 +906,7 @@ export const translations = {
         { date: "2026", category: "路线图", title: "2026 AI 驱动数据安全路线图发布", excerpt: "Nextguard 揭晓 2026 路线图，包含 AI DLP、智能数据分类和深度 Microsoft MIP 整合。" },
         { date: "2026", category: "产品", title: "AI DLP：智能数据防泄正式推出", excerpt: "侦测异常用户行为与可疑传输。预建策略阻止敏感数据上传至 ChatGPT、Gemini 等云端协作平台。" },
         { date: "2026", category: "产品", title: "AI 数据分类功能现已推出", excerpt: "自动发现与标记敏感数据。将数周的手动设定缩减为数小时的 AI 辅助设定。" },
-        { date: "2026", category: "整合", title: "与 Microsoft MIP 深度整合", excerpt: "完全支持 Microsoft Purview、Copilot 與 Azure Information Protection，實現本地與雲端統一策略。" },
+        { date: "2026", category: "整合", title: "与 Microsoft MIP 深度整合", excerpt: "完全支持 Microsoft Purview、Copilot 與 Azure Information Protection，实现本地与云端统一策略。" },
         { date: "2026", category: "公司", title: "Nextguard：拥有完整技术主权的独立厂商", excerpt: "Nextguard 获得永久完整源代码所有权和开发权，确保完全技术自主。" },
         { date: "2026", category: "合作", title: "渠道优先合作伙伴计划启动", excerpt: "Nextguard 承诺 100% 渠道优先，绝不绕过合作伙伴，并提供独家 Skyguard 支持能力。" },
       ],
