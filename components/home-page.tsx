@@ -43,7 +43,7 @@ export function HomePage() {
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           animation: heroTextFlow 4s linear infinite;
-                    padding: 0 6px 4px 0;
+                    padding: 0 20px 6px 0;
         }
         .hero-main-visual {
           animation: heroGlow 3s ease-in-out infinite, heroFloat 6s ease-in-out infinite;
@@ -79,7 +79,7 @@ export function HomePage() {
             <AnimateIn>
               <h1 className="text-7xl md:text-9xl font-black tracking-tighter uppercase italic leading-none hero-glitch-text">
                 <span className="block text-white mb-2">NEXT</span>
-                <span className="block hero-title-gradient pr-4">GUARD</span>
+                <span className="block hero-title-gradient pr-8">GUARD</span>
               </h1>
             </AnimateIn>
           </div>
