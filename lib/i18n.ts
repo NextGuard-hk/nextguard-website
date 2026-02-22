@@ -20,7 +20,11 @@ export const translations = {
       whyRebuildSubtitle: "Going global isn't copy-paste\u2014it's abandoning single-market thinking and rebuilding products and brands that meet global standards.",
       whyRebuildCases: [
         { local: "Meituan", global: "Keeta", description: "Meituan in China, Keeta in Hong Kong\u2014the same technology, but different brands, compliance, and localization strategies." },
-              heroGetStarted: "Get Started",
+            
+        { local: "Douyin", global: "TikTok", description: "Douyin in China, TikTok overseas\u2014the same underlying engine, but content, regulation, and operations are completely reconstructed." },
+        { local: "Pinduoduo", global: "Temu", description: "Pinduoduo in China, Temu overseas\u2014the product logic remains unchanged, but supply chain, payment, and trust systems are fully adapted to international markets." },
+      ],
+      heroGetStarted: "Get Started",
       heroViewSolutions: "View Solutions",
       heroStat1Label: "Real-time Detection",
       heroStat2Label: "Data Secured",
@@ -30,9 +34,6 @@ export const translations = {
       featuredFeature1: "AI-Powered Threat Intelligence",
       featuredFeature2: "Easy-Config Deployment",
       featuredFeature3: "Global Compliance Ready",
-        { local: "Douyin", global: "TikTok", description: "Douyin in China, TikTok overseas\u2014the same underlying engine, but content, regulation, and operations are completely reconstructed." },
-        { local: "Pinduoduo", global: "Temu", description: "Pinduoduo in China, Temu overseas\u2014the product logic remains unchanged, but supply chain, payment, and trust systems are fully adapted to international markets." },
-      ],
       statsTitle: "Nextguard at a Glance",
       stats: [
         { value: "20+", label: "Years of Data Security Experience" },
