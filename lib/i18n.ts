@@ -240,7 +240,7 @@ export const translations = {
       featuredTitle: "重思數據安全",
       featuredDesc: "從被動阻擋到主動智能—這是為 AI 時代重建的 DLP。Nextguard 提供自主保護，在毫秒內適應現代威脅。",
       featuredFeature1: "AI 驅動的威脅情報",
-      featuredFeature2: "零配置即可部署",
+      featuredFeature2: "Easy-Config 即可部署",
       featuredFeature3: "全球合規就緒",
       whyRebuildTitle: "\u70ba\u4ec0\u9ebc\u51fa\u6d77\u9700\u8981\u300c\u91cd\u5efa\u300d\uff1f",
       whyRebuildSubtitle: "\u51fa\u6d77\u4e0d\u662f\u8907\u88fd\u8cbc\u4e0a\uff0c\u800c\u662f\u544a\u5225\u55ae\u4e00\u5e02\u5834\u601d\u7dad\uff0c\u91cd\u5efa\u7b26\u5408\u5168\u7403\u6a19\u6e96\u7684\u7522\u54c1\u8207\u54c1\u724c\u3002",
