@@ -31,11 +31,10 @@ export function Footer() {
               {t.footer.quickLinks}
             </h4>
             <div className="flex flex-col gap-2.5">
-              <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.home}</Link>
                             <Link href="/products" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.products}</Link>
-              <Link href="/company" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.company}</Link>
+              <Link href="/company" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.aboutUs}</Link>
               <Link href="/solutions" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.solutions}</Link>
-              <Link href="/partners" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.partners}</Link>
+              <Link href="/partners" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.becomePartner}</Link>
               <Link href="/news" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.news}</Link>
               <Link href="/contact" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.contact}</Link>
             </div>
