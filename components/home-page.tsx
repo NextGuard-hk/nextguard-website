@@ -18,10 +18,6 @@ export function HomePage() {
           0% { opacity: 0; transform: translateY(20px) skewX(-4deg); filter: blur(6px); }
           100% { opacity: 1; transform: translateY(0) skewX(0deg); filter: blur(0); }
         }
-        @keyframes heroCursorBlink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
         @keyframes heroSubtitleReveal {
           0% { opacity: 0; letter-spacing: 0.6em; filter: blur(4px); }
           100% { opacity: 1; letter-spacing: 0.5em; filter: blur(0); }
@@ -44,17 +40,6 @@ export function HomePage() {
           opacity: 0;
           animation: heroSubtitleReveal 1s ease-out 1s forwards;
         }
-        .hero-cursor {
-          display: inline-block;
-          width: 3px;
-          height: 0.9em;
-          background: #22d3ee;
-          margin-left: 4px;
-          vertical-align: middle;
-          animation: heroCursorBlink 0.8s step-end 1.3s 6;
-          opacity: 0;
-          animation-fill-mode: forwards;
-        }
       `}</style>
 
       {/* Hero */}
@@ -70,7 +55,6 @@ export function HomePage() {
             <h1 className="text-6xl md:text-8xl font-black tracking-tighter uppercase mb-2 italic">
               <span className="hero-next text-white">NEXT</span>
               <span className="hero-guard text-cyan-400">GUARD</span>
-              <span className="hero-cursor" aria-hidden="true" />
             </h1>
           </AnimateIn>
 
