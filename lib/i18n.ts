@@ -4,6 +4,7 @@ export const translations = {
   "en": {
     nav: {
       home: "Home",
+      products: "Products",
       company: "Company",
       solutions: "Solutions",
       partners: "Partners",
@@ -53,6 +54,136 @@ export const translations = {
         description: "We look forward to partnering with you to create a new landscape of data security for the AI era.",
         button: "Contact Sales",
       },
+    },
+    products: {
+      badge: "Products",
+      headline: "Comprehensive Data Security Suite",
+      subheadline: "Nextguard provides a complete portfolio of data-centric security products, powered by Skyguard technology and enhanced with Nextguard AI.",
+      learnMore: "Learn More",
+      suites: [
+        { tag: "DLP Suite", name: "Data Loss Prevention" },
+        { tag: "Gateway Suite", name: "Network & Email Security" },
+        { tag: "Terminal Suite", name: "Endpoint & Mobile" },
+        { tag: "Cloud Suite", name: "CASB & SASE" },
+      ],
+      items: [
+        {
+          id: "mdlp",
+          tag: "Core DLP",
+          title: "Multi-level Data Loss Prevention",
+          abbr: "MDLP",
+          description: "Enterprise-grade data protection across network, endpoint, and discovery. Unified policy management for complex environments.",
+          features: ["Content Discovery", "OCR Integration", "Fingerprinting", "Deep Content Inspection"]
+        },
+        {
+          id: "ucss",
+          tag: "Security Center",
+          title: "Unified Content Security Server",
+          abbr: "UCSS",
+          description: "The central brain of the Nextguard ecosystem. Unified management, reporting, and policy orchestration for all security nodes.",
+          features: ["Centralized Management", "Visual Reporting", "API Integration", "RBAC Access Control"]
+        },
+        {
+          id: "aseg",
+          tag: "Email Security",
+          title: "Advanced Security Email Gateway",
+          abbr: "ASEG",
+          description: "Protect your most critical communication channel. Stop phishing, malware, and sensitive data leakage via email.",
+          features: ["Anti-Phishing", "Email Encryption", "Spam Filtering", "DLP for Attachments"]
+        },
+        {
+          id: "aswg",
+          tag: "Web Security",
+          title: "Advanced Security Web Gateway",
+          abbr: "ASWG",
+          description: "Secure web access for the modern workforce. Filter malicious sites and prevent data exfiltration to unauthorized web apps.",
+          features: ["URL Filtering", "SSL Inspection", "Application Control", "Shadow IT Discovery"]
+        },
+        {
+          id: "mag",
+          tag: "Mobile",
+          title: "Mobile Application Gateway",
+          abbr: "MAG",
+          description: "Secure data on mobile devices. Ensure company information stays safe on iOS and Android without compromising user privacy.",
+          features: ["App Containerization", "Remote Wipe", "Per-app VPN", "Secure Viewing"]
+        },
+        {
+          id: "ucwi",
+          tag: "Endpoint",
+          title: "Unified Content Web Inspector",
+          abbr: "UCWI",
+          description: "Endpoint-level web and application control. Direct visibility into how data is used on the workstation.",
+          features: ["Agent-based Control", "Offline Protection", "Application Visibility", "Local Auditing"]
+        },
+        {
+          id: "dss",
+          tag: "Discovery",
+          title: "Data Security Scanner",
+          abbr: "DSS",
+          description: "Find your sensitive data wherever it hides. Scan databases, file shares, and cloud storage for unprotected PII.",
+          features: ["Database Scanning", "Cloud Storage Audit", "Classification Tagging", "Compliance Reporting"]
+        },
+        {
+          id: "xdr",
+          tag: "Intelligence",
+          title: "Extended Detection & Response",
+          abbr: "XDR",
+          description: "Correlate data security events with endpoint and network logs for a complete picture of threats.",
+          features: ["Cross-layer Analytics", "Threat Hunting", "Auto-Remediation", "Timeline Mapping"]
+        },
+        {
+          id: "dct",
+          tag: "Governance",
+          title: "Data Classification Tool",
+          abbr: "DCT",
+          description: "The foundation of data security. Empower users and AI to tag data based on sensitivity and business value.",
+          features: ["User-driven Tagging", "Automated AI Tagging", "MIP Integration", "Visual Labels"]
+        },
+        {
+          id: "casb",
+          tag: "Cloud",
+          title: "Cloud Access Security Broker",
+          abbr: "CASB",
+          description: "Extend your DLP policies to SaaS applications like M365, Salesforce, and Box.",
+          features: ["SaaS Visibility", "API-based DLP", "Account Takeover Detection", "Access Control"]
+        },
+        {
+          id: "itm",
+          tag: "Inside Threat",
+          title: "Insider Threat Management",
+          abbr: "ITM",
+          description: "Identify high-risk behavior before data leaves the building. Focus on the 'who' as much as the 'what'.",
+          features: ["UEBA", "Video Recording", "Risk Scoring", "Forensic Collection"]
+        },
+        {
+          id: "sase",
+          tag: "Modern Network",
+          title: "Secure Access Service Edge",
+          abbr: "SASE",
+          description: "Converge networking and security in the cloud. Consistent protection for remote offices and roaming users.",
+          features: ["Zero Trust Access", "Cloud-delivered FW", "Global Network", "SD-WAN Integration"]
+        }
+      ],
+      addonsTag: "Coming in 2026",
+      addonsTitle: "Nextguard AI & MIP Add-ons",
+      addonsSubtitle: "Upgrade your existing deployment with our proprietary AI engine and deep Microsoft ecosystem integration.",
+      addons: [
+        {
+          title: "AI-Powered Anomaly Detection",
+          description: "Go beyond regex. Our AI identifies patterns of data misuse that traditional rules miss, significantly reducing false positives."
+        },
+        {
+          title: "Intelligent Data Classification",
+          description: "Leverage Large Language Models to automatically classify and protect documents with 99% accuracy."
+        },
+        {
+          title: "Deep Microsoft MIP Integration",
+          description: "Seamless synchronization between on-premise DLP and Microsoft Purview/MIP labels for unified data governance."
+        }
+      ],
+      ctaTitle: "Ready to Secure Your Data?",
+      ctaSubtitle: "Contact our team for a customized demo and technical consultation.",
+      ctaButton: "Schedule a Demo"
     },
     company: {
       badge: "Who is Nextguard?",
@@ -190,6 +321,7 @@ export const translations = {
   "zh-TW": {
     nav: {
       home: "首頁",
+      products: "產品中心",
       company: "關於我們",
       solutions: "解決方案",
       partners: "合作伙伴",
@@ -239,6 +371,136 @@ export const translations = {
         description: "期待與您攜手，共創 AI 時代的數據安全新格局。",
         button: "聯絡銷售團隊",
       },
+    },
+    products: {
+      badge: "產品中心",
+      headline: "全方位數據安全套件",
+      subheadline: "Nextguard 提供完整的數據安全產品組合，由 Skyguard 技術提供動力，並通過 Nextguard AI 進行增強。",
+      learnMore: "了解更多",
+      suites: [
+        { tag: "DLP 套件", name: "數據防洩露" },
+        { tag: "網關套件", name: "網絡與郵件安全" },
+        { tag: "終端套件", name: "終端與移動端" },
+        { tag: "雲端套件", name: "CASB 與 SASE" },
+      ],
+      items: [
+        {
+          id: "mdlp",
+          tag: "核心 DLP",
+          title: "多層次數據防洩露",
+          abbr: "MDLP",
+          description: "企業級數據保護，覆蓋網絡、終端和發現。為複雜環境提供統一的策略管理。",
+          features: ["內容發現", "OCR 整合", "指紋識別", "深度內容檢查"]
+        },
+        {
+          id: "ucss",
+          tag: "安全中心",
+          title: "統一內容安全服務器",
+          abbr: "UCSS",
+          description: "Nextguard 生態系統的中樞。為所有安全節點提供統一管理、報告和策略編排。",
+          features: ["集中化管理", "可視化報告", "API 整合", "RBAC 權限控制"]
+        },
+        {
+          id: "aseg",
+          tag: "郵件安全",
+          title: "高級郵件安全網關",
+          abbr: "ASEG",
+          description: "保護您最關鍵的溝通渠道。阻止網絡釣魚、惡意軟件和通過郵件發生的敏感數據洩漏。",
+          features: ["防釣魚", "郵件加密", "垃圾郵件過濾", "附件 DLP 檢查"]
+        },
+        {
+          id: "aswg",
+          tag: "網絡安全",
+          title: "高級網絡安全網關",
+          abbr: "ASWG",
+          description: "為現代員工提供安全的網絡訪問。過濾惡意網站並防止數據外流到未經授權的 Web 應用。",
+          features: ["URL 過濾", "SSL 檢查", "應用控制", "影子 IT 發現"]
+        },
+        {
+          id: "mag",
+          tag: "移動端",
+          title: "移動應用網關",
+          abbr: "MAG",
+          description: "保護移動設備上的數據。確保公司信息在 iOS 和 Android 上保持安全，且不影響用戶隱私。",
+          features: ["應用沙箱化", "遠程擦除", "應用級 VPN", "安全查看"]
+        },
+        {
+          id: "ucwi",
+          tag: "終端",
+          title: "統一內容 Web 檢查器",
+          abbr: "UCWI",
+          description: "終端級別的 Web 和應用控制。直接觀察工作站上的數據使用情況。",
+          features: ["客戶端控制", "離線保護", "應用可見性", "本地審計"]
+        },
+        {
+          id: "dss",
+          tag: "發現",
+          title: "數據安全掃描器",
+          abbr: "DSS",
+          description: "尋找隱藏在各處的敏感數據。掃描數據庫、文件共享和雲存儲中的未受保護的個人身份信息 (PII)。",
+          features: ["數據庫掃描", "雲存儲審計", "分類標記", "合規性報告"]
+        },
+        {
+          id: "xdr",
+          tag: "情報",
+          title: "擴展檢測與響應",
+          abbr: "XDR",
+          description: "將數據安全事件與終端和網絡日誌相關聯，提供完整的威脅圖譜。",
+          features: ["跨層分析", "威脅獵捕", "自動化處置", "時間線映射"]
+        },
+        {
+          id: "dct",
+          tag: "治理",
+          title: "數據分類工具",
+          abbr: "DCT",
+          description: "數據安全的基石。賦能用戶和 AI 根據敏感度和業務價值標記數據。",
+          features: ["用戶驅動標記", "AI 自動標記", "MIP 整合", "可視化標籤"]
+        },
+        {
+          id: "casb",
+          tag: "雲端",
+          title: "雲訪問安全代理",
+          abbr: "CASB",
+          description: "將您的 DLP 策略擴展到 M365、Salesforce 和 Box 等 SaaS 應用。",
+          features: ["SaaS 可見性", "基於 API 的 DLP", "賬戶盜用檢測", "訪問控制"]
+        },
+        {
+          id: "itm",
+          tag: "內部威脅",
+          title: "內部威脅管理",
+          abbr: "ITM",
+          description: "在數據離開公司前識別高風險行為。既關注數據，也關注行為人。",
+          features: ["UEBA 行為分析", "屏幕錄像", "風險評分", "取證收集"]
+        },
+        {
+          id: "sase",
+          tag: "現代網絡",
+          title: "安全訪問服務邊緣",
+          abbr: "SASE",
+          description: "在雲端融合網絡與安全。為分支機構和漫遊用戶提供一致的保護。",
+          features: ["零信任訪問", "雲端防火牆", "全球網絡", "SD-WAN 整合"]
+        }
+      ],
+      addonsTag: "2026 年推出",
+      addonsTitle: "Nextguard AI 與 MIP 增強組件",
+      addonsSubtitle: "使用我們專有的 AI 引擎和深度的微軟生態系統整合，升級您的現有部署。",
+      addons: [
+        {
+          title: "AI 驅動的異常行為偵測",
+          description: "超越正則表達式。我們的 AI 能識別傳統規則遺漏的數據濫用模式，顯著降低誤報率。"
+        },
+        {
+          title: "智能數據分類分級",
+          description: "利用大語言模型自動對文檔進行分類和保護，準確率高達 99%。"
+        },
+        {
+          title: "深度 Microsoft MIP 整合",
+          description: "在本地 DLP 和 Microsoft Purview/MIP 標籤之間實現無縫同步，實現統一的數據治理。"
+        }
+      ],
+      ctaTitle: "準備好保護您的數據了嗎？",
+      ctaSubtitle: "聯絡我們的團隊，獲取量身定制的演示和技術諮詢。",
+      ctaButton: "預約演示"
     },
     company: {
       badge: "Who is Nextguard?",
@@ -376,6 +638,7 @@ export const translations = {
   "zh-CN": {
     nav: {
       home: "首页",
+      products: "产品中心",
       company: "关于我们",
       solutions: "解决方案",
       partners: "合作伙伴",
@@ -414,8 +677,8 @@ export const translations = {
       ],
       pillarsTitle: "为什么创立 Nextguard？",
       pillars: [
-        { number: "01", title: "出海 Expand", description: "帮助中国的 DLP 技术自信地走向全球，满足国际标准与合规要求。" },
-        { number: "02", title: "打造 AI 驱动的国际化数据安全", description: "告别传统规则，迈向智能、自适应、云原生数据保护。" },
+        { number: "01", title: "出海 Expand", description: "帮助中国的数据安全技术自信地走向全球，满足国际标准与合规要求。" },
+        { number: "02", title: "打造 AI 驱动的国际化数据安全", description: "告别传统规则，迈向智能、自适应、云原生的数据保护。" },
         { number: "03", title: "建立更安全、更可靠、更合规的环境", description: "提供在真实业务流程中运作的 DLP，保护数据同时不牺牲生产力。" },
         { number: "04", title: "中外技术融合", description: "结合成熟工程实力与全球创新最佳实践，打造在任何市场都能运作的产品。" },
       ],
@@ -425,6 +688,136 @@ export const translations = {
         description: "期待与您携手，共创 AI 时代的数据安全新格局。",
         button: "联系销售团队",
       },
+    },
+    products: {
+      badge: "产品中心",
+      headline: "全方位数据安全套件",
+      subheadline: "Nextguard 提供完整的数据安全产品组合，由 Skyguard 技术提供动力，并通过 Nextguard AI 进行增强。",
+      learnMore: "了解更多",
+      suites: [
+        { tag: "DLP 套件", name: "数据防泄漏" },
+        { tag: "网关套件", name: "网络与邮件安全" },
+        { tag: "终端套件", name: "终端与移动端" },
+        { tag: "云端套件", name: "CASB 与 SASE" },
+      ],
+      items: [
+        {
+          id: "mdlp",
+          tag: "核心 DLP",
+          title: "多层次数据防泄漏",
+          abbr: "MDLP",
+          description: "企业级数据保护，覆盖网络、终端和发现。为复杂环境提供统一的策略管理。",
+          features: ["内容发现", "OCR 整合", "指纹识别", "深度内容检查"]
+        },
+        {
+          id: "ucss",
+          tag: "安全中心",
+          title: "统一内容安全服务器",
+          abbr: "UCSS",
+          description: "Nextguard 生态系统的枢纽。为所有安全节点提供统一管理、报告和策略编排。",
+          features: ["集中化管理", "可视化报告", "API 整合", "RBAC 权限控制"]
+        },
+        {
+          id: "aseg",
+          tag: "邮件安全",
+          title: "高级邮件安全网关",
+          abbr: "ASEG",
+          description: "保护您最关键的沟通渠道。阻止网络钓鱼、恶意软件和通过邮件发生的敏感数据泄露。",
+          features: ["防钓鱼", "邮件加密", "垃圾邮件过滤", "附件 DLP 检查"]
+        },
+        {
+          id: "aswg",
+          tag: "网络安全",
+          title: "高级网络安全网关",
+          abbr: "ASWG",
+          description: "为现代员工提供安全的网络访问。过滤恶意网站并防止数据外流到未经授权的 Web 应用。",
+          features: ["URL 过滤", "SSL 检查", "应用控制", "影子 IT 发现"]
+        },
+        {
+          id: "mag",
+          tag: "移动端",
+          title: "移动应用网关",
+          abbr: "MAG",
+          description: "保护移动设备上的数据。确保公司信息在 iOS 和 Android 上保持安全，且不影响用户隐私。",
+          features: ["应用沙箱化", "远程擦除", "应用级 VPN", "安全查看"]
+        },
+        {
+          id: "ucwi",
+          tag: "终端",
+          title: "统一内容 Web 检查器",
+          abbr: "UCWI",
+          description: "终端级别的 Web 和应用控制。直接观察工作站上的数据使用情况。",
+          features: ["客户端控制", "离线保护", "应用可见性", "本地审计"]
+        },
+        {
+          id: "dss",
+          tag: "发现",
+          title: "数据安全扫描器",
+          abbr: "DSS",
+          description: "寻找隐藏在各处的敏感数据。扫描数据库、文件共享和云存储中的未受保护的个人身份信息 (PII)。",
+          features: ["数据库扫描", "云存储审计", "分类标记", "合规性报告"]
+        },
+        {
+          id: "xdr",
+          tag: "情报",
+          title: "扩展检测与响应",
+          abbr: "XDR",
+          description: "将数据安全事件与终端和网络日志相关联，提供完整的威胁图谱。",
+          features: ["跨层分析", "威胁猎捕", "自动化处置", "时间线映射"]
+        },
+        {
+          id: "dct",
+          tag: "治理",
+          title: "数据分类工具",
+          abbr: "DCT",
+          description: "数据安全的基石。赋能用户和 AI 根据敏感度和业务价值标记数据。",
+          features: ["用户驱动标记", "AI 自动标记", "MIP 整合", "可视化标签"]
+        },
+        {
+          id: "casb",
+          tag: "云端",
+          title: "云访问安全代理",
+          abbr: "CASB",
+          description: "将您的 DLP 策略扩展到 M365、Salesforce 和 Box 等 SaaS 应用。",
+          features: ["SaaS 可见性", "基于 API 的 DLP", "账户盗用检测", "访问控制"]
+        },
+        {
+          id: "itm",
+          tag: "内部威胁",
+          title: "内部威胁管理",
+          abbr: "ITM",
+          description: "在数据离开公司前识别高风险行为。既关注数据，也关注行为人。",
+          features: ["UEBA 行为分析", "屏幕录像", "风险评分", "取证收集"]
+        },
+        {
+          id: "sase",
+          tag: "现代网络",
+          title: "安全访问服务边缘",
+          abbr: "SASE",
+          description: "在云端融合网络与安全。为分支机构和漫游用户提供一致的保护。",
+          features: ["零信任访问", "云端防火墙", "全球网络", "SD-WAN 整合"]
+        }
+      ],
+      addonsTag: "2026 年推出",
+      addonsTitle: "Nextguard AI 与 MIP 增强组件",
+      addonsSubtitle: "使用我们专有的 AI 引擎和深度的微软生态系统整合，升级您的现有部署。",
+      addons: [
+        {
+          title: "AI 驱动的异常行为侦测",
+          description: "超越正则表达式。我们的 AI 能识别传统规则遗漏的数据滥用模式，显著降低误报率。"
+        },
+        {
+          title: "智能数据分类分级",
+          description: "利用大语言模型自动对文档进行分类和保护，准确率高达 99%。"
+        },
+        {
+          title: "深度 Microsoft MIP 整合",
+          description: "在本地 DLP 和 Microsoft Purview/MIP 标签之间实现无缝同步，实现统一的数据治理。"
+        }
+      ],
+      ctaTitle: "准备好保护您的数据了吗？",
+      ctaSubtitle: "联系我们的团队，获取量身定制的演示和技术咨询。",
+      ctaButton: "预约演示"
     },
     company: {
       badge: "Who is Nextguard?",
@@ -459,17 +852,17 @@ export const translations = {
         { question: "技术支持依赖谁？", answer: "Nextguard 拥有前 Skyguard核心研发团队，掌握全部底层技术，不依赖原厂。" },
         { question: "产品路线图由谁决定？", answer: "由 Nextguard 与合作伙伴及客户共同制定，贴近全球市场需求。" },
       ],
-      independenceFooter: "技术完全自主。团队完整掌控。永续运营承诺。Nextguard 不是 Skyguard 的附属品，而是拥有完整技术主权的独立品牌。",
+      independenceFooter: "技术完全自主。团队完整掌控。永续运营承诺. Nextguard 不是 Skyguard 的附属品，而是拥有完整技术主权的独立品牌。",
     },
     solutions: {
       badge: "2026 路线图",
       headline: "全新能力：2026 年 AI 驱动的数据安全",
-      subheadline: "从被动阻挡到主动智能——这是为 AI 时代重建的 DLP。",
+      subheadline: "从被動阻擋到主動智能——這是為 AI 時代重建的 DLP。",
       products: [
         {
           title: "AI DLP – 智能数据防泄",
-          description: "侦测异常用户行为与可疑传输。预建策略阻止敏感数据上传至 ChatGPT、Gemini 等云端协作平台。",
-          features: ["异常行为侦测", "敏感数据上傳阻止", "预建 AI 平台策略", "实时传输监控"],
+          description: "侦测异常用户行为与可疑传输。预建策略阻止敏感数据上传至 ChatGPT、Gemini 等等与云端协作平台。",
+          features: ["异常行为侦测", "敏感数据上传阻止", "预建 AI 平台策略", "实时传输监控"],
         },
         {
           title: "AI Data Classification – 智能分类",
@@ -478,7 +871,7 @@ export const translations = {
         },
         {
           title: "与 Microsoft MIP 深度整合",
-          description: "支持 Microsoft Purview、Copilot 与 Azure Information Protection。在本地 DLP 与云端生态系统间实现统一策略。",
+          description: "支持 Microsoft Purview、Copilot 与 Azure Information Protection。在本地 DLP 與雲端生態系統間實現統一策略。",
           features: ["Microsoft Purview 支持", "Copilot 整合", "Azure Information Protection", "统一本地与云端策略"],
         },
       ],
@@ -498,11 +891,11 @@ export const translations = {
         { title: "绝不绕过您", description: "我们 100% 承诺渠道优先，不与合作伙伴竞争。" },
         { title: "专注数据安全", description: "我们只做一件事并做到极致：DLP 与数据安全。" },
         { title: "独有 Skyguard 支持能力", description: "全球能为现有 Skyguard 客户提供维保、升级与迁移的厂商。" },
-        { title: "合作伙伴賦能", description: "完整的赋能计划、培训和市场推广支持。" },
+        { title: "合作伙伴赋能", description: "完整的赋能计划、培训和市场推广支持。" },
         { title: "无缝迁移", description: "经验验证的从旧版 Skyguard 部署迁移到 Nextguard 管理环境的路径，零停机时间。" },
       ],
       ctaTitle: "成为合作伙伴",
-      ctaDescription: "加入我们的伙伴计划，帮助企业为 AI 時代重建数据安全。",
+      ctaDescription: "加入我们的伙伴计划，帮助企业为 AI 时代重建数据安全。",
       ctaButton: "立即申请",
     },
     news: {
@@ -512,8 +905,8 @@ export const translations = {
       articles: [
         { date: "2026", category: "路线图", title: "2026 AI 驱动数据安全路线图发布", excerpt: "Nextguard 揭晓 2026 路线图，包含 AI DLP、智能数据分类和深度 Microsoft MIP 整合。" },
         { date: "2026", category: "产品", title: "AI DLP：智能数据防泄正式推出", excerpt: "侦测异常用户行为与可疑传输。预建策略阻止敏感数据上传至 ChatGPT、Gemini 等云端协作平台。" },
-        { date: "2026", category: "产品", title: "AI 数据分类功能现已推出", excerpt: "自动发现与标记敏感数据。將数周的手动设定缩减为数小时的 AI 辅助设定。" },
-        { date: "2026", category: "整合", title: "与 Microsoft MIP 深度整合", excerpt: "完全支持 Microsoft Purview、Copilot 与 Azure Information Protection，实现本地与云端统一策略。" },
+        { date: "2026", category: "产品", title: "AI 数据分类功能现已推出", excerpt: "自动发现与标记敏感数据。将数周的手动设定缩减为数小时的 AI 辅助设定。" },
+        { date: "2026", category: "整合", title: "与 Microsoft MIP 深度整合", excerpt: "完全支持 Microsoft Purview、Copilot 與 Azure Information Protection，實現本地與雲端統一策略。" },
         { date: "2026", category: "公司", title: "Nextguard：拥有完整技术主权的独立厂商", excerpt: "Nextguard 获得永久完整源代码所有权和开发权，确保完全技术自主。" },
         { date: "2026", category: "合作", title: "渠道优先合作伙伴计划启动", excerpt: "Nextguard 承诺 100% 渠道优先，绝不绕过合作伙伴，并提供独家 Skyguard 支持能力。" },
       ],
@@ -521,7 +914,7 @@ export const translations = {
     contact: {
       badge: "联系我们",
       headline: "与我们联系",
-      subheadline: "期待与您携手，共创 AI 时代的數據安全新格局。欢迎随时联系我们。",
+      subheadline: "期待与您携手，共创 AI 时代的数据安全新格局。欢迎随时联系我们。",
       form: {
         name: "姓名",
         email: "电子邮件",
@@ -534,7 +927,7 @@ export const translations = {
         messagePlaceholder: "告诉我们您的数据安全需求...",
         successTitle: "消息已发送！",
         successMessage: "感谢您的联系，我们将在 24 小时内回复您。",
-        sendAnother: "发送另一则消息",
+        sendAnother: "发送另一条消息",
       },
       info: {
         title: "联系信息",
