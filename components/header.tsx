@@ -25,8 +25,8 @@ export function Header() {
 
   const languages: { code: Locale; label: string }[] = [
     { code: "en", label: "EN" },
-    { code: "zh-TW", label: "中文" },
-    { code: "zh-CN", label: "简体" },
+        { code: "zh-TW", label: "CN-繁" },
+        { code: "zh-CN", label: "CN-简" },
   ]
 
   return (
