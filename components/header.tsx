@@ -33,6 +33,7 @@ export function Header() {
     { href: "/partners", label: t.nav.partners },
     { href: "/news", label: t.nav.news },
     { href: "/contact", label: t.nav.contact },
+        { href: "https://nextguard-kb.vercel.app", label: t.nav.kb },
   ]
 
   const languages: { code: Locale; label: string }[] = [
@@ -63,6 +64,7 @@ export function Header() {
             <Link
               key={link.href}
               href={link.href}
+                            {...(link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
               className={`text-[18px] transition-colors duration-200 ${
                 pathname === link.href
                   ? "text-primary font-medium"
@@ -124,6 +126,7 @@ export function Header() {
             <Link
               key={link.href}
               href={link.href}
+                            {...(link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
               onClick={() => setMobileOpen(false)}
               className={`block py-3 text-[18px] transition-colors duration-200 ${
                 pathname === link.href
