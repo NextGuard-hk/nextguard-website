@@ -28,7 +28,7 @@ export const translations = {
       featuredTitle: "Rethinking Data Security",
       featuredDesc: "From passive blocking to proactive intelligence—this is DLP rebuilt for the AI era. Nextguard provides autonomous protection that adapts to modern threats in milliseconds.",
       featuredFeature1: "AI-Powered Threat Intelligence",
-      featuredFeature2: "Zero-Config Deployment",
+      featuredFeature2: "Easy-Config Deployment",
       featuredFeature3: "Global Compliance Ready",
         { local: "Douyin", global: "TikTok", description: "Douyin in China, TikTok overseas\u2014the same underlying engine, but content, regulation, and operations are completely reconstructed." },
         { local: "Pinduoduo", global: "Temu", description: "Pinduoduo in China, Temu overseas\u2014the product logic remains unchanged, but supply chain, payment, and trust systems are fully adapted to international markets." },
