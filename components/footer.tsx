@@ -18,7 +18,7 @@ export function Footer() {
               alt="Nextguard Technology Limited"
               width={160}
               height={36}
-              className="h-7 w-auto"
+              className="h-7 w-auto mix-blend-screen"
             />
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
               {t.footer.description}
