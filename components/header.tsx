@@ -56,12 +56,12 @@ export function Header() {
         <div className="flex items-center gap-3">
           {/* Language Switcher */}
           <button
-            onClick={() => setLocale(locale === "en" ? "zh-TW" : "en")}
+            onClick={() => setLocale(locale === "en" ? "zh-TW" : locale === "zh-TW" ? "zh-CN" : "en")}
             className="flex items-center gap-1.5 rounded-md border border-border/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:border-primary/50 hover:text-foreground"
             aria-label="Switch language"
           >
             <Globe className="h-[18px] w-[18px]" />
-            {locale === "en" ? "中文" : "EN"}
+            {locale === "en" ? "中文" : locale === "zh-TW" ? "简体" : "EN"}
           </button>
 
           {/* Mobile Menu Toggle */}
