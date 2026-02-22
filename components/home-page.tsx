@@ -73,13 +73,13 @@ export function HomePage() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-6xl px-6 text-center">
-          <div className="relative inline-block mb-4 hero-main-visual px-4 py-2">
+          <div className="relative inline-block mb-4 hero-main-visual px-4 py-2 overflow-visible">
             <div className="hero-scan-line" />
             
             <AnimateIn>
               <h1 className="text-7xl md:text-9xl font-black tracking-tighter uppercase italic leading-none hero-glitch-text">
                 <span className="block text-white mb-2">NEXT</span>
-                <span className="block hero-title-gradient">GUARD</span>
+                <span className="block hero-title-gradient pr-4">GUARD</span>
               </h1>
             </AnimateIn>
           </div>
