@@ -98,7 +98,7 @@ export function HomePage() {
         {/* Stats / Visual Section */}
         <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-12">
           {[
-            { icon: Zap, label: t.home.heroStat1Label, value: "0.3s" },
+            { icon: Zap, label: t.home.heroStat1Label, value: "< 1s" },
             { icon: Lock, label: t.home.heroStat2Label, value: "100%" },
             { icon: Globe, label: t.home.heroStat3Label, value: "24/7" }
           ].map((stat, i) => (
@@ -147,7 +147,7 @@ export function HomePage() {
                     {[
                       { label: "AI Threat Detection", value: "99.7%", color: "cyan" },
                       { label: "Policy Coverage", value: "100%", color: "green" },
-                      { label: "Response Latency", value: "0.3s", color: "blue" },
+                      { label: "Response Latency", value: "< 1s", color: "blue" },
                       { label: "Global Compliance", value: "Active", color: "purple" },
                     ].map((row, i) => (
                       <div key={i} className="flex items-center justify-between py-2 border-b border-white/5">
