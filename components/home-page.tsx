@@ -47,10 +47,10 @@ export function HomePage() {
           <AnimateIn delay={300}>
             <div className="flex flex-wrap justify-center gap-4">
               <Link href="/contact" className="rounded-none border-2 border-cyan-400 bg-cyan-400 px-8 py-3 font-bold text-black transition-all hover:bg-transparent hover:text-cyan-400 uppercase tracking-widest">
-                Get Started
+                {t.home.heroGetStarted}
               </Link>
               <Link href="/solutions" className="rounded-none border-2 border-white/20 bg-white/5 px-8 py-3 font-bold text-white transition-all hover:border-cyan-400 hover:text-cyan-400 uppercase tracking-widest">
-                View Solutions
+                {t.home.heroViewSolutions}
               </Link>
             </div>
           </AnimateIn>
@@ -65,9 +65,9 @@ export function HomePage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {[
-              { icon: Zap, label: "Real-time Detection", value: "0.3s" },
-              { icon: Lock, label: "Data Secured", value: "100%" },
-              { icon: Globe, label: "Global Coverage", value: "24/7" }
+              { icon: Zap, label: t.home.heroStat1Label, value: "0.3s" },
+              { icon: Lock, label: t.home.heroStat2Label, value: "100%" },
+              { icon: Globe, label: t.home.heroStat3Label, value: "24/7" }
             ].map((stat, i) => (
               <AnimateIn key={i} delay={i * 100} className="flex flex-col items-center text-center">
                 <div className="mb-4 rounded-full bg-cyan-500/10 p-4">
@@ -87,16 +87,15 @@ export function HomePage() {
           <div className="flex flex-col md:flex-row items-center gap-16">
             <div className="flex-1">
               <AnimateIn>
-                <h2 className="text-4xl font-bold text-white mb-6 uppercase tracking-tight">Rethinking Data Security</h2>
+                <h2 className="text-4xl font-bold text-white mb-6 uppercase tracking-tight">{t.home.featuredTitle}</h2>
                 <p className="text-zinc-400 text-lg mb-8">
-                  From passive blocking to proactive intelligence—this is DLP rebuilt for the AI era. 
-                  Nextguard provides autonomous protection that adapts to modern threats in milliseconds.
+              {t.home.featuredDesc}
                 </p>
                 <div className="space-y-4">
                   {[
-                    "AI-Powered Threat Intelligence",
-                    "Zero-Config Deployment",
-                    "Global Compliance Ready"
+                    t.home.featuredFeature1,
+                    t.home.featuredFeature2,
+                    t.home.featuredFeature3
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 text-cyan-400 font-mono text-sm uppercase tracking-wider">
                       <div className="h-1 w-1 bg-cyan-400" />
