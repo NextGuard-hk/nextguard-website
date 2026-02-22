@@ -43,7 +43,7 @@ export function Footer() {
           {/* Resources */}
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {t.footer.resources}
+              {t.footer.resources} <span className="text-yellow-400 text-xs font-normal normal-case tracking-normal">(In Progress)</span>
             </h4>
             <div className="flex flex-col gap-2.5">
               <span className="text-sm text-muted-foreground">{t.footer.documentation}</span>
@@ -56,7 +56,7 @@ export function Footer() {
           {/* Legal */}
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {t.footer.legal}
+              {t.footer.legal} <span className="text-yellow-400 text-xs font-normal normal-case tracking-normal">(In Progress)</span>
             </h4>
             <div className="flex flex-col gap-2.5">
               <span className="text-sm text-muted-foreground">{t.footer.privacy}</span>
