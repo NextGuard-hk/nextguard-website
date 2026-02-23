@@ -32,7 +32,7 @@ export function Header() {
     { href: "/partners", label: t.nav.becomePartner },
     { href: "/news", label: t.nav.news },
     { href: "/contact", label: t.nav.contact },
-        { href: "https://nextguard-kb.vercel.app", label: t.nav.kb },
+        { href: "https://kb.next-guard.com", label: t.nav.kb },
   ]
 
   const languages: { code: Locale; label: string }[] = [
