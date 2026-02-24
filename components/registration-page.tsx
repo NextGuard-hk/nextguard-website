@@ -32,9 +32,9 @@ export function RegistrationPage() {
             <div className="rounded-2xl border border-cyan-500/20 bg-zinc-900/80 p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                  { icon: CalendarDays, label: "Date", desc: "March 2026 (TBC)" },
-                  { icon: Clock, label: "Time", desc: "09:00 - 17:00" },
-                  { icon: MapPin, label: "Venue", desc: "To Be Confirmed" },
+                  { icon: CalendarDays, label: "Date", desc: "27 March 2026" },
+                  { icon: Clock, label: "Time", desc: "13:30 - 17:00" },
+                  { icon: MapPin, label: "Venue", desc: "4/F, HKPC Building, 78 Tat Chee Avenue, Kowloon, Hong Kong" },
                   { icon: Users, label: "Capacity", desc: "Limited Seats" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3 p-4 rounded-xl border border-zinc-700/40 bg-zinc-800/30">
