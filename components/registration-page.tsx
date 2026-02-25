@@ -263,7 +263,7 @@ export function RegistrationPage() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-xs text-zinc-400">For event enquiries, please contact:</p>
-                      <p className="text-sm text-cyan-400">partner@next-guard.com</p>
+                      <p className="text-sm text-cyan-400">sales@next-guard.com</p>
                     </div>
                   </div>
                 </div>
