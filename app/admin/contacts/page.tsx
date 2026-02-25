@@ -21,6 +21,7 @@ export default function AdminContactsPage() {
   const [checking, setChecking] = useState(true)
   const [totpLoading, setTotpLoading] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
+  const [codeSent, setCodeSent] = useState(false)
 
   useEffect(() => {
     checkAuth()
@@ -47,16 +48,17 @@ export default function AdminContactsPage() {
     }
     setTotpLoading(true)
     setError("")
+    setCodeSent(false)
     try {
       const res = await fetch("/api/contact/totp", {
         headers: { "x-admin-password": password },
       })
       const data = await res.json()
       if (res.ok) {
-        setTotpCode(data.code)
+        setCodeSent(true)
         setTotpExpiry(data.expiresIn)
       } else {
-        setError(data.message || "Failed to get 2FA code")
+        setError(data.message || "Failed to send 2FA code")
       }
     } catch (err) {
       setError("Network error")
@@ -133,6 +135,11 @@ export default function AdminContactsPage() {
                 <p className="text-red-400 text-sm">{error}</p>
               </div>
             )}
+            {codeSent && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-4">
+                <p className="text-green-400 text-sm">Verification code sent to admin email. Check your inbox.</p>
+              </div>
+            )}
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-sm text-zinc-300 mb-1">Password</label>
@@ -163,7 +170,7 @@ export default function AdminContactsPage() {
                     disabled={totpLoading || !password}
                     className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
                   >
-                    {totpLoading ? "..." : "Get Code"}
+                    {totpLoading ? "..." : "Send Code"}
                   </button>
                 </div>
                 {totpExpiry > 0 && (
