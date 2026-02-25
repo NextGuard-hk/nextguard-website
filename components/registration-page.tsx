@@ -27,7 +27,7 @@ export function RegistrationPage() {
     }
     try {
       await fetch(
-        'https://script.google.com/macros/s/AKfycbx4OtJXQg2DI0IM5hv08B90Of6hcbmu9zFfQKRKDYGkOEhi3vij5XLvOLOhofTdaWbATQ/exec',
+                'https://script.google.com/macros/s/AKfycbzYACr_lf9Qg6zRBaaKEJPLcdq1qRGQW6gZ_xD9bP0Z9xyI9VsL2V7_ng3__dtKMgNl/exec',
         { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
       )
       setSubmitted(true)
