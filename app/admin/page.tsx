@@ -204,7 +204,7 @@ export default function AdminPage() {
         <div className="flex gap-1 mb-6 bg-zinc-900 p-1 rounded-lg w-fit">
           <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
-          <button onClick={() => { setTab("downloads"); if (dlItems.length === 0) fetchDownloads() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Downloads</button>
+          <button onClick={() => { setTab("downloads"); if (dlItems.length === 0) fetchDownloads() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
         </div>
 
         {tab === "contacts" && (
