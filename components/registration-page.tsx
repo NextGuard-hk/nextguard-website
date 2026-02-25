@@ -9,10 +9,33 @@ import { CalendarDays, MapPin, Clock, Users, CheckCircle, Send, Building2, User,
 export function RegistrationPage() {
   const { t } = useLanguage()
   const [submitted, setSubmitted] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setSubmitted(true)
+    setIsSubmitting(true)
+    const form = e.currentTarget
+    const data = {
+      fullName: (form.elements.namedItem('fullName') as HTMLInputElement).value,
+      email: (form.elements.namedItem('email') as HTMLInputElement).value,
+      company: (form.elements.namedItem('company') as HTMLInputElement).value,
+      jobTitle: (form.elements.namedItem('jobTitle') as HTMLInputElement).value,
+      phone: (form.elements.namedItem('phone') as HTMLInputElement).value,
+      country: (form.elements.namedItem('country') as HTMLInputElement).value,
+      attendees: (form.elements.namedItem('attendees') as HTMLSelectElement).value,
+      notes: (form.elements.namedItem('notes') as HTMLTextAreaElement).value,
+    }
+    try {
+      await fetch(
+        'https://script.google.com/macros/s/AKfycbx4OtJXQg2DI0IM5hv08B90Of6hcbmu9zFfQKRKDYGkOEhi3vij5XLvOLOhofTdaWbATQ/exec',
+        { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+      )
+      setSubmitted(true)
+    } catch {
+      setSubmitted(true)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -189,10 +212,10 @@ export function RegistrationPage() {
                       <p className="text-xs text-muted-foreground">Please kindly RSVP by 10 March 2026. Limited seats available.</p>
                       <button
                         type="submit"
+                                        disabled={isSubmitting}
                         className="group inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/90"
                       >
-                        <Send className="h-4 w-4" />
-                        Register Now
+                        {isSubmitting ? 'Submitting...' : (<><Send className="h-4 w-4" /> Register Now</>)}
                       </button>
                     </form>
                   )}
