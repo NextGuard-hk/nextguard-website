@@ -42,7 +42,8 @@ function formatSize(bytes: number): string {
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false)
   const [password, setPassword] = useState("")
-  const [totpCode, setTotpCode] = useState("")   const [adminEmail, setAdminEmail] = useState("")
+  const [totpCode, setTotpCode] = useState("")
+      const [adminEmail, setAdminEmail] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -69,7 +70,9 @@ export default function AdminPage() {
   }
 
   async function sendCode() {
-    if (!password) { setError("Enter password first"); return }     const emailLower = adminEmail.toLowerCase().trim()     if (!emailLower || (!emailLower.endsWith("@skyguard.com.cn") && !emailLower.endsWith("@next-guard.com"))) {       setError("Only @skyguard.com.cn or @next-guard.com emails are allowed"); return     }
+    if (!password) { setError("Enter password first"); return }  
+       const emailLower = adminEmail.toLowerCase().trim() 
+       if       (!emailLower || (!emailLower.endsWith("@skyguard.com.cn") && !emailLower.endsWith("@next-guard.com"))) {       setError("Only @skyguard.com.cn or @next-guard.com emails are allowed"); return     }
     setTotpLoading(true); setError(""); setCodeSent(false)
     try {
       const r = await fetch("/api/contact/totp", { headers: { "x-admin-password": password, "x-admin-email": adminEmail.trim() } })
