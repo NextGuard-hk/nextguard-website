@@ -30,7 +30,6 @@ export function Header() {
     { href: "/company", label: t.nav.aboutUs },
     { href: "/solutions", label: t.nav.solutions },
     { href: "/partners", label: t.nav.becomePartner },
-    { href: "/news", label: t.nav.news },
     { href: "/contact", label: t.nav.contact },
         { href: "/partner-day-2026-registration", label: "RSVP" },
         { href: "https://kb.next-guard.com", label: t.nav.kb },
