@@ -116,11 +116,10 @@ export default function AdminPage() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const key = dlPath + file.name
-        const r = await fetch(`/api/downloads?action=upload-url&key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(file.type || "application/octet-stream")}`)
-        if (r.ok) {
-          const d = await r.json()
-          await fetch(d.url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } })
-        }
+                const formData = new FormData()
+        formData.append("file", file)
+        formData.append("key", key)
+        await fetch("/api/downloads", { method: "POST", body: formData })
       }
       fetchDownloads(dlPath)
     } catch {} finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = "" }
@@ -138,13 +137,11 @@ export default function AdminPage() {
     if (!newFolder.trim()) return
     const key = dlPath + newFolder.trim() + "/.keep"
     try {
-      const r = await fetch(`/api/downloads?action=upload-url&key=${encodeURIComponent(key)}&contentType=text/plain`)
-      if (r.ok) {
-        const d = await r.json()
-        await fetch(d.url, { method: "PUT", body: "", headers: { "Content-Type": "text/plain" } })
-        setNewFolder("")
-        fetchDownloads(dlPath)
-      }
+            const formData = new FormData()
+      formData.append("file", new Blob([""], { type: "text/plain" }), ".keep")
+      formData.append("key", key)
+      const r = await fetch("/api/downloads", { method: "POST", body: formData })
+      if (r.ok) { setNewFolder(""); fetchDownloads(dlPath) }
     } catch {}
   }
 
@@ -213,7 +210,7 @@ export default function AdminPage() {
         {tab === "contacts" && (
           <div>
             <div className="flex justify-end mb-4">
-              <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Download CSV</button>
+              <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
@@ -246,7 +243,7 @@ export default function AdminPage() {
         {tab === "rsvp" && (
           <div>
             <div className="flex justify-end mb-4">
-              <button onClick={() => window.open("/api/rsvp?password=NextGuard123&format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Download CSV</button>
+              <button onClick={() => window.open("/api/rsvp?password=NextGuard123&format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
