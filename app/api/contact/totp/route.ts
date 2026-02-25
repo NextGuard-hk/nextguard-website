@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('x-admin-password');
   const adminPassword = process.env.CONTACT_ADMIN_PASSWORD;
   const totpSecret = process.env.CONTACT_TOTP_SECRET;
-  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminEmail = request.headers.get('x-admin-email') || '';   const allowedDomains = ['@skyguard.com.cn', '@next-guard.com'];   const emailLower = adminEmail.toLowerCase().trim();   const isValidDomain = allowedDomains.some(d => emailLower.endsWith(d));
 
-  if (!adminPassword || !totpSecret || !adminEmail) {
+  if (!adminPassword || !totpSecret) {
     return NextResponse.json(
       { status: 'error', message: 'Server configuration error' },
       { status: 500 }
@@ -62,10 +62,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const code = generateTOTP(totpSecret);
+  if (!adminEmail || !isValidDomain) {     return NextResponse.json(       { status: 'error', message: 'Invalid email. Only @skyguard.com.cn and @next-guard.com domains are allowed.' },       { status: 400 }     );   }    const code = generateTOTP(totpSecret);
   const secondsRemaining = 30 - (Math.floor(Date.now() / 1000) % 30);
 
-  const emailSent = await sendCodeEmail(adminEmail, code);
+  const emailSent = await sendCodeEmail(emailLower, code);
 
   if (!emailSent) {
     return NextResponse.json(
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     status: 'success',
-    message: 'Verification code sent to admin email',
+    message: `Verification code sent to ${emailLower}`,
     expiresIn: secondsRemaining,
   });
 }
