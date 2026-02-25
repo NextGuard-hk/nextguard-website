@@ -19,6 +19,8 @@ export default function AdminContactsPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [totpLoading, setTotpLoading] = useState(false)
+  const [totpExpiry, setTotpExpiry] = useState(0)
 
   useEffect(() => {
     checkAuth()
@@ -35,6 +37,31 @@ export default function AdminContactsPage() {
       console.error(e)
     } finally {
       setChecking(false)
+    }
+  }
+
+  async function fetchTotpCode() {
+    if (!password) {
+      setError("Enter password first")
+      return
+    }
+    setTotpLoading(true)
+    setError("")
+    try {
+      const res = await fetch("/api/contact/totp", {
+        headers: { "x-admin-password": password },
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setTotpCode(data.code)
+        setTotpExpiry(data.expiresIn)
+      } else {
+        setError(data.message || "Failed to get 2FA code")
+      }
+    } catch (err) {
+      setError("Network error")
+    } finally {
+      setTotpLoading(false)
     }
   }
 
@@ -120,15 +147,28 @@ export default function AdminContactsPage() {
               </div>
               <div>
                 <label className="block text-sm text-zinc-300 mb-1">2FA Code</label>
-                <input
-                  type="text"
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none"
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value)}
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none"
+                    placeholder="6-digit code"
+                    maxLength={6}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={fetchTotpCode}
+                    disabled={totpLoading || !password}
+                    className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {totpLoading ? "..." : "Get Code"}
+                  </button>
+                </div>
+                {totpExpiry > 0 && (
+                  <p className="text-xs text-zinc-500 mt-1">Code expires in {totpExpiry}s</p>
+                )}
               </div>
               <button
                 type="submit"
