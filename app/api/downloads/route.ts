@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
-import { cookies } from "next/headers"
 
 const BUCKET = "nextguard-downloads"
 const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || "NextGuard123"
@@ -16,8 +15,10 @@ const S3 = new S3Client({
 })
 
 function isAdmin(req: NextRequest): boolean {
-  const c = req.cookies.get("admin_session")
-  return c?.value === "authenticated"
+  const sessionSecret = process.env.CONTACT_SESSION_SECRET
+  if (!sessionSecret) return false
+  const token = req.cookies.get("contact_admin_token")
+  return token?.value === sessionSecret
 }
 
 export async function GET(req: NextRequest) {
@@ -25,7 +26,6 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get("action")
   const pw = searchParams.get("pw")
 
-  // List files - requires password or admin
   if (!action || action === "list") {
     if (pw !== DOWNLOAD_PASSWORD && !isAdmin(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -51,7 +51,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Download file - requires password or admin
   if (action === "download") {
     if (pw !== DOWNLOAD_PASSWORD && !isAdmin(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -66,21 +65,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Upload URL - admin only
-  if (action === "upload-url") {
-    if (!isAdmin(req)) return NextResponse.json({ error: "Admin only" }, { status: 403 })
-    const key = searchParams.get("key")
-    const contentType = searchParams.get("contentType") || "application/octet-stream"
-    if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 })
-    try {
-      const url = await getSignedUrl(S3, new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }), { expiresIn: 3600 })
-      return NextResponse.json({ url })
-    } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
-    }
-  }
-
   return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+}
+
+export async function POST(req: NextRequest) {
+  if (!isAdmin(req)) {
+    return NextResponse.json({ error: "Admin only" }, { status: 403 })
+  }
+  try {
+    const formData = await req.formData()
+    const file = formData.get("file") as File | null
+    const key = formData.get("key") as string | null
+    if (!file || !key) {
+      return NextResponse.json({ error: "Missing file or key" }, { status: 400 })
+    }
+    const buffer = Buffer.from(await file.arrayBuffer())
+    await S3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type || "application/octet-stream",
+    }))
+    return NextResponse.json({ success: true, key })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: NextRequest) {
