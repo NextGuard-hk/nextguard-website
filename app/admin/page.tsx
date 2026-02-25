@@ -43,7 +43,7 @@ export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false)
   const [password, setPassword] = useState("")
   const [totpCode, setTotpCode] = useState("")
-      const [adminEmail, setAdminEmail] = useState("")
+  const [adminEmail, setAdminEmail] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -63,16 +63,15 @@ export default function AdminPage() {
   useEffect(() => { checkAuth() }, [])
 
   async function checkAuth() {
-    try {
-      const r = await fetch("/api/contact/auth")
-      if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps() }
-    } catch {} finally { setChecking(false) }
+    try { const r = await fetch("/api/contact/auth"); if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps() } } catch {} finally { setChecking(false) }
   }
 
   async function sendCode() {
-    if (!password) { setError("Enter password first"); return }  
-       const emailLower = adminEmail.toLowerCase().trim() 
-       if       (!emailLower || (!emailLower.endsWith("@skyguard.com.cn") && !emailLower.endsWith("@next-guard.com"))) {       setError("Only @skyguard.com.cn or @next-guard.com emails are allowed"); return     }
+    if (!password) { setError("Enter password first"); return }
+    const emailLower = adminEmail.toLowerCase().trim()
+    if (!emailLower || (!emailLower.endsWith("@skyguard.com.cn") && !emailLower.endsWith("@next-guard.com"))) {
+      setError("Only @skyguard.com.cn or @next-guard.com emails are allowed"); return
+    }
     setTotpLoading(true); setError(""); setCodeSent(false)
     try {
       const r = await fetch("/api/contact/totp", { headers: { "x-admin-password": password, "x-admin-email": adminEmail.trim() } })
@@ -119,7 +118,7 @@ export default function AdminPage() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const key = dlPath + file.name
-                const formData = new FormData()
+        const formData = new FormData()
         formData.append("file", file)
         formData.append("key", key)
         await fetch("/api/downloads", { method: "POST", body: formData })
@@ -140,7 +139,7 @@ export default function AdminPage() {
     if (!newFolder.trim()) return
     const key = dlPath + newFolder.trim() + "/.keep"
     try {
-            const formData = new FormData()
+      const formData = new FormData()
       formData.append("file", new Blob([""], { type: "text/plain" }), ".keep")
       formData.append("key", key)
       const r = await fetch("/api/downloads", { method: "POST", body: formData })
@@ -160,51 +159,53 @@ export default function AdminPage() {
   }
 
   if (checking) return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-      <div className="text-zinc-400">Checking authentication...</div>
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <p className="text-zinc-400">Checking authentication...</p>
     </div>
   )
 
   if (!isAuth) return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold text-white mb-2">Admin Login</h1>
-          <p className="text-zinc-400 text-sm mb-6">NextGuard Admin Dashboard</p>
-          {error && <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4"><p className="text-red-400 text-sm">{error}</p></div>}
-          {codeSent && <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-4"><p className="text-green-400 text-sm">Verification code sent to {adminEmail.trim()}.</p></div>}
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm text-zinc-300 mb-1">Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Enter admin password" required />
-            </div>
-            <div>
-              <label className="block text-sm text-zinc-300 mb-1">Email Address<span className="text-zinc-500 text-sm ml-2">(@skyguard.com.cn or @next-guard.com)</span></label>           <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="your.name@next-guard.com" required />         </div>         <div>           <label className="block text-sm font-medium text-zinc-300 mb-1.5">2FA Code</label>
-              <div className="flex gap-2">
-                <input type="text" value={totpCode} onChange={e => setTotpCode(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="6-digit code" maxLength={6} required />
-                <button type="button" onClick={sendCode} disabled={totpLoading || !password} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">{totpLoading ? "..." : "Send Code"}</button>
-              </div>
-              {totpExpiry > 0 && <p className="text-xs text-zinc-500 mt-1">Code expires in {totpExpiry}s</p>}
-            </div>
-            <button type="submit" disabled={loading} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50">{loading ? "Authenticating..." : "Login"}</button>
-          </form>
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <form onSubmit={handleLogin} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 w-full max-w-md space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Admin Login</h1>
+          <p className="text-zinc-400 text-sm mt-1">NextGuard Admin Dashboard</p>
         </div>
-      </div>
+        {error && <div className="bg-red-900/30 border border-red-800 rounded-lg px-4 py-3 text-red-300 text-sm">{error}</div>}
+        {codeSent && <div className="bg-green-900/30 border border-green-800 rounded-lg px-4 py-3 text-green-300 text-sm">Verification code sent to {adminEmail.trim()}.</div>}
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-2">Password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Enter admin password" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-2">Email Address <span className="text-zinc-500">(@skyguard.com.cn or @next-guard.com)</span></label>
+          <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="your.name@next-guard.com" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-2">2FA Code</label>
+          <div className="flex gap-2">
+            <input type="text" value={totpCode} onChange={e => setTotpCode(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="6-digit code" maxLength={6} required />
+            <button type="button" onClick={sendCode} disabled={totpLoading} className="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50">{totpLoading ? "..." : "Send Code"}</button>
+          </div>
+          {totpExpiry > 0 && <p className="text-zinc-500 text-xs mt-2">Code expires in {totpExpiry}s</p>}
+        </div>
+        <button type="submit" disabled={loading} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-lg font-medium disabled:opacity-50">{loading ? "Authenticating..." : "Login"}</button>
+      </form>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6">
+    <div className="min-h-screen bg-black text-white p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           <div className="flex gap-3">
             <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") fetchDownloads(dlPath) }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
             <button onClick={handleLogout} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm">Logout</button>
           </div>
         </div>
 
-        <div className="flex gap-1 mb-6 bg-zinc-900 p-1 rounded-lg w-fit">
+        <div className="flex gap-2 mb-6">
           <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
           <button onClick={() => { setTab("downloads"); if (dlItems.length === 0) fetchDownloads() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
@@ -215,30 +216,27 @@ export default function AdminPage() {
             <div className="flex justify-end mb-4">
               <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="border-b border-zinc-800">
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Name</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Email</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Company</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Message</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Date</th>
-                  </tr></thead>
-                  <tbody>
-                    {contacts.length === 0 ? <tr><td colSpan={5} className="text-center text-zinc-500 py-12">No submissions yet</td></tr>
-                    : contacts.slice().reverse().map(c => (
-                      <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                        <td className="px-6 py-4 text-sm text-white">{c.fullName}</td>
-                        <td className="px-6 py-4 text-sm text-cyan-400">{c.email}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300">{c.company || "-"}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300 max-w-xs truncate">{c.message}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-500 whitespace-nowrap">{c.timestamp ? new Date(c.timestamp).toLocaleDateString() : "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-zinc-800 text-zinc-400">
+                  <th className="text-left py-3 px-4">Name</th>
+                  <th className="text-left py-3 px-4">Email</th>
+                  <th className="text-left py-3 px-4">Company</th>
+                  <th className="text-left py-3 px-4">Message</th>
+                  <th className="text-left py-3 px-4">Date</th>
+                </tr></thead>
+                <tbody>
+                  {contacts.length === 0 ? <tr><td colSpan={5} className="text-center py-8 text-zinc-500">No contacts yet</td></tr> : contacts.slice().reverse().map(c => (
+                    <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                      <td className="py-3 px-4">{c.fullName}</td>
+                      <td className="py-3 px-4">{c.email}</td>
+                      <td className="py-3 px-4">{c.company || "-"}</td>
+                      <td className="py-3 px-4 max-w-xs truncate">{c.message}</td>
+                      <td className="py-3 px-4">{c.timestamp ? new Date(c.timestamp).toLocaleDateString() : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -248,38 +246,35 @@ export default function AdminPage() {
             <div className="flex justify-end mb-4">
               <button onClick={() => window.open("/api/rsvp?password=NextGuard123&format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="border-b border-zinc-800">
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">#</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Name</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Email</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Company</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Job Title</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Phone</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Country</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Attendees</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Date</th>
-                  </tr></thead>
-                  <tbody>
-                    {rsvps.length === 0 ? <tr><td colSpan={9} className="text-center text-zinc-500 py-12">No registrations yet</td></tr>
-                    : rsvps.map((r, i) => (
-                      <tr key={r.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                        <td className="px-6 py-4 text-sm text-zinc-500">{i + 1}</td>
-                        <td className="px-6 py-4 text-sm text-white">{r.fullName}</td>
-                        <td className="px-6 py-4 text-sm text-cyan-400">{r.email}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300">{r.company}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300">{r.jobTitle}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300">{r.phone}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300">{r.country}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-300">{r.attendees}</td>
-                        <td className="px-6 py-4 text-sm text-zinc-500 whitespace-nowrap">{r.timestamp ? new Date(r.timestamp).toLocaleString() : "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-zinc-800 text-zinc-400">
+                  <th className="text-left py-3 px-4">#</th>
+                  <th className="text-left py-3 px-4">Name</th>
+                  <th className="text-left py-3 px-4">Email</th>
+                  <th className="text-left py-3 px-4">Company</th>
+                  <th className="text-left py-3 px-4">Job Title</th>
+                  <th className="text-left py-3 px-4">Phone</th>
+                  <th className="text-left py-3 px-4">Country</th>
+                  <th className="text-left py-3 px-4">Attendees</th>
+                  <th className="text-left py-3 px-4">Date</th>
+                </tr></thead>
+                <tbody>
+                  {rsvps.length === 0 ? <tr><td colSpan={9} className="text-center py-8 text-zinc-500">No registrations yet</td></tr> : rsvps.map((r, i) => (
+                    <tr key={r.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                      <td className="py-3 px-4">{i + 1}</td>
+                      <td className="py-3 px-4">{r.fullName}</td>
+                      <td className="py-3 px-4">{r.email}</td>
+                      <td className="py-3 px-4">{r.company}</td>
+                      <td className="py-3 px-4">{r.jobTitle}</td>
+                      <td className="py-3 px-4">{r.phone}</td>
+                      <td className="py-3 px-4">{r.country}</td>
+                      <td className="py-3 px-4">{r.attendees}</td>
+                      <td className="py-3 px-4">{r.timestamp ? new Date(r.timestamp).toLocaleString() : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -292,56 +287,54 @@ export default function AdminPage() {
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">{uploading ? "Uploading..." : "Upload Files"}</button>
               <div className="flex gap-2">
                 <input type="text" value={newFolder} onChange={e => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
-                <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">Create Folder</button>
+                <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded-lg text-sm">Create Folder</button>
               </div>
             </div>
 
             {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 mb-4 text-sm">
+            <div className="flex items-center gap-1 text-sm mb-4">
               <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>
               {dlPath.split("/").filter(Boolean).map((crumb, i, arr) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-zinc-600">/</span>
+                <span key={i}>
+                  <span className="text-zinc-600"> / </span>
                   <button onClick={() => fetchDownloads(arr.slice(0, i + 1).join("/") + "/")} className="text-cyan-400 hover:text-cyan-300">{crumb}</button>
-                </div>
+                </span>
               ))}
             </div>
 
             {/* File List */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
               {dlLoading ? (
-                <div className="text-center text-zinc-500 py-12">Loading...</div>
+                <p className="text-zinc-500 text-center py-8">Loading...</p>
               ) : dlItems.length === 0 ? (
-                <div className="text-center text-zinc-500 py-12">No files in this directory</div>
+                <p className="text-zinc-500 text-center py-8">No files in this directory</p>
               ) : (
-                <table className="w-full">
-                  <thead><tr className="border-b border-zinc-800">
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Name</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Size</th>
-                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Modified</th>
-                    <th className="text-right text-xs font-medium text-zinc-400 uppercase px-6 py-3">Actions</th>
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-zinc-800 text-zinc-400">
+                    <th className="text-left py-3 px-4">Name</th>
+                    <th className="text-left py-3 px-4">Size</th>
+                    <th className="text-left py-3 px-4">Modified</th>
+                    <th className="text-right py-3 px-4">Actions</th>
                   </tr></thead>
                   <tbody>
                     {dlPath && (
-                      <tr className="border-b border-zinc-800/50 hover:bg-zinc-800/30 cursor-pointer" onClick={dlGoUp}>
-                        <td className="px-6 py-3 text-sm text-zinc-300" colSpan={4}><span className="flex items-center gap-2">&#x21A9; ..</span></td>
+                      <tr className="border-b border-zinc-800/50 hover:bg-zinc-900/50 cursor-pointer" onClick={dlGoUp}>
+                        <td className="py-3 px-4 text-zinc-400" colSpan={4}>{"\u21A9 .."}</td>
                       </tr>
                     )}
                     {dlItems.filter(item => item.name !== ".keep").map(item => (
-                      <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                        <td className="px-6 py-3 text-sm">
+                      <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                        <td className="py-3 px-4">
                           {item.type === "folder" ? (
-                            <button onClick={() => fetchDownloads(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">&#x1F4C1; {item.name}</button>
+                            <button onClick={() => fetchDownloads(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">{"\uD83D\uDCC1"} {item.name}</button>
                           ) : (
-                            <span className="flex items-center gap-2 text-white">&#x1F4C4; {item.name}</span>
+                            <span className="flex items-center gap-2">{"\uD83D\uDCC4"} {item.name}</span>
                           )}
                         </td>
-                        <td className="px-6 py-3 text-sm text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
-                        <td className="px-6 py-3 text-sm text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
-                        <td className="px-6 py-3 text-sm text-right">
-                          {item.type === "file" && (
-                            <button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs font-medium">Delete</button>
-                          )}
+                        <td className="py-3 px-4">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
+                        <td className="py-3 px-4">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
+                        <td className="py-3 px-4 text-right">
+                          <button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs font-medium">Delete</button>
                         </td>
                       </tr>
                     ))}
@@ -351,6 +344,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
       </div>
     </div>
   )
