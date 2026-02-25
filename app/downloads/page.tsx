@@ -159,7 +159,7 @@ export default function DownloadsPage() {
                     </td>
                   </tr>
                 )}
-                {items.map(item => (
+                {items.filter(item => item.name !== ".keep").map(item => (
                   <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                     <td className="px-6 py-3 text-sm">
                       {item.type === "folder" ? (
