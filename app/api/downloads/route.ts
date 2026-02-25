@@ -97,6 +97,30 @@ export async function DELETE(req: NextRequest) {
   try {
     const { key } = await req.json()
     if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 })
+
+    // If key ends with "/", it's a folder - delete all objects under it
+    if (key.endsWith("/")) {
+      let continuationToken: string | undefined
+      let deleted = 0
+      do {
+        const list = await S3.send(new ListObjectsV2Command({
+          Bucket: BUCKET,
+          Prefix: key,
+          ContinuationToken: continuationToken,
+        }))
+        const objects = list.Contents || []
+        for (const obj of objects) {
+          if (obj.Key) {
+            await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
+            deleted++
+          }
+        }
+        continuationToken = list.NextContinuationToken
+      } while (continuationToken)
+      return NextResponse.json({ success: true, deleted })
+    }
+
+    // Single file delete
     await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
     return NextResponse.json({ success: true })
   } catch (e: any) {
