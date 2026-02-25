@@ -9,10 +9,36 @@ import { Mail, Globe, Send, CheckCircle, Shield, MessageSquare, Lock } from "luc
 export function ContactPage() {
   const { t } = useLanguage()
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setSubmitted(true)
+    setSubmitting(true)
+    setError("")
+    const form = e.currentTarget
+    const formData = {
+      fullName: (form.elements.namedItem("name") as HTMLInputElement).value,
+      email: (form.elements.namedItem("email") as HTMLInputElement).value,
+      company: (form.elements.namedItem("company") as HTMLInputElement).value,
+      message: (form.elements.namedItem("message") as HTMLTextAreaElement).value,
+    }
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+      if (res.ok) {
+        setSubmitted(true)
+      } else {
+        setError("Failed to send message. Please try again.")
+      }
+    } catch (err) {
+      setError("Network error. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -56,89 +82,87 @@ export function ContactPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 lg:grid-cols-5">
             {/* Form */}
-            <AnimateIn className="lg:col-span-3">
-              <div className="rounded-xl border border-border/50 bg-card p-6 md:p-8 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(6,182,212,0.04),transparent_60%)]" />
-                <div className="relative">
-                  {submitted ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <div className="w-16 h-16 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-4">
-                        <CheckCircle className="h-8 w-8 text-cyan-400" />
+            <AnimateIn delay={100} className="lg:col-span-3">
+              <div className="rounded-xl border border-border/50 bg-card p-6 md:p-8">
+                {submitted ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground">{t.contact.form.successTitle}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{t.contact.form.successMessage}</p>
+                    <button
+                      onClick={() => setSubmitted(false)}
+                      className="mt-6 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                    >
+                      {t.contact.form.sendAnother}
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-5">
+                    {error && (
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                        <p className="text-red-400 text-sm">{error}</p>
                       </div>
-                      <h3 className="mt-4 text-xl font-semibold text-foreground">
-                        {t.contact.form.successTitle}
-                      </h3>
-                      <p className="mt-2 text-sm text-muted-foreground">{t.contact.form.successMessage}</p>
-                      <button
-                        onClick={() => setSubmitted(false)}
-                        className="mt-6 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-                      >
-                        {t.contact.form.sendAnother}
-                      </button>
+                    )}
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1.5">
+                        {t.contact.form.name}
+                      </label>
+                      <input
+                        id="name"
+                        type="text"
+                        required
+                        placeholder={t.contact.form.namePlaceholder}
+                        className="w-full rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
                     </div>
-                  ) : (
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-                      <div className="grid gap-5 sm:grid-cols-2">
-                        <div className="flex flex-col gap-1.5">
-                          <label htmlFor="name" className="text-sm font-medium text-foreground">
-                            {t.contact.form.name}
-                          </label>
-                          <input
-                            id="name"
-                            type="text"
-                            required
-                            placeholder={t.contact.form.namePlaceholder}
-                            className="rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <label htmlFor="email" className="text-sm font-medium text-foreground">
-                            {t.contact.form.email}
-                          </label>
-                          <input
-                            id="email"
-                            type="email"
-                            required
-                            placeholder={t.contact.form.emailPlaceholder}
-                            className="rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="company" className="text-sm font-medium text-foreground">
-                          {t.contact.form.company}
-                        </label>
-                        <input
-                          id="company"
-                          type="text"
-                          placeholder={t.contact.form.companyPlaceholder}
-                          className="rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="message" className="text-sm font-medium text-foreground">
-                          {t.contact.form.message}
-                        </label>
-                        <textarea
-                          id="message"
-                          required
-                          rows={5}
-                          placeholder={t.contact.form.messagePlaceholder}
-                          className="resize-none rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        className="group inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/90"
-                      >
-                        <Send className="h-4 w-4" />
-                        {t.contact.form.submit}
-                      </button>
-                    </form>
-                  )}
-                </div>
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
+                        {t.contact.form.email}
+                      </label>
+                      <input
+                        id="email"
+                        type="email"
+                        required
+                        placeholder={t.contact.form.emailPlaceholder}
+                        className="w-full rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="company" className="block text-sm font-medium text-foreground mb-1.5">
+                        {t.contact.form.company}
+                      </label>
+                      <input
+                        id="company"
+                        type="text"
+                        placeholder={t.contact.form.companyPlaceholder}
+                        className="w-full rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="message" className="block text-sm font-medium text-foreground mb-1.5">
+                        {t.contact.form.message}
+                      </label>
+                      <textarea
+                        id="message"
+                        required
+                        rows={5}
+                        placeholder={t.contact.form.messagePlaceholder}
+                        className="w-full resize-none rounded-lg border border-border/50 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="group inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4" />
+                      {submitting ? "Sending..." : t.contact.form.submit}
+                    </button>
+                  </form>
+                )}
               </div>
             </AnimateIn>
+
             {/* Contact Info */}
             <AnimateIn delay={200} className="lg:col-span-2">
               <div className="flex flex-col gap-6">
