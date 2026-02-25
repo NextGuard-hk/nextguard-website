@@ -35,7 +35,6 @@ export function Footer() {
               <Link href="/company" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.aboutUs}</Link>
               <Link href="/solutions" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.solutions}</Link>
               <Link href="/partners" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.becomePartner}</Link>
-              <Link href="/news" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.news}</Link>
               <Link href="/contact" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.contact}</Link>
             </div>
           </div>
