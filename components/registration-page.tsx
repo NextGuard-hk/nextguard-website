@@ -55,7 +55,7 @@ export function RegistrationPage() {
     <>
       {/* Event Info Banner */}
       <section className="relative bg-zinc-950 pt-24 pb-8">
-        <PageHeader title="Partner Day 2026" subtitle="NextGuard Partner Day 2026 - Hong Kong" />
+                <PageHeader badge="RSVP" headline="Partner Day 2026" subheadline="NextGuard Partner Day 2026 - Hong Kong" />
         <div className="relative mx-auto max-w-6xl px-6 mt-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
