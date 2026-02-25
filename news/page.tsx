@@ -1,5 +1,5 @@
-import { NewsPage } from "@/components/news-page"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return <NewsPage />
+  redirect("/company")
 }
