@@ -24,7 +24,7 @@ async function sendCodeEmail(to: string, code: string): Promise<boolean> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'NextGuard Admin <noreply@send.next-guard.com>',
+        from: 'NextGuard Admin <noreply@next-guard.com>',
         to: [to],
         subject: 'Your NextGuard Admin Verification Code',
         html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
