@@ -8,7 +8,7 @@ export const translations = {
       solutions: "New Features",
             becomePartner: "Become Partner",
       news: "News",
-      contact: "Contact",
+      contact: "Contact Us",
             kb: "Knowledge Base",
     },
     home: {
