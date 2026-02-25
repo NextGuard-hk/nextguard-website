@@ -324,7 +324,7 @@ export default function AdminPage() {
                         <td className="px-6 py-3 text-sm text-zinc-300" colSpan={4}><span className="flex items-center gap-2">&#x21A9; ..</span></td>
                       </tr>
                     )}
-                    {dlItems.map(item => (
+                    {dlItems.filter(item => item.name !== ".keep").map(item => (
                       <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                         <td className="px-6 py-3 text-sm">
                           {item.type === "folder" ? (
