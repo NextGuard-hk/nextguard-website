@@ -42,7 +42,7 @@ function formatSize(bytes: number): string {
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false)
   const [password, setPassword] = useState("")
-  const [totpCode, setTotpCode] = useState("")
+  const [totpCode, setTotpCode] = useState("")   const [adminEmail, setAdminEmail] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -69,10 +69,10 @@ export default function AdminPage() {
   }
 
   async function sendCode() {
-    if (!password) { setError("Enter password first"); return }
+    if (!password) { setError("Enter password first"); return }     const emailLower = adminEmail.toLowerCase().trim()     if (!emailLower || (!emailLower.endsWith("@skyguard.com.cn") && !emailLower.endsWith("@next-guard.com"))) {       setError("Only @skyguard.com.cn or @next-guard.com emails are allowed"); return     }
     setTotpLoading(true); setError(""); setCodeSent(false)
     try {
-      const r = await fetch("/api/contact/totp", { headers: { "x-admin-password": password } })
+      const r = await fetch("/api/contact/totp", { headers: { "x-admin-password": password, "x-admin-email": adminEmail.trim() } })
       const d = await r.json()
       if (r.ok) { setCodeSent(true); setTotpExpiry(d.expiresIn) }
       else setError(d.message || "Failed to send 2FA code")
@@ -147,7 +147,7 @@ export default function AdminPage() {
 
   async function handleLogout() {
     await fetch("/api/contact/auth", { method: "DELETE" })
-    setIsAuth(false); setContacts([]); setRsvps([]); setPassword(""); setTotpCode("")
+    setIsAuth(false); setContacts([]); setRsvps([]); setPassword(""); setTotpCode(""); setAdminEmail("")
   }
 
   function dlGoUp() {
@@ -169,14 +169,14 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-white mb-2">Admin Login</h1>
           <p className="text-zinc-400 text-sm mb-6">NextGuard Admin Dashboard</p>
           {error && <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4"><p className="text-red-400 text-sm">{error}</p></div>}
-          {codeSent && <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-4"><p className="text-green-400 text-sm">Verification code sent to admin email.</p></div>}
+          {codeSent && <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-4"><p className="text-green-400 text-sm">Verification code sent to {adminEmail.trim()}.</p></div>}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm text-zinc-300 mb-1">Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Enter admin password" required />
             </div>
             <div>
-              <label className="block text-sm text-zinc-300 mb-1">2FA Code</label>
+              <label className="block text-sm text-zinc-300 mb-1">Email Address<span className="text-zinc-500 text-sm ml-2">(@skyguard.com.cn or @next-guard.com)</span></label>           <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="your.name@next-guard.com" required />         </div>         <div>           <label className="block text-sm font-medium text-zinc-300 mb-1.5">2FA Code</label>
               <div className="flex gap-2">
                 <input type="text" value={totpCode} onChange={e => setTotpCode(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="6-digit code" maxLength={6} required />
                 <button type="button" onClick={sendCode} disabled={totpLoading || !password} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">{totpLoading ? "..." : "Send Code"}</button>
