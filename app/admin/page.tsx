@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 
 interface Contact {
   id: string
@@ -23,6 +23,22 @@ interface Registration {
   timestamp: string
 }
 
+interface FileItem {
+  name: string
+  path: string
+  size?: number
+  lastModified?: string
+  type: "file" | "folder"
+}
+
+function formatSize(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+}
+
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false)
   const [password, setPassword] = useState("")
@@ -33,9 +49,15 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-  const [tab, setTab] = useState<"contacts" | "rsvp">("contacts")
+  const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
+  const [dlItems, setDlItems] = useState<FileItem[]>([])
+  const [dlPath, setDlPath] = useState("")
+  const [dlLoading, setDlLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [newFolder, setNewFolder] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { checkAuth() }, [])
 
@@ -79,9 +101,62 @@ export default function AdminPage() {
     } catch {}
   }
 
+  async function fetchDownloads(prefix = "") {
+    setDlLoading(true)
+    try {
+      const r = await fetch(`/api/downloads?prefix=${encodeURIComponent(prefix)}`)
+      if (r.ok) { const d = await r.json(); setDlItems(d.items || []); setDlPath(prefix) }
+    } catch {} finally { setDlLoading(false) }
+  }
+
+  async function handleUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const key = dlPath + file.name
+        const r = await fetch(`/api/downloads?action=upload-url&key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(file.type || "application/octet-stream")}`)
+        if (r.ok) {
+          const d = await r.json()
+          await fetch(d.url, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } })
+        }
+      }
+      fetchDownloads(dlPath)
+    } catch {} finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = "" }
+  }
+
+  async function handleDelete(key: string) {
+    if (!confirm(`Delete ${key}?`)) return
+    try {
+      await fetch("/api/downloads", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) })
+      fetchDownloads(dlPath)
+    } catch {}
+  }
+
+  async function createFolder() {
+    if (!newFolder.trim()) return
+    const key = dlPath + newFolder.trim() + "/.keep"
+    try {
+      const r = await fetch(`/api/downloads?action=upload-url&key=${encodeURIComponent(key)}&contentType=text/plain`)
+      if (r.ok) {
+        const d = await r.json()
+        await fetch(d.url, { method: "PUT", body: "", headers: { "Content-Type": "text/plain" } })
+        setNewFolder("")
+        fetchDownloads(dlPath)
+      }
+    } catch {}
+  }
+
   async function handleLogout() {
     await fetch("/api/contact/auth", { method: "DELETE" })
     setIsAuth(false); setContacts([]); setRsvps([]); setPassword(""); setTotpCode("")
+  }
+
+  function dlGoUp() {
+    const parts = dlPath.replace(/\/$/, "").split("/").filter(Boolean)
+    parts.pop()
+    fetchDownloads(parts.length > 0 ? parts.join("/") + "/" : "")
   }
 
   if (checking) return (
@@ -124,7 +199,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
           <div className="flex gap-3">
-            <button onClick={() => { fetchContacts(); fetchRsvps() }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
+            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") fetchDownloads(dlPath) }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
             <button onClick={handleLogout} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm">Logout</button>
           </div>
         </div>
@@ -132,6 +207,7 @@ export default function AdminPage() {
         <div className="flex gap-1 mb-6 bg-zinc-900 p-1 rounded-lg w-fit">
           <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
+          <button onClick={() => { setTab("downloads"); if (dlItems.length === 0) fetchDownloads() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Downloads</button>
         </div>
 
         {tab === "contacts" && (
@@ -204,6 +280,74 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "downloads" && (
+          <div>
+            {/* Upload & Create Folder */}
+            <div className="flex flex-wrap gap-3 mb-4">
+              <input ref={fileInputRef} type="file" multiple onChange={e => handleUpload(e.target.files)} className="hidden" />
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">{uploading ? "Uploading..." : "Upload Files"}</button>
+              <div className="flex gap-2">
+                <input type="text" value={newFolder} onChange={e => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
+                <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">Create Folder</button>
+              </div>
+            </div>
+
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-2 mb-4 text-sm">
+              <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>
+              {dlPath.split("/").filter(Boolean).map((crumb, i, arr) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-zinc-600">/</span>
+                  <button onClick={() => fetchDownloads(arr.slice(0, i + 1).join("/") + "/")} className="text-cyan-400 hover:text-cyan-300">{crumb}</button>
+                </div>
+              ))}
+            </div>
+
+            {/* File List */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              {dlLoading ? (
+                <div className="text-center text-zinc-500 py-12">Loading...</div>
+              ) : dlItems.length === 0 ? (
+                <div className="text-center text-zinc-500 py-12">No files in this directory</div>
+              ) : (
+                <table className="w-full">
+                  <thead><tr className="border-b border-zinc-800">
+                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Name</th>
+                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Size</th>
+                    <th className="text-left text-xs font-medium text-zinc-400 uppercase px-6 py-3">Modified</th>
+                    <th className="text-right text-xs font-medium text-zinc-400 uppercase px-6 py-3">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    {dlPath && (
+                      <tr className="border-b border-zinc-800/50 hover:bg-zinc-800/30 cursor-pointer" onClick={dlGoUp}>
+                        <td className="px-6 py-3 text-sm text-zinc-300" colSpan={4}><span className="flex items-center gap-2">&#x21A9; ..</span></td>
+                      </tr>
+                    )}
+                    {dlItems.map(item => (
+                      <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                        <td className="px-6 py-3 text-sm">
+                          {item.type === "folder" ? (
+                            <button onClick={() => fetchDownloads(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">&#x1F4C1; {item.name}</button>
+                          ) : (
+                            <span className="flex items-center gap-2 text-white">&#x1F4C4; {item.name}</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3 text-sm text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
+                        <td className="px-6 py-3 text-sm text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
+                        <td className="px-6 py-3 text-sm text-right">
+                          {item.type === "file" && (
+                            <button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs font-medium">Delete</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
