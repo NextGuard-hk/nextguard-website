@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
     const res = await fetch(NPOINT_URL, { cache: "no-store" })
     const data = await res.json()
-    let news = (data.news || []).filter((n: any) => n.status === "published")
+    let news = (data.articles || []).filter((n: any) => n.status === "published")
 
     // Filter by tag if provided
     if (tag) {
