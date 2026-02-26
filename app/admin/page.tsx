@@ -130,26 +130,34 @@ export default function AdminPage() {
     } catch {} finally { setDlLoading(false) }
   }
 
-    async function handleUpload(files: FileList | null) {
+      async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return
     setUploading(true)
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const key = dlPath + file.name
-        // Use presigned URL to bypass Vercel 4.5MB body size limit
+        // Step 1: Get presigned URL
         const presignRes = await fetch(`/api/downloads?action=presign-upload&key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`)
         if (!presignRes.ok) throw new Error('Failed to get presigned URL')
         const { url } = await presignRes.json()
-        // Upload directly to R2 via presigned URL
+        // Step 2: Upload directly to R2 via presigned URL
         const uploadRes = await fetch(url, {
           method: 'PUT',
           headers: { 'Content-Type': file.type || 'application/octet-stream' },
           body: file,
         })
         if (!uploadRes.ok) throw new Error('Upload to R2 failed')
-        // Log the upload
-        await fetch(`/api/downloads?action=confirm-upload&key=${encodeURIComponent(key)}&size=${file.size}`)
+        // Step 3: Confirm upload + virus scan
+        const confirmRes = await fetch(`/api/downloads?action=confirm-upload&key=${encodeURIComponent(key)}&size=${file.size}`)
+        const confirmData = await confirmRes.json()
+        if (confirmData.virus) {
+          alert(`File blocked - virus detected in ${file.name}: ${confirmData.message}`)
+          continue
+        }
+        if (confirmData.scan) {
+          console.log(`Scan result for ${file.name}: ${confirmData.scan}`)
+        }
       }
       fetchDownloads(dlPath)
     } catch (e: any) { alert('Upload failed: ' + (e.message || 'Unknown error'))
@@ -338,6 +346,7 @@ export default function AdminPage() {
           {uploading ? "Uploading..." : `Upload to ${uploadMode === "public" ? "Public" : "Internal"}`}
         </button>
       </div>
+                  <button onClick={async () => { const r = await fetch('/api/downloads?action=setup-cors'); const d = await r.json(); alert(d.message || d.error || 'Done') }} className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-lg text-xs">Setup CORS</button>
       <div className={`text-xs px-3 py-2 rounded-lg mb-4 ${uploadMode === "public" ? "bg-green-900/30 text-green-400 border border-green-700/50" : "bg-orange-900/30 text-orange-400 border border-orange-700/50"}`}>
         {uploadMode === "public" ? "🌍 Public files will be visible on /downloads page" : "🔒 Internal files are private - not accessible from public site"}
       </div>
