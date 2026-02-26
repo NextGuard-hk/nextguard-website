@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const LOG_NPOINT_URL = 'https://api.npoint.io/141c14f9077701d99bc1';
+
+async function writeLog(entry: Record<string, string>) {
+  try {
+    const logEntry = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...entry };
+    const getRes = await fetch(LOG_NPOINT_URL, { cache: 'no-store' });
+    const current = await getRes.json();
+    const logs = current.logs || [];
+    logs.push(logEntry);
+    await fetch(LOG_NPOINT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logs: logs.slice(-500) }),
+    });
+  } catch (e) { console.error('Log write error:', e); }
+}
+
 // Simple TOTP-like: generate a 6-digit code from secret + time window
 function generateTOTP(secret: string): string {
   const timeStep = Math.floor(Date.now() / 30000); // 30-second window
@@ -58,6 +75,7 @@ export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
 
   if (isRateLimited(ip)) {
+    await writeLog({ type: 'login', action: 'rate_limited', ip, status: 'blocked' });
     return NextResponse.json(
       { status: 'error', message: 'Too many attempts. Try again in 15 minutes.' },
       { status: 429 }
@@ -66,7 +84,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const { password, totpCode } = await request.json();
-
     const adminPassword = process.env.CONTACT_ADMIN_PASSWORD;
     const totpSecret = process.env.CONTACT_TOTP_SECRET;
     const sessionSecret = process.env.CONTACT_SESSION_SECRET;
@@ -81,6 +98,7 @@ export async function POST(request: NextRequest) {
     // Verify password
     if (password !== adminPassword) {
       recordAttempt(ip);
+      await writeLog({ type: 'login', action: 'login_failed', ip, reason: 'invalid_password' });
       return NextResponse.json(
         { status: 'error', message: 'Invalid credentials' },
         { status: 401 }
@@ -90,11 +108,15 @@ export async function POST(request: NextRequest) {
     // Verify TOTP code
     if (!verifyTOTP(totpSecret, totpCode)) {
       recordAttempt(ip);
+      await writeLog({ type: 'login', action: 'login_failed', ip, reason: 'invalid_2fa' });
       return NextResponse.json(
         { status: 'error', message: 'Invalid 2FA code' },
         { status: 401 }
       );
     }
+
+    // Log successful login
+    await writeLog({ type: 'login', action: 'login_success', ip });
 
     // Generate session token (valid for 2 hours)
     const response = NextResponse.json({
@@ -136,7 +158,9 @@ export async function GET(request: NextRequest) {
 }
 
 // DELETE endpoint for logout
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for') || 'unknown';
+  await writeLog({ type: 'login', action: 'logout', ip });
   const response = NextResponse.json({ status: 'logged_out' });
   response.cookies.delete('contact_admin_token');
   return response;
