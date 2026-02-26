@@ -231,28 +231,44 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   try {
     const body = await req.json()
-    const { filePath } = body
-    if (!filePath) return NextResponse.json({ error: 'Missing filePath' }, { status: 400 })
-    const obj = await S3.send(new GetObjectCommand({ Bucket: BUCKET, Key: filePath }))
-    const content = await obj.Body?.transformToString() || ''
-    const lines = content.split('\n')
+    const { filePath, content, fileName } = body
+    let syslogContent = ''
+    let syslogFileName = ''
+    let syslogFilePath = ''
+
+    if (content) {
+      // Direct text upload - no admin required for demo
+      syslogContent = content
+      syslogFileName = fileName || `upload-${new Date().toISOString().slice(0,10)}.log`
+      syslogFilePath = `upload/${syslogFileName}`
+    } else if (filePath) {
+      // R2 file - admin required
+      if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+      const obj = await S3.send(new GetObjectCommand({ Bucket: BUCKET, Key: filePath }))
+      syslogContent = await obj.Body?.transformToString() || ''
+      syslogFileName = filePath.split('/').pop() || filePath
+      syslogFilePath = filePath
+    } else {
+      return NextResponse.json({ error: 'Missing filePath or content' }, { status: 400 })
+    }
+
+    const lines = syslogContent.split('\n')
     const events: SyslogEvent[] = []
     for (let i = 0; i < lines.length; i++) {
       const evt = parseSyslogLine(lines[i], i)
       if (evt) events.push(evt)
     }
-    if (events.length === 0) return NextResponse.json({ error: 'No valid syslog events found' }, { status: 400 })
+    if (events.length === 0) return NextResponse.json({ error: 'No valid syslog events found in the uploaded content' }, { status: 400 })
     const results = await analyzeWithLLM(events)
     const fp = results.filter(r => r.verdict === 'false_positive').length
     const tp = results.filter(r => r.verdict === 'true_positive').length
     const nr = results.filter(r => r.verdict === 'needs_review').length
     const analysis: SyslogAnalysis = {
       id: `sa-${Date.now()}`,
-      fileName: filePath.split('/').pop() || filePath,
-      filePath,
+      fileName: syslogFileName,
+      filePath: syslogFilePath,
       analyzedAt: new Date().toISOString(),
       totalEvents: events.length,
       falsePositives: fp,
