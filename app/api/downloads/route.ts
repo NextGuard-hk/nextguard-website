@@ -71,7 +71,9 @@ export async function GET(req: NextRequest) {
         type: 'file' as const,
       }))
       return NextResponse.json({ items: [...folders, ...files] })
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
   }
 
   if (action === 'download') {
@@ -89,7 +91,9 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'download', key, ip })
       const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 })
       return NextResponse.json({ url })
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -99,11 +103,13 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(req)) {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   }
+  const ip = req.headers.get('x-forwarded-for') || 'unknown'
+  let key = 'unknown'
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
-    const key = formData.get('key') as string | null
-    if (!file || !key) {
+    key = (formData.get('key') as string | null) || 'unknown'
+    if (!file || key === 'unknown') {
       return NextResponse.json({ error: 'Missing file or key' }, { status: 400 })
     }
     const buffer = Buffer.from(await file.arrayBuffer())
@@ -113,18 +119,22 @@ export async function POST(req: NextRequest) {
       Body: buffer,
       ContentType: file.type || 'application/octet-stream',
     }))
-    const ip = req.headers.get('x-forwarded-for') || 'unknown'
-    await writeLog({ type: 'file', action: 'upload', key, size: file.size.toString(), ip })
+    await writeLog({ type: 'file', action: 'upload', key, size: file.size.toString(), ip, status: 'success' })
     return NextResponse.json({ success: true, key })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) {
+    await writeLog({ type: 'file', action: 'upload', key, ip, status: 'failed', reason: e.message })
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+  const ip = req.headers.get('x-forwarded-for') || 'unknown'
+  let key = 'unknown'
   try {
-    const { key } = await req.json()
-    if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
-    const ip = req.headers.get('x-forwarded-for') || 'unknown'
+    const body = await req.json()
+    key = body.key || 'unknown'
+    if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
     if (key.endsWith('/')) {
       let continuationToken: string | undefined
       let deleted = 0
@@ -136,11 +146,14 @@ export async function DELETE(req: NextRequest) {
         }
         continuationToken = list.NextContinuationToken
       } while (continuationToken)
-      await writeLog({ type: 'file', action: 'delete_folder', key, count: deleted.toString(), ip })
+      await writeLog({ type: 'file', action: 'delete_folder', key, count: deleted.toString(), ip, status: 'success' })
       return NextResponse.json({ success: true, deleted })
     }
     await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
-    await writeLog({ type: 'file', action: 'delete', key, ip })
+    await writeLog({ type: 'file', action: 'delete', key, ip, status: 'success' })
     return NextResponse.json({ success: true })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) {
+    await writeLog({ type: 'file', action: 'delete', key, ip, status: 'failed', reason: e.message })
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
