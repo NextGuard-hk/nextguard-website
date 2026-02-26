@@ -215,6 +215,42 @@ export default function AdminPage() {
     setIsAuth(false); setContacts([]); setRsvps([]); setPassword(""); setTotpCode(""); setAdminEmail("")
   }
 
+    async function fetchNews() {
+    setNewsLoading(true)
+    try {
+      const r = await fetch('/api/news-feed/admin')
+      if (r.ok) { const d = await r.json(); setNewsArticles(d.articles || []) }
+    } catch {} finally { setNewsLoading(false) }
+  }
+
+  async function triggerCollect() {
+    setNewsLoading(true)
+    try {
+      const r = await fetch('/api/news-feed/collect', { method: 'POST' })
+      if (r.ok) { await fetchNews() }
+    } catch {} finally { setNewsLoading(false) }
+  }
+
+  async function updateNewsStatus(id: string, status: string) {
+    try {
+      await fetch('/api/news-feed/admin', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+      fetchNews()
+    } catch {}
+  }
+
+  async function deleteNewsArticle(id: string) {
+    if (!confirm('Delete this article?')) return
+    try {
+      await fetch('/api/news-feed/admin', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      fetchNews()
+    } catch {}
+  }
+
+  async function publishAllPending() {
+    const pending = newsArticles.filter((a: any) => a.status === 'pending')
+    for (const a of pending) { await updateNewsStatus(a.id, 'published') }
+  }
+
   function dlGoUp() {
     const parts = dlPath.replace(/\/$/, "").split("/").filter(Boolean)
     parts.pop()
