@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, PutBucketCorsCommand } from '@aws-sdk/client-s3'
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
@@ -89,23 +89,41 @@ export async function GET(req: NextRequest) {
   const pw = searchParams.get('pw')
   const admin = isAdmin(req)
 
-  // Setup CORS for R2 bucket - admin only, run once
+  // Setup CORS for R2 bucket via Cloudflare REST API - admin only
   if (action === 'setup-cors') {
     if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const accountId = process.env.R2_ACCOUNT_ID
+    const cfApiToken = process.env.CLOUDFLARE_API_TOKEN
+    if (!accountId || !cfApiToken) {
+      return NextResponse.json({ error: 'Missing R2_ACCOUNT_ID or CLOUDFLARE_API_TOKEN env var. Please add CLOUDFLARE_API_TOKEN (with R2 edit permissions) in Vercel Environment Variables.' }, { status: 500 })
+    }
     try {
-      await S3.send(new PutBucketCorsCommand({
-        Bucket: BUCKET,
-        CORSConfiguration: {
-          CORSRules: [{
-            AllowedOrigins: ['*'],
-            AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD'],
-            AllowedHeaders: ['*'],
-            ExposeHeaders: ['ETag'],
-            MaxAgeSeconds: 86400,
-          }],
+      const corsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${BUCKET}/cors`
+      const corsPolicy = {
+        rules: [{
+          allowed: {
+            origins: ['*'],
+            methods: ['GET', 'PUT', 'POST', 'HEAD'],
+            headers: ['*'],
+          },
+          exposeHeaders: ['ETag'],
+          maxAgeSeconds: 86400,
+        }],
+      }
+      const res = await fetch(corsUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${cfApiToken}`,
+          'Content-Type': 'application/json',
         },
-      }))
-      return NextResponse.json({ success: true, message: 'CORS configured for R2 bucket' })
+        body: JSON.stringify(corsPolicy),
+      })
+      const data = await res.json()
+      if (data.success) {
+        return NextResponse.json({ success: true, message: 'CORS configured for R2 bucket' })
+      } else {
+        return NextResponse.json({ error: data.errors?.[0]?.message || 'Cloudflare API error', details: data.errors }, { status: 500 })
+      }
     } catch (e: any) {
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
