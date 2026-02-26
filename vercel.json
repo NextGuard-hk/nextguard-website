@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/news-feed/collect?secret=nextguard-collect-2024",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
