@@ -65,7 +65,7 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-  const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news">("contacts")
+    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
   const [dlItems, setDlItems] = useState<FileItem[]>([])
@@ -80,6 +80,10 @@ export default function AdminPage() {
   const [newsLoading, setNewsLoading] = useState(false)
   const [newsFilter, setNewsFilter] = useState<"all"|"pending"|"published">("all")
   const [uploadMode, setUploadMode] = useState<"public" | "internal">("public")
+    const [syslogFiles, setSyslogFiles] = useState<any[]>([])
+  const [syslogLoading, setSyslogLoading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { checkAuth() }, [])
@@ -215,14 +219,6 @@ export default function AdminPage() {
     setIsAuth(false); setContacts([]); setRsvps([]); setPassword(""); setTotpCode(""); setAdminEmail("")
   }
 
-    async function fetchNews() {
-    setNewsLoading(true)
-    try {
-      const r = await fetch('/api/news-feed/admin')
-      if (r.ok) { const d = await r.json(); setNewsArticles(d.articles || []) }
-    } catch {} finally { setNewsLoading(false) }
-  }
-
   async function triggerCollect() {
     setNewsLoading(true)
     try {
@@ -231,24 +227,23 @@ export default function AdminPage() {
     } catch {} finally { setNewsLoading(false) }
   }
 
-  async function updateNewsStatus(id: string, status: string) {
+    async function fetchSyslogFiles() {
+    setSyslogLoading(true)
     try {
-      await fetch('/api/news-feed/admin', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
-      fetchNews()
-    } catch {}
+      const r = await fetch('/api/syslog-analysis?action=list-files')
+      if (r.ok) { const d = await r.json(); setSyslogFiles(d.items || []) }
+    } catch {} finally { setSyslogLoading(false) }
   }
 
-  async function deleteNewsArticle(id: string) {
-    if (!confirm('Delete this article?')) return
+  async function analyzeSyslog(filePath: string) {
+    setAnalyzing(true); setAnalysisResult(null)
     try {
-      await fetch('/api/news-feed/admin', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-      fetchNews()
-    } catch {}
-  }
-
-  async function publishAllPending() {
-    const pending = newsArticles.filter((a: any) => a.status === 'pending')
-    for (const a of pending) { await updateNewsStatus(a.id, 'published') }
+      const r = await fetch('/api/syslog-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filePath }) })
+      const d = await r.json()
+      if (r.ok) { setAnalysisResult(d.analysis); alert(`Analysis complete: ${d.analysis.totalEvents} events - ${d.analysis.falsePositives} FP, ${d.analysis.truePositives} TP, ${d.analysis.needsReview} needs review`) }
+      else alert('Analysis failed: ' + (d.error || 'Unknown error'))
+    } catch (e: any) { alert('Analysis error: ' + e.message) }
+    finally { setAnalyzing(false) }
   }
 
   function dlGoUp() {
@@ -314,6 +309,7 @@ export default function AdminPage() {
 
         {tab === "contacts" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                        <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Syslog</button>
             <div className="flex justify-end mb-4">
               <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
@@ -413,6 +409,33 @@ export default function AdminPage() {
             </div>))}</div>)}
           </div>
         )}
+                  {tab === "syslog" && (
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-white">Syslog Analysis</h2>
+                <button onClick={fetchSyslogFiles} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Refresh Files</button>
+              </div>
+                            {analyzing && <div className="text-center py-4 text-cyan-400">Analyzing with AI... This may take a moment.</div>}
+              {syslogLoading ? <p className="text-zinc-400">Loading syslog files...</p> : syslogFiles.length === 0 ? <p className="text-zinc-500">No syslog files found. Upload files to internal/Syslog/ via Uploads tab.</p> : (
+                              <table className="w-full text-sm text-left">
+                  <thead><tr className="text-zinc-400 border-b border-zinc-800"><th className="pb-3 pr-4">Name</th><th className="pb-3 pr-4">Size</th><th className="pb-3">Actions</th></tr></thead>
+                                                  <tbody>{syslogFiles.filter((f: any) => f.type === 'file').map((f: any) => (<tr key={f.path} className="border-b border-zinc-800/50"><td className="py-2 pr-4 text-white">{f.name}</td><td className="py-2 pr-4 text-zinc-400">{f.size ? formatSize(f.size) : '-'}</td><td className="py-2"><button onClick={() => analyzeSyslog(f.path)} disabled={analyzing} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs font-medium disabled:opacity-50">{analyzing ? 'Analyzing...' : 'Analyze with AI'}</button></td></tr>))}</tbody>
+                                                </table>
+              )}
+              {analysisResult && (
+                <div className="mt-6 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                                    <h3 className="text-white font-bold mb-2">Latest Analysis: {analysisResult.fileName}</h3>
+                  <div className="grid grid-cols-4 gap-4 text-center">
+                    <div><div className="text-2xl font-bold text-white">{analysisResult.totalEvents}</div><div className="text-xs text-zinc-500">Total</div></div>
+                    <div><div className="text-2xl font-bold text-green-400">{analysisResult.falsePositives}</div><div className="text-xs text-zinc-500">False Positive</div></div>
+                    <div><div className="text-2xl font-bold text-red-400">{analysisResult.truePositives}</div><div className="text-xs text-zinc-500">True Positive</div></div>
+                    <div><div className="text-2xl font-bold text-yellow-400">{analysisResult.needsReview}</div><div className="text-xs text-zinc-500">Needs Review</div></div>
+                  </div>
+                                    <p className="text-center mt-4 text-sm text-zinc-400">View detailed results on the <a href="/soc-review" className="text-cyan-400 hover:text-cyan-300 underline">SOC Review Dashboard</a></p>
+                </div>
+              )}
+            </div>
+                    )}
 
       </div>
     </div>
