@@ -65,7 +65,7 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog" | "syslog">("contacts")
+    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
   const [dlItems, setDlItems] = useState<FileItem[]>([])
@@ -305,11 +305,11 @@ export default function AdminPage() {
           <button onClick={() => { setTab("downloads"); fetchDownloads(uploadMode + "/") }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
           <button onClick={() => { setTab("logs"); fetchLogs() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Logs</button>
           <button onClick={() => { setTab("news"); fetchNews() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>News</button>
+                      <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Syslog</button>
         </div>
 
         {tab === "contacts" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-                        <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${(tab as string) === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Syslog</button>
             <div className="flex justify-end mb-4">
               <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
@@ -409,7 +409,7 @@ export default function AdminPage() {
             </div>))}</div>)}
           </div>
         )}
-                  {(tab as string) === "syslog" && (
+                  {tab === "syslog" && (
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-white">Syslog Analysis</h2>
