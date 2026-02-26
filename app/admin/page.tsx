@@ -136,7 +136,7 @@ export default function AdminPage() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-              const key = uploadMode + "/" + file.name
+                    const key = (dlPath.startsWith("public/") || dlPath.startsWith("internal/")) ? dlPath + file.name : uploadMode + "/" + dlPath + file.name
         const formData = new FormData()
         formData.append("file", file)
         formData.append("key", key)
@@ -156,7 +156,7 @@ export default function AdminPage() {
 
   async function createFolder() {
     if (!newFolder.trim()) return
-    const key = dlPath + newFolder.trim() + "/.keep"
+        const key = (dlPath.startsWith("public/") || dlPath.startsWith("internal/")) ? dlPath + newFolder.trim() + "/.keep" : uploadMode + "/" + dlPath + newFolder.trim() + "/.keep"
     try {
       const formData = new FormData()
       formData.append("file", new Blob([""], { type: "text/plain" }), ".keep")
