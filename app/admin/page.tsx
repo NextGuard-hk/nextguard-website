@@ -65,7 +65,7 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-  const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs">("contacts")
+  const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
   const [dlItems, setDlItems] = useState<FileItem[]>([])
@@ -76,7 +76,7 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logFilter, setLogFilter] = useState("all")
-    const [uploadMode, setUploadMode] = useState<"public" | "internal">("public")
+    const [newsArticles, setNewsArticles] = useState<any[]>([])   const [newsLoading, setNewsLoading] = useState(false)   const [newsFilter, setNewsFilter] = useState<"all"|"pending"|"published">("all")   const [uploadMode, setUploadMode] = useState<"public" | "internal">("public")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { checkAuth() }, [])
@@ -260,7 +260,7 @@ export default function AdminPage() {
           <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
                   <button onClick={() => { setTab("downloads"); fetchDownloads(uploadMode + "/") }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
-          <button onClick={() => { setTab("logs"); fetchLogs() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Logs</button>
+          <button onClick={() => { setTab("logs"); fetchLogs() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Logs</button>         <button onClick={() => { setTab("news"); fetchNews() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>News</button>
         </div>
 
         {tab === "contacts" && (
@@ -462,6 +462,20 @@ export default function AdminPage() {
                 </table>
               )}
             </div>
+          </div>
+        )}
+
+                {tab === "news" && (
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap items-center">
+              <button onClick={triggerCollect} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm">Collect Now</button>
+              <button onClick={publishAllPending} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Publish All Pending</button>
+              <span className="text-zinc-400 text-sm ml-auto">{newsArticles.length} total | {newsArticles.filter(a=>a.status==="pending").length} pending | {newsArticles.filter(a=>a.status==="published").length} published</span>
+            </div>
+            <div className="flex gap-2">
+              {(["all","pending","published"] as const).map(f=>(<button key={f} onClick={()=>setNewsFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${newsFilter===f?"bg-cyan-600 text-white":"bg-zinc-800 text-zinc-400 hover:text-white"}`}>{f=="all"?"All":f=="pending"?"Pending":"Published"}</button>))}
+            </div>
+            {newsLoading ? <div className="text-center py-8 text-zinc-400">Loading news...</div> : (newsArticles.filter(a=>newsFilter==="all"||a.status===newsFilter).length===0 ? <div className="text-center py-8 text-zinc-400">No articles found</div> : <div className="space-y-3">{newsArticles.filter(a=>newsFilter==="all"||a.status===newsFilter).map(a=>(<div key={a.id} className={`border rounded-lg p-4 ${a.status==="pending"?"border-yellow-600/30 bg-yellow-900/10":"border-zinc-700 bg-zinc-800/50"}`}><div className="flex items-start justify-between gap-4"><div className="flex-1"><div className="flex items-center gap-2 mb-1"><span className={`px-2 py-0.5 rounded text-xs font-medium ${a.status==="pending"?"bg-yellow-500/20 text-yellow-400":"bg-green-500/20 text-green-400"}`}>{a.status}</span><span className="text-zinc-500 text-xs">{a.source}</span><span className="text-zinc-600 text-xs">{a.importance}</span></div><h3 className="text-white font-medium text-sm">{a.title}</h3><p className="text-zinc-400 text-xs mt-1 line-clamp-2">{a.summary}</p><div className="flex gap-1 mt-2">{a.tags?.slice(0,4).map((t:string)=>(<span key={t} className="px-2 py-0.5 bg-zinc-700 rounded text-xs text-zinc-300">{t}</span>))}</div></div><div className="flex gap-2 flex-shrink-0">{a.status==="pending"&&<button onClick={()=>updateNewsStatus(a.id,"published")} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-xs">Publish</button>}{a.status==="published"&&<button onClick={()=>updateNewsStatus(a.id,"pending")} className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs">Unpublish</button>}<button onClick={()=>deleteNewsArticle(a.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded text-xs">Delete</button></div></div></div>))}</div>)}
           </div>
         )}
 
