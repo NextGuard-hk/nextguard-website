@@ -160,17 +160,20 @@ export async function GET(request: NextRequest) {
     
     const relevantItems = filterRelevantArticles(allItems)
     
-    let existingData: { articles: NewsArticle[] } = { articles: [] }
+    // Safely read existing data from npoint, handle both formats
+    let existingArticles: NewsArticle[] = []
     try {
       const existingRes = await fetch(NPOINT_API)
       if (existingRes.ok) {
-        existingData = await existingRes.json()
+        const raw = await existingRes.json()
+        // Support both { articles: [...] } and { news: [...] } formats
+        existingArticles = Array.isArray(raw.articles) ? raw.articles : Array.isArray(raw.news) ? raw.news : []
       }
     } catch {
-      existingData = { articles: [] }
+      existingArticles = []
     }
     
-    const existingUrls = new Set(existingData.articles.map(a => a.url))
+    const existingUrls = new Set(existingArticles.map(a => a.url))
     const now = new Date().toISOString()
     
     const newArticles: NewsArticle[] = relevantItems
@@ -185,25 +188,24 @@ export async function GET(request: NextRequest) {
         collectedAt: now,
         tags: autoTag(item.title, item.description),
         importance: scoreImportance(item.title, item.description),
-        status: "pending" as const,
+        status: "published" as const,
         language: "en" as const,
       }))
     
-    if (newArticles.length > 0) {
-      const updatedArticles = [...newArticles, ...existingData.articles].slice(0, 200)
-      await fetch(NPOINT_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articles: updatedArticles }),
-      })
-    }
+    // Always write back in the correct { articles: [...] } format
+    const updatedArticles = [...newArticles, ...existingArticles].slice(0, 200)
+    await fetch(NPOINT_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ articles: updatedArticles }),
+    })
     
     return NextResponse.json({
       success: true,
       totalFetched: allItems.length,
       relevant: relevantItems.length,
       newAdded: newArticles.length,
-      totalStored: (existingData.articles.length + newArticles.length),
+      totalStored: updatedArticles.length,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
