@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
+import IdleTimer from "./IdleTimer"
 
 interface Contact {
   id: string
@@ -223,6 +224,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-6 pt-24">
+            <IdleTimer onLogout={handleLogout} />
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
