@@ -9,7 +9,7 @@ const tagColors: Record<string,string> = { AI:"bg-purple-500/10 text-purple-400 
 const importBadge: Record<string,string> = { high:"bg-red-500/20 text-red-400", medium:"bg-yellow-500/20 text-yellow-400", low:"bg-muted text-muted-foreground" }
 function timeAgo(d: string) { const s=Math.floor((Date.now()-new Date(d).getTime())/1000); if(s<60)return"just now"; if(s<3600)return`${Math.floor(s/60)}m ago`; if(s<86400)return`${Math.floor(s/3600)}h ago`; if(s<604800)return`${Math.floor(s/86400)}d ago`; return new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric"}) }
 export function NewsFeedPage() {
-  const { language } = useLanguage()
+  const { locale: language } = useLanguage()
   const [articles, setArticles] = useState<NewsArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTag, setActiveTag] = useState<string|null>(null)
