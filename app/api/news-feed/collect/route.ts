@@ -192,12 +192,12 @@ export async function GET(request: NextRequest) {
         language: "en" as const,
       }))
     
-        // Always write back in the correct { news: [...] } format
+            // Always write back in the correct { articles: [...] } format
     const updatedArticles = [...newArticles, ...existingArticles].slice(0, 200)
     await fetch(NPOINT_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ news: updatedArticles }),
+      body: JSON.stringify({ articles: updatedArticles }),
     })
     
     return NextResponse.json({
