@@ -80,18 +80,20 @@ export async function GET(req: NextRequest) {
     if (pw !== DOWNLOAD_PASSWORD && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const ip = req.headers.get('x-forwarded-for') || 'unknown'
+    const key = searchParams.get('key') || 'unknown'
     try {
-      let key = searchParams.get('key')
-      if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
+      if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
       // Non-admin users can only download public/ files
       if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
+        await writeLog({ type: 'file', action: 'download', key, ip, status: 'failed', reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
-      const ip = req.headers.get('x-forwarded-for') || 'unknown'
-      await writeLog({ type: 'file', action: 'download', key, ip })
       const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 })
+      await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
       return NextResponse.json({ url })
     } catch (e: any) {
+      await writeLog({ type: 'file', action: 'download', key, ip, status: 'failed', reason: e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
