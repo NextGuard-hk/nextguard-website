@@ -65,7 +65,7 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog">("contacts")
+    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog" | "syslog">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
   const [dlItems, setDlItems] = useState<FileItem[]>([])
