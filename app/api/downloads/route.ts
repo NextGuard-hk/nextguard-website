@@ -4,6 +4,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 const BUCKET = "nextguard-downloads"
 const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || "NextGuard123"
+const LOG_NPOINT_URL = "https://api.npoint.io/141c14f9077701d99bc1"
 
 const S3 = new S3Client({
   region: "auto",
@@ -19,6 +20,21 @@ function isAdmin(req: NextRequest): boolean {
   if (!sessionSecret) return false
   const token = req.cookies.get("contact_admin_token")
   return token?.value === sessionSecret
+}
+
+async function writeLog(entry: Record<string, string>) {
+  try {
+    const logEntry = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...entry };
+    const getRes = await fetch(LOG_NPOINT_URL, { cache: "no-store" });
+    const current = await getRes.json();
+    const logs = current.logs || [];
+    logs.push(logEntry);
+    await fetch(LOG_NPOINT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logs: logs.slice(-500) }),
+    });
+  } catch (e) { console.error("Log write error:", e); }
 }
 
 export async function GET(req: NextRequest) {
@@ -58,6 +74,8 @@ export async function GET(req: NextRequest) {
     try {
       const key = searchParams.get("key")
       if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 })
+      const ip = req.headers.get("x-forwarded-for") || "unknown"
+      await writeLog({ type: "file", action: "download", key, ip })
       const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 })
       return NextResponse.json({ url })
     } catch (e: any) {
@@ -86,6 +104,8 @@ export async function POST(req: NextRequest) {
       Body: buffer,
       ContentType: file.type || "application/octet-stream",
     }))
+    const ip = req.headers.get("x-forwarded-for") || "unknown"
+    await writeLog({ type: "file", action: "upload", key, size: file.size.toString(), ip })
     return NextResponse.json({ success: true, key })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -97,6 +117,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { key } = await req.json()
     if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 })
+    const ip = req.headers.get("x-forwarded-for") || "unknown"
 
     // If key ends with "/", it's a folder - delete all objects under it
     if (key.endsWith("/")) {
@@ -117,11 +138,13 @@ export async function DELETE(req: NextRequest) {
         }
         continuationToken = list.NextContinuationToken
       } while (continuationToken)
+      await writeLog({ type: "file", action: "delete_folder", key, count: deleted.toString(), ip })
       return NextResponse.json({ success: true, deleted })
     }
 
     // Single file delete
     await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
+    await writeLog({ type: "file", action: "delete", key, ip })
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
