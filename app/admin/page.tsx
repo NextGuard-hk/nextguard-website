@@ -136,7 +136,7 @@ export default function AdminPage() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-                    const key = (dlPath.startsWith("public/") || dlPath.startsWith("internal/")) ? dlPath + file.name : uploadMode + "/" + dlPath + file.name
+                          const key = dlPath + file.name
         const formData = new FormData()
         formData.append("file", file)
         formData.append("key", key)
@@ -156,7 +156,7 @@ export default function AdminPage() {
 
   async function createFolder() {
     if (!newFolder.trim()) return
-        const key = (dlPath.startsWith("public/") || dlPath.startsWith("internal/")) ? dlPath + newFolder.trim() + "/.keep" : uploadMode + "/" + dlPath + newFolder.trim() + "/.keep"
+            const key = dlPath + newFolder.trim() + "/.keep"
     try {
       const formData = new FormData()
       formData.append("file", new Blob([""], { type: "text/plain" }), ".keep")
@@ -238,7 +238,7 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6">
           <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
-          <button onClick={() => { setTab("downloads"); if (dlItems.length === 0) fetchDownloads() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
+                  <button onClick={() => { setTab("downloads"); fetchDownloads(uploadMode + "/") }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
           <button onClick={() => { setTab("logs"); fetchLogs() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Logs</button>
         </div>
 
@@ -315,10 +315,10 @@ export default function AdminPage() {
       <input ref={fileInputRef} type="file" multiple onChange={e => handleUpload(e.target.files)} className="hidden" />
       {/* Upload Mode Sub-tabs */}
       <div className="flex gap-2 mb-4">
-        <button onClick={() => setUploadMode("public")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "public" ? "bg-green-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+                <button onClick={() => { setUploadMode("public"); fetchDownloads("public/") }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "public" ? "bg-green-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
           🌍 Upload for Public
         </button>
-        <button onClick={() => setUploadMode("internal")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "internal" ? "bg-orange-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+                <button onClick={() => { setUploadMode("internal"); fetchDownloads("internal/") }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "internal" ? "bg-orange-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
           🔒 Upload for Internal
         </button>
         <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={`ml-auto px-4 py-2 rounded-lg text-sm disabled:opacity-50 ${uploadMode === "public" ? "bg-green-600 hover:bg-green-500 text-white" : "bg-orange-600 hover:bg-orange-500 text-white"}`}>
