@@ -53,8 +53,12 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ contacts }),
     });
 
-    // Send email notification (non-blocking)
-    sendNotification(entry).catch(() => {});
+    // Send email notification (await to ensure delivery)
+    try {
+      await sendNotification(entry);
+    } catch (e) {
+      console.error('Failed to send contact notification:', e);
+    }
 
     return NextResponse.json({ status: 'success', id: entry.id });
   } catch (error) {
