@@ -1,0 +1,21 @@
+name: Collect AI News Feed
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger news collection
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://www.next-guard.com/api/news-feed/collect?secret=nextguard-collect-2024")
+          echo "HTTP Status: $response"
+          if [ "$response" != "200" ]; then
+            echo "Collection failed with status $response"
+            exit 1
+          fi
+          echo "News collection completed successfully"
