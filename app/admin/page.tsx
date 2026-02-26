@@ -76,7 +76,10 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logFilter, setLogFilter] = useState("all")
-    const [newsArticles, setNewsArticles] = useState<any[]>([])   const [newsLoading, setNewsLoading] = useState(false)   const [newsFilter, setNewsFilter] = useState<"all"|"pending"|"published">("all")   const [uploadMode, setUploadMode] = useState<"public" | "internal">("public")
+      const [newsArticles, setNewsArticles] = useState<any[]>([])
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [newsFilter, setNewsFilter] = useState<"all"|"pending"|"published">("all")
+  const [uploadMode, setUploadMode] = useState<"public" | "internal">("public")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { checkAuth() }, [])
