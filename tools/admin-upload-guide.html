@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>NextGuard Admin Upload Guide - DOCX Generator</title>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
 <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 <style>
 body{font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#fff;}
@@ -23,18 +23,12 @@ button:hover{background:#0284c7;}
 async function generateDocx() {
   document.getElementById('status').textContent = 'Generating...';
   try {
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
     const H1 = HeadingLevel.HEADING_1;
     const H2 = HeadingLevel.HEADING_2;
     const CENTER = AlignmentType.CENTER;
-    const p = (text, opts) => new Paragraph({ text, ...opts });
+    const p = (text, opts) => new Paragraph({ text: text, ...opts });
     const doc = new Document({
-      styles: {
-        default: {
-          heading1: { run: { bold: true, size: 28, color: '0ea5e9' } },
-          heading2: { run: { bold: true, size: 24, color: '334155' } }
-        }
-      },
       sections: [{ properties: {}, children: [
         p('NextGuard Admin Upload Guide', { heading: HeadingLevel.TITLE, alignment: CENTER }),
         p('Version 1.0 | Prepared by NextGuard Technology', { alignment: CENTER }),
