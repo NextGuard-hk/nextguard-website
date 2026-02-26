@@ -31,6 +31,20 @@ interface FileItem {
   type: "file" | "folder"
 }
 
+interface LogEntry {
+  id: string
+  timestamp: string
+  type: string
+  action: string
+  ip?: string
+  key?: string
+  size?: string
+  count?: string
+  reason?: string
+  status?: string
+  [k: string]: string | undefined
+}
+
 function formatSize(bytes: number): string {
   if (bytes === 0) return "0 B"
   const k = 1024
@@ -50,7 +64,7 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-  const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads">("contacts")
+  const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
   const [dlItems, setDlItems] = useState<FileItem[]>([])
@@ -58,6 +72,9 @@ export default function AdminPage() {
   const [dlLoading, setDlLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [newFolder, setNewFolder] = useState("")
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logFilter, setLogFilter] = useState("all")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { checkAuth() }, [])
@@ -147,6 +164,14 @@ export default function AdminPage() {
     } catch {}
   }
 
+  async function fetchLogs() {
+    setLogsLoading(true)
+    try {
+      const r = await fetch("/api/logs")
+      if (r.ok) { const d = await r.json(); setLogs(d.logs || []) }
+    } catch {} finally { setLogsLoading(false) }
+  }
+
   async function handleLogout() {
     await fetch("/api/contact/auth", { method: "DELETE" })
     setIsAuth(false); setContacts([]); setRsvps([]); setPassword(""); setTotpCode(""); setAdminEmail("")
@@ -157,6 +182,8 @@ export default function AdminPage() {
     parts.pop()
     fetchDownloads(parts.length > 0 ? parts.join("/") + "/" : "")
   }
+
+  const filteredLogs = logFilter === "all" ? logs : logs.filter(l => l.type === logFilter)
 
   if (checking) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -200,7 +227,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           <div className="flex gap-3">
-            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") fetchDownloads(dlPath) }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
+            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") fetchDownloads(dlPath); if (tab === "logs") fetchLogs() }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
             <button onClick={handleLogout} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm">Logout</button>
           </div>
         </div>
@@ -209,6 +236,7 @@ export default function AdminPage() {
           <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
           <button onClick={() => { setTab("downloads"); if (dlItems.length === 0) fetchDownloads() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
+          <button onClick={() => { setTab("logs"); fetchLogs() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Logs</button>
         </div>
 
         {tab === "contacts" && (
@@ -281,7 +309,6 @@ export default function AdminPage() {
 
         {tab === "downloads" && (
           <div>
-            {/* Upload & Create Folder */}
             <div className="flex flex-wrap gap-3 mb-4">
               <input ref={fileInputRef} type="file" multiple onChange={e => handleUpload(e.target.files)} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">{uploading ? "Uploading..." : "Upload Files"}</button>
@@ -290,8 +317,6 @@ export default function AdminPage() {
                 <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded-lg text-sm">Create Folder</button>
               </div>
             </div>
-
-            {/* Breadcrumbs */}
             <div className="flex items-center gap-1 text-sm mb-4">
               <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>
               {dlPath.split("/").filter(Boolean).map((crumb, i, arr) => (
@@ -301,8 +326,6 @@ export default function AdminPage() {
                 </span>
               ))}
             </div>
-
-            {/* File List */}
             <div className="overflow-x-auto">
               {dlLoading ? (
                 <p className="text-zinc-500 text-center py-8">Loading...</p>
@@ -336,6 +359,61 @@ export default function AdminPage() {
                         <td className="py-3 px-4 text-right">
                           <button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs font-medium">Delete</button>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === "logs" && (
+          <div>
+            <div className="flex flex-wrap gap-3 mb-4 items-center">
+              <span className="text-zinc-400 text-sm">Filter:</span>
+              {["all", "login", "file"].map(f => (
+                <button key={f} onClick={() => setLogFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${logFilter === f ? "bg-cyan-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>{f === "all" ? "All" : f === "login" ? "Login" : "File Ops"}</button>
+              ))}
+              <span className="text-zinc-500 text-xs ml-auto">{filteredLogs.length} records</span>
+            </div>
+            <div className="overflow-x-auto">
+              {logsLoading ? (
+                <p className="text-zinc-500 text-center py-8">Loading logs...</p>
+              ) : filteredLogs.length === 0 ? (
+                <p className="text-zinc-500 text-center py-8">No logs yet</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-zinc-800 text-zinc-400">
+                    <th className="text-left py-3 px-4">Time</th>
+                    <th className="text-left py-3 px-4">Type</th>
+                    <th className="text-left py-3 px-4">Action</th>
+                    <th className="text-left py-3 px-4">Details</th>
+                    <th className="text-left py-3 px-4">IP</th>
+                  </tr></thead>
+                  <tbody>
+                    {filteredLogs.slice().reverse().map(log => (
+                      <tr key={log.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                        <td className="py-3 px-4 text-zinc-300 whitespace-nowrap">{log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${log.type === "login" ? "bg-blue-600/20 text-blue-400" : "bg-green-600/20 text-green-400"}`}>{log.type}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            log.action === "login_success" || log.action === "upload" ? "bg-green-600/20 text-green-400" :
+                            log.action === "login_failed" || log.action === "rate_limited" ? "bg-red-600/20 text-red-400" :
+                            log.action === "delete" || log.action === "delete_folder" ? "bg-orange-600/20 text-orange-400" :
+                            "bg-zinc-600/20 text-zinc-400"
+                          }`}>{log.action}</span>
+                        </td>
+                        <td className="py-3 px-4 text-zinc-400 max-w-xs truncate">
+                          {log.key && <span>Key: {log.key}</span>}
+                          {log.reason && <span>Reason: {log.reason}</span>}
+                          {log.size && <span> Size: {formatSize(Number(log.size))}</span>}
+                          {log.count && <span> Files: {log.count}</span>}
+                          {log.status && <span> Status: {log.status}</span>}
+                        </td>
+                        <td className="py-3 px-4 text-zinc-500 text-xs">{log.ip || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
