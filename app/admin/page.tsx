@@ -72,6 +72,8 @@ export default function AdminPage() {
   const [dlPath, setDlPath] = useState("")
   const [dlLoading, setDlLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadFileName, setUploadFileName] = useState("")
   const [newFolder, setNewFolder] = useState("")
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
@@ -129,26 +131,42 @@ export default function AdminPage() {
   async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return
     setUploading(true)
+    setUploadProgress(0)
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
+        setUploadFileName(file.name + (files.length > 1 ? " (" + (i + 1) + "/" + files.length + ")" : ""))
         const key = dlPath + file.name
-        const presignRes = await fetch(`/api/downloads?action=presign-upload&key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`)
+        const presignRes = await fetch("/api/downloads?action=presign-upload&key=" + encodeURIComponent(key) + "&contentType=" + encodeURIComponent(file.type || 'application/octet-stream'))
         if (!presignRes.ok) throw new Error('Failed to get presigned URL')
         const { url } = await presignRes.json()
-        const uploadRes = await fetch(url, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file })
-        if (!uploadRes.ok) throw new Error('Upload to R2 failed')
-        const confirmRes = await fetch(`/api/downloads?action=confirm-upload&key=${encodeURIComponent(key)}&size=${file.size}`)
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          xhr.open('PUT', url)
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              setUploadProgress(Math.round((event.loaded / event.total) * 100))
+            }
+          }
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve()
+            else reject(new Error('Upload to R2 failed'))
+          }
+          xhr.onerror = () => reject(new Error('Upload to R2 failed'))
+          xhr.send(file)
+        })
+        const confirmRes = await fetch("/api/downloads?action=confirm-upload&key=" + encodeURIComponent(key) + "&size=" + file.size)
         const confirmData = await confirmRes.json()
-        if (confirmData.virus) { alert(`File blocked - virus detected in ${file.name}: ${confirmData.message}`); continue }
-        if (confirmData.scan) { console.log(`Scan result for ${file.name}: ${confirmData.scan}`) }
+        if (confirmData.virus) { alert("File blocked - virus detected in " + file.name + ": " + confirmData.message); continue }
+        if (confirmData.scan) { console.log("Scan result for " + file.name + ": " + confirmData.scan) }
       }
       fetchDownloads(dlPath)
-    } catch (e: any) { alert('Upload failed: ' + (e.message || 'Unknown error')) } finally { setUploading(false); if (fileInputRef.current) (fileInputRef.current as any).value = "" }
+    } catch (e: any) { alert('Upload failed: ' + (e.message || 'Unknown error')) } finally { setUploading(false); setUploadProgress(0); setUploadFileName(""); if (fileInputRef.current) (fileInputRef.current as any).value = "" }
   }
 
   async function handleDelete(key: string) {
-    if (!confirm(`Delete ${key}?`)) return
+    if (!confirm("Delete " + key + "?")) return
     try { await fetch("/api/downloads", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }); fetchDownloads(dlPath) } catch {}
   }
 
@@ -156,11 +174,11 @@ export default function AdminPage() {
     if (!newFolder.trim()) return
     const key = dlPath + newFolder.trim() + "/.keep"
     try {
-      const presignRes = await fetch(`/api/downloads?action=presign-upload&key=${encodeURIComponent(key)}&contentType=text/plain`)
+      const presignRes = await fetch("/api/downloads?action=presign-upload&key=" + encodeURIComponent(key) + "&contentType=text/plain")
       if (!presignRes.ok) throw new Error('Failed to get presigned URL')
       const { url } = await presignRes.json()
       await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: '' })
-      await fetch(`/api/downloads?action=confirm-upload&key=${encodeURIComponent(key)}&size=0`)
+      await fetch("/api/downloads?action=confirm-upload&key=" + encodeURIComponent(key) + "&size=0")
       setNewFolder(""); fetchDownloads(dlPath)
     } catch {}
   }
@@ -240,7 +258,7 @@ export default function AdminPage() {
     try {
       const r = await fetch('/api/syslog-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filePath }) })
       const d = await r.json()
-      if (r.ok) { setAnalysisResult(d.analysis); alert(`Analysis complete: ${d.analysis.totalEvents} events - ${d.analysis.falsePositives} FP, ${d.analysis.truePositives} TP, ${d.analysis.needsReview} needs review`) }
+      if (r.ok) { setAnalysisResult(d.analysis); alert("Analysis complete: " + d.analysis.totalEvents + " events - " + d.analysis.falsePositives + " FP, " + d.analysis.truePositives + " TP, " + d.analysis.needsReview + " needs review") }
       else alert('Analysis failed: ' + (d.error || 'Unknown error'))
     } catch (e: any) { alert('Analysis error: ' + e.message) }
     finally { setAnalyzing(false) }
@@ -300,12 +318,12 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-2 mb-6 flex-wrap">
-          <button onClick={() => setTab("contacts")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Contacts ({contacts.length})</button>
-          <button onClick={() => setTab("rsvp")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>RSVP ({rsvps.length})</button>
-          <button onClick={() => { setTab("downloads"); fetchDownloads(uploadMode + "/") }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Uploads</button>
-          <button onClick={() => { setTab("logs"); fetchLogs() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Logs</button>
-          <button onClick={() => { setTab("news"); fetchNews() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>News</button>
-                      <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white"}`}>Syslog</button>
+          <button onClick={() => setTab("contacts")} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Contacts ({contacts.length})</button>
+          <button onClick={() => setTab("rsvp")} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>RSVP ({rsvps.length})</button>
+          <button onClick={() => { setTab("downloads"); fetchDownloads(uploadMode + "/") }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Uploads</button>
+          <button onClick={() => { setTab("logs"); fetchLogs() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Logs</button>
+          <button onClick={() => { setTab("news"); fetchNews() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>News</button>
+                          <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Syslog</button>
         </div>
 
         {tab === "contacts" && (
@@ -340,10 +358,21 @@ export default function AdminPage() {
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <input ref={fileInputRef} type="file" multiple onChange={(e) => handleUpload(e.target.files)} className="hidden" />
             <div className="flex gap-2 mb-4">
-              <button onClick={() => { setUploadMode("public"); fetchDownloads("public/") }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "public" ? "bg-green-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>Public</button>
-              <button onClick={() => { setUploadMode("internal"); fetchDownloads("internal/") }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "internal" ? "bg-orange-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>Internal</button>
+              <button onClick={() => { setUploadMode("public"); fetchDownloads("public/") }} className={"flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors " + (uploadMode === "public" ? "bg-green-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white")}>Public</button>
+              <button onClick={() => { setUploadMode("internal"); fetchDownloads("internal/") }} className={"flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors " + (uploadMode === "internal" ? "bg-orange-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white")}>Internal</button>
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="ml-auto bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">{uploading ? "Uploading..." : "Upload"}</button>
             </div>
+            {uploading && (
+              <div className="mb-4 p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-cyan-400">{uploadFileName}</span>
+                  <span className="text-zinc-400">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-zinc-700 rounded-full h-3">
+                  <div className="bg-cyan-500 h-3 rounded-full transition-all duration-300" style={{width: uploadProgress + "%"}}></div>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 mb-4">
               <input type="text" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
               <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">Create Folder</button>
@@ -357,7 +386,7 @@ export default function AdminPage() {
                 <thead><tr className="text-zinc-400 border-b border-zinc-800"><th className="pb-3 pr-4">Name</th><th className="pb-3 pr-4">Size</th><th className="pb-3 pr-4">Modified</th><th className="pb-3">Actions</th></tr></thead>
                 <tbody>
                   {dlPath && <tr className="border-b border-zinc-800/50"><td colSpan={4} className="py-2"><button onClick={dlGoUp} className="text-cyan-400 hover:text-cyan-300">.. (up)</button></td></tr>}
-                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">📁 {item.name}</button> : <span className="text-zinc-300">📄 {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3"><button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
+                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3"><button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
                 </tbody>
               </table>
             )}
@@ -368,7 +397,7 @@ export default function AdminPage() {
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <div className="flex items-center gap-4 mb-4">
               <span className="text-zinc-400 text-sm">Filter:</span>
-              {["all", "login", "file"].map(f => (<button key={f} onClick={() => setLogFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${logFilter === f ? "bg-cyan-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>{f === "all" ? "All" : f === "login" ? "Login" : "File Ops"}</button>))}
+              {["all", "login", "file"].map(f => (<button key={f} onClick={() => setLogFilter(f)} className={"px-3 py-1.5 rounded-md text-xs font-medium transition-colors " + (logFilter === f ? "bg-cyan-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white")}>{f === "all" ? "All" : f === "login" ? "Login" : "File Ops"}</button>))}
               <span className="text-zinc-500 text-xs ml-auto">{filteredLogs.length} records</span>
             </div>
             {logsLoading ? <p className="text-zinc-400">Loading logs...</p> : filteredLogs.length === 0 ? <p className="text-zinc-500">No logs yet</p> : (
@@ -388,13 +417,13 @@ export default function AdminPage() {
               <span className="text-zinc-500 text-xs ml-auto">{newsArticles.length} total | {newsArticles.filter((a: any)=>a.status==="pending").length} pending | {newsArticles.filter((a: any)=>a.status==="published").length} published</span>
             </div>
             <div className="flex gap-2 mb-4">
-              {(["all","pending","published"] as const).map(f=>(<button key={f} onClick={()=>setNewsFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${newsFilter===f?"bg-cyan-600 text-white":"bg-zinc-800 text-zinc-400 hover:text-white"}`}>{f==="all"?"All":f==="pending"?"Pending":"Published"}</button>))}
+              {(["all","pending","published"] as const).map(f=>(<button key={f} onClick={()=>setNewsFilter(f)} className={"px-3 py-1.5 rounded-md text-xs font-medium transition-colors " + (newsFilter===f?"bg-cyan-600 text-white":"bg-zinc-800 text-zinc-400 hover:text-white")}>{f==="all"?"All":f==="pending"?"Pending":"Published"}</button>))}
             </div>
             {newsLoading ? <p className="text-zinc-400">Loading news...</p> : (newsArticles.filter((a: any)=>newsFilter==="all"||a.status===newsFilter).length===0 ? <p className="text-zinc-500">No articles found</p> : <div className="space-y-4">{newsArticles.filter((a: any)=>newsFilter==="all"||a.status===newsFilter).map((a: any)=>(<div key={a.id} className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
               <div className="flex items-center gap-2 mb-2">
-                <span className={`px-2 py-0.5 rounded text-xs ${a.status==="published"?"bg-green-600/20 text-green-400":"bg-yellow-600/20 text-yellow-400"}`}>{a.status}</span>
+                <span className={"px-2 py-0.5 rounded text-xs " + (a.status==="published"?"bg-green-600/20 text-green-400":"bg-yellow-600/20 text-yellow-400")}>{a.status}</span>
                 <span className="text-zinc-500 text-xs">{a.source}</span>
-                <span className={`text-xs px-2 py-0.5 rounded ${a.importance==="high"?"bg-red-600/20 text-red-400":a.importance==="medium"?"bg-yellow-600/20 text-yellow-400":"bg-zinc-700 text-zinc-400"}`}>{a.importance}</span>
+                <span className={"text-xs px-2 py-0.5 rounded " + (a.importance==="high"?"bg-red-600/20 text-red-400":a.importance==="medium"?"bg-yellow-600/20 text-yellow-400":"bg-zinc-700 text-zinc-400")}>{a.importance}</span>
               </div>
               <h3 className="text-white font-medium mb-1">{a.title}</h3>
               <p className="text-zinc-400 text-sm mb-2">{a.summary}</p>
@@ -415,12 +444,12 @@ export default function AdminPage() {
                 <h2 className="text-lg font-bold text-white">Syslog Analysis</h2>
                 <button onClick={fetchSyslogFiles} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Refresh Files</button>
               </div>
-                            {analyzing && <div className="text-center py-4 text-cyan-400">Analyzing with AI... This may take a moment.</div>}
+                        {analyzing && <div className="text-center py-4 text-cyan-400">Analyzing with AI... This may take a moment.</div>}
               {syslogLoading ? <p className="text-zinc-400">Loading syslog files...</p> : syslogFiles.length === 0 ? <p className="text-zinc-500">No syslog files found. Upload files to internal/Syslog/ via Uploads tab.</p> : (
                               <table className="w-full text-sm text-left">
                   <thead><tr className="text-zinc-400 border-b border-zinc-800"><th className="pb-3 pr-4">Name</th><th className="pb-3 pr-4">Size</th><th className="pb-3">Actions</th></tr></thead>
-                                                  <tbody>{syslogFiles.filter((f: any) => f.type === 'file').map((f: any) => (<tr key={f.path} className="border-b border-zinc-800/50"><td className="py-2 pr-4 text-white">{f.name}</td><td className="py-2 pr-4 text-zinc-400">{f.size ? formatSize(f.size) : '-'}</td><td className="py-2"><button onClick={() => analyzeSyslog(f.path)} disabled={analyzing} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs font-medium disabled:opacity-50">{analyzing ? 'Analyzing...' : 'Analyze with AI'}</button></td></tr>))}</tbody>
-                                                </table>
+                                          <tbody>{syslogFiles.filter((f: any) => f.type === 'file').map((f: any) => (<tr key={f.path} className="border-b border-zinc-800/50"><td className="py-2 pr-4 text-white">{f.name}</td><td className="py-2 pr-4 text-zinc-400">{f.size ? formatSize(f.size) : '-'}</td><td className="py-2"><button onClick={() => analyzeSyslog(f.path)} disabled={analyzing} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs font-medium disabled:opacity-50">{analyzing ? 'Analyzing...' : 'Analyze with AI'}</button></td></tr>))}</tbody>
+                                          </table>
               )}
               {analysisResult && (
                 <div className="mt-6 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
@@ -435,7 +464,7 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
-                    )}
+                          )}
 
       </div>
     </div>
