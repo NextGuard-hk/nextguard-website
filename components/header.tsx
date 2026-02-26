@@ -27,6 +27,7 @@ export function Header() {
     { href: "/solutions", label: t.nav.solutions },
     { href: "/contact", label: t.nav.contact },
     { href: "/partner-day-2026-registration", label: "RSVP" },
+        { href: "/news/ai-feed", label: t.nav.aiFeed || "AI News" },
     { href: "https://kb.next-guard.com", label: t.nav.kb },
   ]
   const languages: { code: Locale; label: string }[] = [
