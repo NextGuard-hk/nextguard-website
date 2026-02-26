@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const NPOINT_URL = 'https://api.npoint.io/20f0b0ac01ead865a619';
+const NOTIFY_EMAIL = 'oscar@next-guard.com';
+
+async function sendNotification(entry: Record<string, string>) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) return;
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'NextGuard Website <noreply@next-guard.com>',
+        to: [NOTIFY_EMAIL],
+        subject: `New RSVP Registration from ${entry.fullName || 'Unknown'}`,
+        html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+          <h2 style="color:#0f172a;border-bottom:2px solid #06b6d4;padding-bottom:12px;">New RSVP Registration</h2>
+          <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Name</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.fullName || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Email</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;"><a href="mailto:${entry.email}">${entry.email || '-'}</a></td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Company</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.company || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Job Title</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.jobTitle || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Phone</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.phone || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Country</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.country || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Attendees</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.attendees || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;border-bottom:1px solid #e2e8f0;">Notes</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">${entry.notes || '-'}</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:bold;color:#475569;">Time</td><td style="padding:8px 12px;">${entry.timestamp || new Date().toISOString()}</td></tr>
+          </table>
+          <p style="margin-top:20px;color:#94a3b8;font-size:12px;">This is an automated notification from NextGuard Website.</p>
+        </div>`,
+      }),
+    });
+  } catch (e) { console.error('Notification email error:', e); }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +58,9 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ registrations }),
     });
+
+    // Send email notification (non-blocking)
+    sendNotification(entry).catch(() => {});
 
     return NextResponse.json({ status: 'success', id: entry.id });
   } catch (error) {
