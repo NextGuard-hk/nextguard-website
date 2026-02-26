@@ -76,6 +76,7 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logFilter, setLogFilter] = useState("all")
+    const [uploadMode, setUploadMode] = useState<"public" | "internal">("public")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { checkAuth() }, [])
@@ -135,7 +136,7 @@ export default function AdminPage() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const key = dlPath + file.name
+              const key = uploadMode + "/" + file.name
         const formData = new FormData()
         formData.append("file", file)
         formData.append("key", key)
@@ -310,64 +311,81 @@ export default function AdminPage() {
         )}
 
         {tab === "downloads" && (
-          <div>
-            <div className="flex flex-wrap gap-3 mb-4">
-              <input ref={fileInputRef} type="file" multiple onChange={e => handleUpload(e.target.files)} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">{uploading ? "Uploading..." : "Upload Files"}</button>
-              <div className="flex gap-2">
-                <input type="text" value={newFolder} onChange={e => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
-                <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded-lg text-sm">Create Folder</button>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 text-sm mb-4">
-              <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>
-              {dlPath.split("/").filter(Boolean).map((crumb, i, arr) => (
-                <span key={i}>
-                  <span className="text-zinc-600"> / </span>
-                  <button onClick={() => fetchDownloads(arr.slice(0, i + 1).join("/") + "/")} className="text-cyan-400 hover:text-cyan-300">{crumb}</button>
-                </span>
-              ))}
-            </div>
-            <div className="overflow-x-auto">
-              {dlLoading ? (
-                <p className="text-zinc-500 text-center py-8">Loading...</p>
-              ) : dlItems.length === 0 ? (
-                <p className="text-zinc-500 text-center py-8">No files in this directory</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b border-zinc-800 text-zinc-400">
-                    <th className="text-left py-3 px-4">Name</th>
-                    <th className="text-left py-3 px-4">Size</th>
-                    <th className="text-left py-3 px-4">Modified</th>
-                    <th className="text-right py-3 px-4">Actions</th>
-                  </tr></thead>
-                  <tbody>
-                    {dlPath && (
-                      <tr className="border-b border-zinc-800/50 hover:bg-zinc-900/50 cursor-pointer" onClick={dlGoUp}>
-                        <td className="py-3 px-4 text-zinc-400" colSpan={4}>{"\u21A9 .."}</td>
-                      </tr>
-                    )}
-                    {dlItems.filter(item => item.name !== ".keep").map(item => (
-                      <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
-                        <td className="py-3 px-4">
-                          {item.type === "folder" ? (
-                            <button onClick={() => fetchDownloads(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">{"\uD83D\uDCC1"} {item.name}</button>
-                          ) : (
-                            <span className="flex items-center gap-2">{"\uD83D\uDCC4"} {item.name}</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
-                        <td className="py-3 px-4">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
-                        <td className="py-3 px-4 text-right">
-                          <button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs font-medium">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+    <div>
+      <input ref={fileInputRef} type="file" multiple onChange={e => handleUpload(e.target.files)} className="hidden" />
+      {/* Upload Mode Sub-tabs */}
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setUploadMode("public")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "public" ? "bg-green-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+          🌍 Upload for Public
+        </button>
+        <button onClick={() => setUploadMode("internal")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === "internal" ? "bg-orange-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+          🔒 Upload for Internal
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={`ml-auto px-4 py-2 rounded-lg text-sm disabled:opacity-50 ${uploadMode === "public" ? "bg-green-600 hover:bg-green-500 text-white" : "bg-orange-600 hover:bg-orange-500 text-white"}`}>
+          {uploading ? "Uploading..." : `Upload to ${uploadMode === "public" ? "Public" : "Internal"}`}
+        </button>
+      </div>
+      <div className={`text-xs px-3 py-2 rounded-lg mb-4 ${uploadMode === "public" ? "bg-green-900/30 text-green-400 border border-green-700/50" : "bg-orange-900/30 text-orange-400 border border-orange-700/50"}`}>
+        {uploadMode === "public" ? "🌍 Public files will be visible on /downloads page" : "🔒 Internal files are private - not accessible from public site"}
+      </div>
+      <div className="flex gap-2 mb-4">
+        <input type="text" value={newFolder} onChange={e => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
+        <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">Create Folder</button>
+      </div>
+      <div className="flex items-center gap-1 text-sm mb-4">
+        <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>
+        {dlPath.split("/").filter(Boolean).map((crumb, i, arr) => (
+          <span key={i}>
+            <span className="text-zinc-600"> / </span>
+            <button onClick={() => fetchDownloads(arr.slice(0, i + 1).join("/") + "/")} className="text-cyan-400 hover:text-cyan-300">{crumb}</button>
+          </span>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
+        {dlLoading ? (
+          <p className="text-zinc-500 text-center py-8">Loading...</p>
+        ) : dlItems.length === 0 ? (
+          <p className="text-zinc-500 text-center py-8">No files in this directory</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-zinc-800 text-zinc-400">
+              <th className="text-left py-3 px-4">Name</th>
+              <th className="text-left py-3 px-4">Size</th>
+              <th className="text-left py-3 px-4">Modified</th>
+              <th className="text-right py-3 px-4">Actions</th>
+            </tr></thead>
+            <tbody>
+              {dlPath && (
+                <tr className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                  <td className="py-3 px-4 text-zinc-400" colSpan={4}>
+                    <button onClick={dlGoUp} className="hover:text-cyan-400">↑ ..</button>
+                  </td>
+                </tr>
               )}
-            </div>
-          </div>
+              {dlItems.filter(item => item.name !== ".keep").map(item => (
+                <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                  <td className="py-3 px-4">
+                    {item.type === "folder" ? (
+                      <button onClick={() => fetchDownloads(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">📁 {item.name}</button>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        {item.path.startsWith("internal/") ? <span className="text-xs bg-orange-900/30 text-orange-400 px-1.5 py-0.5 rounded">🔒</span> : <span className="text-xs bg-green-900/30 text-green-400 px-1.5 py-0.5 rounded">🌍</span>}
+                        📄 {item.name}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
+                  <td className="py-3 px-4">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
+                  <td className="py-3 px-4 text-right">
+                    <button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs font-medium">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
         )}
 
         {tab === "logs" && (
