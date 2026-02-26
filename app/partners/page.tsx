@@ -1,5 +1,5 @@
-import { PartnersPage } from "@/components/partners-page"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return <PartnersPage />
+  redirect("/contact")
 }
