@@ -1,0 +1,69 @@
+name: Daily Backup (7-day retention)
+
+on:
+  schedule:
+    - cron: '0 16 * * *'  # 4PM UTC = midnight HKT
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create daily backup tag
+        run: |
+          DATE=$(date +'%Y-%m-%d')
+          TAG_NAME="backup-${DATE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Delete existing tag for today if re-running
+          git tag -d "$TAG_NAME" 2>/dev/null || true
+          git push origin --delete "$TAG_NAME" 2>/dev/null || true
+          # Create new backup tag
+          git tag -a "$TAG_NAME" -m "Daily backup ${DATE}"
+          git push origin "$TAG_NAME"
+          echo "Created backup tag: $TAG_NAME"
+
+      - name: Clean up old backups (keep last 7 days)
+        run: |
+          echo "Cleaning up backup tags older than 7 days..."
+          CUTOFF_DATE=$(date -d '7 days ago' +'%Y-%m-%d')
+          echo "Cutoff date: $CUTOFF_DATE"
+          # List and delete old backup tags
+          git tag -l 'backup-*' | while read tag; do
+            TAG_DATE=$(echo "$tag" | sed 's/backup-//')
+            if [[ "$TAG_DATE" < "$CUTOFF_DATE" ]]; then
+              echo "Deleting old backup: $tag"
+              git push origin --delete "$tag" 2>/dev/null || true
+              git tag -d "$tag" 2>/dev/null || true
+            else
+              echo "Keeping backup: $tag"
+            fi
+          done
+          echo "Cleanup complete."
+
+      - name: Backup npoint.io databases
+        run: |
+          DATE=$(date +'%Y-%m-%d')
+          mkdir -p backups
+          # Backup contacts DB
+          curl -s "https://api.npoint.io/c02d0f460449e1d7f8f3" > backups/contacts-${DATE}.json
+          # Backup RSVP DB
+          curl -s "https://api.npoint.io/20f0b0ac01ead865a619" > backups/rsvp-${DATE}.json
+          # Backup logs DB
+          curl -s "https://api.npoint.io/141c14f9077701d99bc1" > backups/logs-${DATE}.json
+          echo "Database backups saved:"
+          ls -la backups/
+
+      - name: Upload database backups as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 7
