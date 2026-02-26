@@ -130,20 +130,31 @@ export default function AdminPage() {
     } catch {} finally { setDlLoading(false) }
   }
 
-  async function handleUpload(files: FileList | null) {
+    async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return
     setUploading(true)
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-                          const key = dlPath + file.name
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("key", key)
-        await fetch("/api/downloads", { method: "POST", body: formData })
+        const key = dlPath + file.name
+        // Use presigned URL to bypass Vercel 4.5MB body size limit
+        const presignRes = await fetch(`/api/downloads?action=presign-upload&key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`)
+        if (!presignRes.ok) throw new Error('Failed to get presigned URL')
+        const { url } = await presignRes.json()
+        // Upload directly to R2 via presigned URL
+        const uploadRes = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        })
+        if (!uploadRes.ok) throw new Error('Upload to R2 failed')
+        // Log the upload
+        await fetch(`/api/downloads?action=confirm-upload&key=${encodeURIComponent(key)}&size=${file.size}`)
       }
       fetchDownloads(dlPath)
-    } catch {} finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = "" }
+    } catch (e: any) { alert('Upload failed: ' + (e.message || 'Unknown error'))
+    } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""
+    }
   }
 
   async function handleDelete(key: string) {
@@ -154,15 +165,17 @@ export default function AdminPage() {
     } catch {}
   }
 
-  async function createFolder() {
+    async function createFolder() {
     if (!newFolder.trim()) return
-            const key = dlPath + newFolder.trim() + "/.keep"
+    const key = dlPath + newFolder.trim() + "/.keep"
     try {
-      const formData = new FormData()
-      formData.append("file", new Blob([""], { type: "text/plain" }), ".keep")
-      formData.append("key", key)
-      const r = await fetch("/api/downloads", { method: "POST", body: formData })
-      if (r.ok) { setNewFolder(""); fetchDownloads(dlPath) }
+      // Use presigned URL for folder creation too
+      const presignRes = await fetch(`/api/downloads?action=presign-upload&key=${encodeURIComponent(key)}&contentType=text/plain`)
+      if (!presignRes.ok) throw new Error('Failed to get presigned URL')
+      const { url } = await presignRes.json()
+      await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: '' })
+      await fetch(`/api/downloads?action=confirm-upload&key=${encodeURIComponent(key)}&size=0`)
+      setNewFolder(""); fetchDownloads(dlPath)
     } catch {}
   }
 
