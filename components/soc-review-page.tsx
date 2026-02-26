@@ -136,7 +136,7 @@ export function SocReviewPage() {
 
   return (
     <>
-      <PageHeader badge="SOC Review" title="Syslog Analysis Dashboard" description="AI-powered false positive detection for SOC analysts" />
+      <PageHeader badge="SOC Review" headline="Syslog Analysis Dashboard" subheadline="AI-powered false positive detection for SOC analysts" />
 
       {/* Upload Modal */}
       {showUpload && (
@@ -223,7 +223,7 @@ export function SocReviewPage() {
         <div className="text-center py-12">
           <Shield className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
           <p className="text-zinc-400">No syslog analyses available yet.</p>
-          <p className="text-zinc-600 text-sm mt-1">Click "Upload Syslog" above to analyze your first log file.</p>
+          <p className="text-zinc-600 text-sm mt-1">Click &quot;Upload Syslog&quot; above to analyze your first log file.</p>
         </div>
       ) : (
         <div className="space-y-3">
