@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     // Log successful login
     await writeLog({ type: 'login', action: 'login_success', ip });
 
-    // Generate session token (valid for 2 hours)
+    // Generate session token (valid for 30 minutes)
     const response = NextResponse.json({
       status: 'success',
       token: sessionSecret,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
-      maxAge: 2 * 60 * 60, // 2 hours
+      maxAge: 30 * 60, // 30 minutes idle timeout
       path: '/',
     });
 
