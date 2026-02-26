@@ -47,13 +47,40 @@ export async function GET(req: NextRequest) {
   const pw = searchParams.get('pw')
   const admin = isAdmin(req)
 
+  // Presigned upload URL - admin only
+  if (action === 'presign-upload') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const key = searchParams.get('key')
+    const contentType = searchParams.get('contentType') || 'application/octet-stream'
+    if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
+    try {
+      const url = await getSignedUrl(S3, new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        ContentType: contentType,
+      }), { expiresIn: 3600 })
+      return NextResponse.json({ url, key })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // Confirm upload completed - admin only
+  if (action === 'confirm-upload') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const key = searchParams.get('key') || 'unknown'
+    const size = searchParams.get('size') || '0'
+    const ip = req.headers.get('x-forwarded-for') || 'unknown'
+    await writeLog({ type: 'file', action: 'upload', key, size, ip, status: 'success' })
+    return NextResponse.json({ success: true })
+  }
+
   if (!action || action === 'list') {
     if (pw !== DOWNLOAD_PASSWORD && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     try {
       let prefix = searchParams.get('prefix') || ''
-      // Non-admin (public) users can only browse public/ prefix
       if (!admin) {
         prefix = PUBLIC_PREFIX + prefix.replace(/^public\//, '')
       }
@@ -84,7 +111,6 @@ export async function GET(req: NextRequest) {
     const key = searchParams.get('key') || 'unknown'
     try {
       if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
-      // Non-admin users can only download public/ files
       if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
         await writeLog({ type: 'file', action: 'download', key, ip, status: 'failed', reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
