@@ -39,7 +39,7 @@ export function Header() {
   const currentLang = languages.find((l) => l.code === locale)
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between pl-2 pr-6 py-4">
         <Link href="/" className="flex items-center gap-2 mr-8 mix-blend-screen" onClick={() => setMobileOpen(false)}>
           <Image
             src="/images/nextguard-logo.png"
