@@ -276,7 +276,6 @@ export default function AdminPage() {
 
   if (!isAuth) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-      <IdleTimer onLogout={handleLogout} />
       <div className="max-w-md w-full bg-zinc-900 rounded-2xl p-8 border border-zinc-800">
         <h1 className="text-2xl font-bold text-white mb-2">Admin Login</h1>
         <p className="text-zinc-400 mb-6">NextGuard Admin Dashboard</p>
