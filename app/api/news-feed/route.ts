@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 
 const NPOINT_URL = "https://api.npoint.io/ea9aac6e3aff30bb0dfa"
 
+const IMPORTANCE_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 }
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -20,7 +22,9 @@ export async function GET(req: NextRequest) {
 
     // Sort by importance desc, then publishedAt desc
     news.sort((a: any, b: any) => {
-      if (b.importance !== a.importance) return b.importance - a.importance
+      const impA = IMPORTANCE_ORDER[a.importance] || 0
+      const impB = IMPORTANCE_ORDER[b.importance] || 0
+      if (impB !== impA) return impB - impA
       return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     })
 
