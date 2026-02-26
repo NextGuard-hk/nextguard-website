@@ -29,6 +29,7 @@ export function Header() {
     { href: "/partner-day-2026-registration", label: "RSVP" },
         { href: "/news/ai-feed", label: t.nav.aiFeed || "AI News" },
     { href: "https://kb.next-guard.com", label: t.nav.kb },
+        { href: "/soc-review", label: "SOC Review" },
   ]
   const languages: { code: Locale; label: string }[] = [
     { code: "en", label: "English" },
