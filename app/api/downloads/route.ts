@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, PutBucketCorsCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
 const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || 'NextGuard123'
 const LOG_NPOINT_URL = 'https://api.npoint.io/141c14f9077701d99bc1'
+const VT_API_KEY = process.env.VIRUSTOTAL_API_KEY || ''
 
 // Prefix constants
 const PUBLIC_PREFIX = 'public/'
@@ -41,11 +42,74 @@ async function writeLog(entry: Record<string, string>) {
   } catch (e) { console.error('Log write error:', e); }
 }
 
+// Scan file with VirusTotal by URL (for R2 presigned download URL)
+async function scanWithVirusTotal(key: string): Promise<{ safe: boolean; message: string }> {
+  if (!VT_API_KEY) return { safe: true, message: 'Virus scanning not configured (no API key)' }
+  try {
+    // Generate a temporary download URL for VirusTotal to fetch
+    const downloadUrl = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 600 })
+    // Submit URL to VirusTotal for scanning
+    const scanRes = await fetch('https://www.virustotal.com/api/v3/urls', {
+      method: 'POST',
+      headers: { 'x-apikey': VT_API_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `url=${encodeURIComponent(downloadUrl)}`,
+    })
+    if (!scanRes.ok) return { safe: true, message: 'VirusTotal scan request failed, allowing upload' }
+    const scanData = await scanRes.json()
+    const analysisId = scanData?.data?.id
+    if (!analysisId) return { safe: true, message: 'No analysis ID returned' }
+    // Poll for results (wait up to 60s)
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 5000))
+      const resultRes = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
+        headers: { 'x-apikey': VT_API_KEY },
+      })
+      if (!resultRes.ok) continue
+      const result = await resultRes.json()
+      const status = result?.data?.attributes?.status
+      if (status === 'completed') {
+        const stats = result?.data?.attributes?.stats || {}
+        const malicious = stats.malicious || 0
+        const suspicious = stats.suspicious || 0
+        if (malicious > 0 || suspicious > 0) {
+          return { safe: false, message: `Threat detected: ${malicious} malicious, ${suspicious} suspicious` }
+        }
+        return { safe: true, message: 'Scan clean' }
+      }
+    }
+    return { safe: true, message: 'Scan timeout, allowing upload' }
+  } catch (e: any) {
+    return { safe: true, message: `Scan error: ${e.message}` }
+  }
+}
+
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
   const action = searchParams.get('action')
   const pw = searchParams.get('pw')
   const admin = isAdmin(req)
+
+  // Setup CORS for R2 bucket - admin only, run once
+  if (action === 'setup-cors') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    try {
+      await S3.send(new PutBucketCorsCommand({
+        Bucket: BUCKET,
+        CORSConfiguration: {
+          CORSRules: [{
+            AllowedOrigins: ['*'],
+            AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD'],
+            AllowedHeaders: ['*'],
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 86400,
+          }],
+        },
+      }))
+      return NextResponse.json({ success: true, message: 'CORS configured for R2 bucket' })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
 
   // Presigned upload URL - admin only
   if (action === 'presign-upload') {
@@ -65,14 +129,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Confirm upload completed - admin only
+  // Confirm upload completed + virus scan - admin only
   if (action === 'confirm-upload') {
     if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
     const key = searchParams.get('key') || 'unknown'
     const size = searchParams.get('size') || '0'
     const ip = req.headers.get('x-forwarded-for') || 'unknown'
-    await writeLog({ type: 'file', action: 'upload', key, size, ip, status: 'success' })
-    return NextResponse.json({ success: true })
+    // Run virus scan
+    const scanResult = await scanWithVirusTotal(key)
+    if (!scanResult.safe) {
+      // Delete the infected file from R2
+      try { await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })) } catch {}
+      await writeLog({ type: 'file', action: 'upload-blocked', key, size, ip, status: 'virus-detected', reason: scanResult.message })
+      return NextResponse.json({ success: false, virus: true, message: scanResult.message }, { status: 400 })
+    }
+    await writeLog({ type: 'file', action: 'upload', key, size, ip, status: 'success', scan: scanResult.message })
+    return NextResponse.json({ success: true, scan: scanResult.message })
   }
 
   if (!action || action === 'list') {
