@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const SOC_PASSWORD = process.env.SOC_ACCESS_PASSWORD || 'NextGuard123'
+const SOC_PASSWORD = process.env.SOC_ACCESS_PASSWORD || ''
 
 export async function POST(req: NextRequest) {
   try {
