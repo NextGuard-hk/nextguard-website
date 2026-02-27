@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { PageHeader } from "./page-header"
 import { AnimateIn } from "./animate-in"
-import { Shield, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Search, ChevronDown, ChevronRight, RefreshCw, Upload, X, Loader2, Play } from "lucide-react"
+import { Shield, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Search, ChevronDown, ChevronRight, RefreshCw, Upload, X, Loader2, Play, Trash2 } from "lucide-react"
 
 interface AnalysisResult {
   id: string
@@ -224,7 +224,7 @@ export function SocReviewPage() {
     }
   }
 
-  function toggleEvent(id: string) {
+  async function handleDeleteAnalysis(analysisId: string) {     if (!confirm('Delete this analysis record?')) return     try {       const r = await fetch('/api/syslog-analysis', {         method: 'DELETE',         headers: { 'Content-Type': 'application/json' },         body: JSON.stringify({ analysisId }),       })       if (r.ok) {         await fetchAnalyses()         if (selectedAnalysis?.id === analysisId) setSelectedAnalysis(analyses.length > 1 ? analyses[0] : null)       }     } catch {}   }   function toggleEvent(id: string) {
     setExpandedEvents(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
@@ -310,7 +310,7 @@ export function SocReviewPage() {
           <select value={selectedAnalysis?.id || ''} onChange={e => setSelectedAnalysis(analyses.find(a => a.id === e.target.value) || null)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:border-cyan-500 focus:outline-none">
             {analyses.map(a => (<option key={a.id} value={a.id}>{a.fileName} - {new Date(a.analyzedAt).toLocaleDateString()}</option>))}
           </select>
-          <button onClick={() => { setShowUpload(true); setUploadError(''); setUploadContent(''); setUploadFileName('') }} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2"><Upload className="w-4 h-4" /> Upload Syslog</button>
+          <button onClick={() => { setShowUpload(true); setUploadError(''); setUploadContent(''); setUploadFileName('') }} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2"><Upload className="w-4 h-4" /> Upload Syslog</button>         {selectedAnalysis && <button onClick={() => handleDeleteAnalysis(selectedAnalysis.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 border border-red-500/30"><Trash2 className="w-4 h-4" /> Delete</button>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(['all', 'false_positive', 'true_positive', 'needs_review'] as const).map(f => (
