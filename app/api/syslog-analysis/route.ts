@@ -300,12 +300,12 @@ export async function PATCH(req: NextRequest) {
     if (!analysis) return NextResponse.json({ error: 'Analysis not found' }, { status: 404 })
     const result = analysis.results.find(r => r.id === resultId)
     if (!result) return NextResponse.json({ error: 'Result not found' }, { status: 404 })
+    const oldVerdict = result.socOverride || result.verdict
     if (socOverride) result.socOverride = socOverride
     if (socNotes) result.socNotes = socNotes
     result.reviewedBy = reviewedBy || 'SOC Analyst'
     result.reviewedAt = new Date().toISOString()
-    if (socOverride === 'false_positive') { analysis.falsePositives++; if (result.verdict === 'true_positive') analysis.truePositives--; else if (result.verdict === 'needs_review') analysis.needsReview-- }
-    if (socOverride === 'true_positive') { analysis.truePositives++; if (result.verdict === 'false_positive') analysis.falsePositives--; else if (result.verdict === 'needs_review') analysis.needsReview-- }
+    const oldV = oldVerdict; if (oldV === 'false_positive') analysis.falsePositives--; else if (oldV === 'true_positive') analysis.truePositives--; else if (oldV === 'needs_review') analysis.needsReview--; if (socOverride === 'false_positive') analysis.falsePositives++; else if (socOverride === 'true_positive') analysis.truePositives++; else analysis.needsReview++
     await saveAnalyses(analyses)
     return NextResponse.json({ success: true })
   } catch (e: any) {
