@@ -343,7 +343,8 @@ export default function AdminPage() {
   }
 
   async function analyzeSyslog(filePath: string) {
-    setAnalyzing(true); setAnalysisResult(null)
+    setAnalyzing(true); 220
+    (null)
     try {
       const r = await fetch('/api/syslog-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filePath }) })
       const d = await r.json()
@@ -506,7 +507,11 @@ export default function AdminPage() {
             )}
             <div className="flex gap-2 mb-4">
               <input type="text" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
+<<<<<<< HEAD
+              <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">{createFolderLoading ? 'Creating...' : 'Create Folder'}</button>
+=======
               <button onClick={createFolder} disabled={createFolderLoading} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">{createFolderLoading ? 'Creating...' : 'Create Folder'}</button>
+>>>>>>> 206b2125705c6e3626d12c8b9e3fa9b89421e472
             </div>
             <div className="flex gap-1 mb-4 text-sm">
               <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>

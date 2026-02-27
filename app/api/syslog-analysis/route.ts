@@ -8,7 +8,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
 const SYSLOG_NPOINT = process.env.NPOINT_SYSLOG_URL || ''
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
+const LLM_API_KEY = process.env.PERPLEXITY_API_KEY || process.env.OPENAI_API_KEY || ''
+const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ? 'https://api.perplexity.ai/chat/completions' : LLM_ENDPOINT
+const LLM_MODEL = process.env.PERPLEXITY_API_KEY ? 'sonar' : 'gpt-4o-mini'
 
 const S3 = new S3Client({
   region: 'auto',
@@ -104,7 +106,7 @@ function parseSyslogLine(line: string, index: number): SyslogEvent | null {
 }
 
 async function analyzeWithLLM(events: SyslogEvent[]): Promise<AnalysisResult[]> {
-  if (!OPENAI_API_KEY) {
+  if (!LLM_API_KEY) {
     return events.map(evt => ({
       id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
       eventId: evt.id,
@@ -121,11 +123,11 @@ async function analyzeWithLLM(events: SyslogEvent[]): Promise<AnalysisResult[]> 
     const batch = events.slice(i, i + batchSize)
     const prompt = `You are a cybersecurity SOC analyst specializing in DLP (Data Loss Prevention) syslog analysis. Analyze each syslog event below and determine if it is a FALSE POSITIVE, TRUE POSITIVE, or NEEDS REVIEW.\n\nFor each event, respond in JSON array format with objects containing:\n- eventIndex (number, 0-based index in this batch)\n- verdict: "false_positive", "true_positive", or "needs_review"\n- confidence: 0-100\n- reasoning: brief explanation\n- recommendation: what SOC should do\n\nEvents:\n${batch.map((e, idx) => `[${idx}] ${e.raw}`).join('\n')}\n\nRespond with ONLY a JSON array, no other text.`
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetch(LLM_ENDPOINT, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${LLM_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: LLM_MODEL,
           messages: [{ role: 'system', content: 'You are a DLP security analyst. Respond only with valid JSON.' }, { role: 'user', content: prompt }],
           temperature: 0.1,
           max_tokens: 2000,
