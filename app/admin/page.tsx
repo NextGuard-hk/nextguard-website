@@ -137,25 +137,57 @@ export default function AdminPage() {
         const file = files[i]
         setUploadFileName(file.name + (files.length > 1 ? " (" + (i + 1) + "/" + files.length + ")" : ""))
         const key = dlPath + file.name
-        const presignRes = await fetch("/api/downloads?action=presign-upload&key=" + encodeURIComponent(key) + "&contentType=" + encodeURIComponent(file.type || 'application/octet-stream'))
-        if (!presignRes.ok) throw new Error('Failed to get presigned URL')
-        const { url } = await presignRes.json()
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-          xhr.open('PUT', url)
-          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              setUploadProgress(Math.round((event.loaded / event.total) * 100))
+        const CHUNK_SIZE = 100 * 1024 * 1024 // 100MB per chunk
+          if (file.size > CHUNK_SIZE) {
+            // Multipart upload for large files
+            const createRes = await fetch("/api/downloads?action=multipart-create&key=" + encodeURIComponent(key) + "&contentType=" + encodeURIComponent(file.type || 'application/octet-stream'))
+            if (!createRes.ok) throw new Error('Failed to create multipart upload')
+            const { uploadId } = await createRes.json()
+            const totalParts = Math.ceil(file.size / CHUNK_SIZE)
+            const parts: { ETag: string; PartNumber: number }[] = []
+            try {
+              for (let p = 0; p < totalParts; p++) {
+                const start = p * CHUNK_SIZE
+                const end = Math.min(start + CHUNK_SIZE, file.size)
+                const chunk = file.slice(start, end)
+                const partNumber = p + 1
+                const presignPartRes = await fetch("/api/downloads?action=multipart-presign&key=" + encodeURIComponent(key) + "&uploadId=" + encodeURIComponent(uploadId) + "&partNumber=" + partNumber)
+                if (!presignPartRes.ok) throw new Error('Failed to presign part ' + partNumber)
+                const { url: partUrl } = await presignPartRes.json()
+                const partRes = await fetch(partUrl, { method: 'PUT', body: chunk })
+                if (!partRes.ok) throw new Error('Failed to upload part ' + partNumber)
+                const etag = partRes.headers.get('ETag') || ''
+                parts.push({ ETag: etag, PartNumber: partNumber })
+                setUploadProgress(Math.round(((p + 1) / totalParts) * 100))
+              }
+              const completeRes = await fetch("/api/downloads?action=multipart-complete&key=" + encodeURIComponent(key) + "&uploadId=" + encodeURIComponent(uploadId) + "&parts=" + encodeURIComponent(JSON.stringify(parts)))
+              if (!completeRes.ok) throw new Error('Failed to complete multipart upload')
+            } catch (mpErr) {
+              await fetch("/api/downloads?action=multipart-abort&key=" + encodeURIComponent(key) + "&uploadId=" + encodeURIComponent(uploadId))
+              throw mpErr
             }
+          } else {
+            // Single PUT for small files
+            const presignRes = await fetch("/api/downloads?action=presign-upload&key=" + encodeURIComponent(key) + "&contentType=" + encodeURIComponent(file.type || 'application/octet-stream'))
+            if (!presignRes.ok) throw new Error('Failed to get presigned URL')
+            const { url } = await presignRes.json()
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest()
+              xhr.open('PUT', url)
+              xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  setUploadProgress(Math.round((event.loaded / event.total) * 100))
+                }
+              }
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve()
+                else reject(new Error('Upload to R2 failed'))
+              }
+              xhr.onerror = () => reject(new Error('Upload to R2 failed'))
+              xhr.send(file)
+            })
           }
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve()
-            else reject(new Error('Upload to R2 failed'))
-          }
-          xhr.onerror = () => reject(new Error('Upload to R2 failed'))
-          xhr.send(file)
-        })
         const confirmRes = await fetch("/api/downloads?action=confirm-upload&key=" + encodeURIComponent(key) + "&size=" + file.size)
         const confirmData = await confirmRes.json()
         if (confirmData.virus) { alert("File blocked - virus detected in " + file.name + ": " + confirmData.message); continue }
