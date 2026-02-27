@@ -48,7 +48,7 @@ const verdictConfig: Record<string, { label: string; color: string; bg: string; 
   needs_review: { label: 'Needs Review', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/30', icon: AlertTriangle },
 }
 
-async function decompressGzip(buffer: ArrayBuffer): Promise<string> {
+async function decompressGzip(buffer: ArrayBuffer) {
   const ds = new DecompressionStream('gzip')
   const writer = ds.writable.getWriter()
   writer.write(new Uint8Array(buffer))
