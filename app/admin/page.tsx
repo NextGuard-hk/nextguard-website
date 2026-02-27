@@ -516,11 +516,7 @@ export default function AdminPage() {
             )}
           </div>
         )}
-
-        {tab === "logs" && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-            <div className="flex items-center gap-4 mb-4">
-              
+        
       {/* Rename Modal */}
       {renameItem && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setRenameItem(null)}>
@@ -551,6 +547,11 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+              
+
+        {tab === "logs" && (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+            <div className="flex items-center gap-4 mb-4">
               <span className="text-zinc-400 text-sm">Filter:</span>
               {["all", "login", "file"].map(f => (<button key={f} onClick={() => setLogFilter(f)} className={"px-3 py-1.5 rounded-md text-xs font-medium transition-colors " + (logFilter === f ? "bg-cyan-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white")}>{f === "all" ? "All" : f === "login" ? "Login" : "File Ops"}</button>))}
               <span className="text-zinc-500 text-xs ml-auto">{filteredLogs.length} records</span>
