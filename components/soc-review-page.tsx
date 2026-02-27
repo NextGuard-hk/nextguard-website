@@ -239,7 +239,7 @@ export function SocReviewPage() {
 
   return (
     <>
-      <PageHeader title="SOC Review" subtitle="Syslog Analysis Dashboard" description="AI-powered false positive detection for SOC analysts" />
+      <PageHeader badge="AI SOC" headline="Syslog Analysis Dashboard" subheadline="AI-powered false positive detection for SOC analysts" />
       <div className="max-w-6xl mx-auto px-4 pb-16">
 
       {/* Demo Banner */}
