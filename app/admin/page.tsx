@@ -435,7 +435,7 @@ export default function AdminPage() {
   )
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-4 md:p-8 pt-32">
+    <div className="min-h-screen bg-zinc-950 px-4 pb-4 md:px-8 md:pb-8" style={{paddingTop: '120px'}}>
       <IdleTimer onLogout={handleLogout} />
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
