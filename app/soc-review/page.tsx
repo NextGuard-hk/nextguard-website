@@ -4,7 +4,7 @@ import { Footer } from "@/components/footer"
 import SocAuthWrapper from "@/components/soc-auth-wrapper"
 
 export const metadata = {
-  title: "SOC Review – NextGuard",
+  title: "AI SOC – NextGuard",
   description: "AI-powered syslog analysis dashboard for SOC analysts",
 }
 
