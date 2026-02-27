@@ -29,6 +29,13 @@ function isAdmin(req: NextRequest): boolean {
   return token?.value === sessionSecret
 }
 
+function isDownloadUser(req: NextRequest): boolean {
+  const downloadSecret = process.env.DOWNLOAD_PASSWORD
+  if (!downloadSecret) return false
+  const token = req.cookies.get('download_session_token')
+  return token?.value === downloadSecret
+}
+
 async function writeLog(entry: Record<string, string>) {
   try {
     const logEntry = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...entry };
