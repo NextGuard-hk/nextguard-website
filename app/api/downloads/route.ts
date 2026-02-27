@@ -6,6 +6,8 @@ const BUCKET = 'nextguard-downloads'
 const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || ''
 const LOG_NPOINT_URL = process.env.NPOINT_LOGS_URL || ''
 const VT_API_KEY = process.env.VIRUSTOTAL_API_KEY || ''
+const STORAGE_WARN_BYTES = 800 * 1024 * 1024 * 1024 // 800GB storage warning threshold
+const STORAGE_NOTIFY_EMAIL = 'oscar@next-guard.com'
 
 // Prefix constants
 const PUBLIC_PREFIX = 'public/'
@@ -45,6 +47,45 @@ async function writeLog(entry: Record<string, string>) {
 // Scan file with VirusTotal by URL (for R2 presigned download URL)
 async function scanWithVirusTotal(key: string): Promise<{ safe: boolean; message: string }> {
   if (!VT_API_KEY) return { safe: true, message: 'Virus scanning not configured (no API key)' }
+  // Check total R2 bucket storage and notify if over threshold
+async function checkStorageAndNotify() {
+  try {
+    let totalSize = 0
+    let continuationToken: string | undefined
+    do {
+      const list = await S3.send(new ListObjectsV2Command({
+        Bucket: BUCKET, ContinuationToken: continuationToken
+      }))
+      for (const obj of list.Contents || []) {
+        totalSize += obj.Size || 0
+      }
+      continuationToken = list.NextContinuationToken
+    } while (continuationToken)
+    if (totalSize >= STORAGE_WARN_BYTES) {
+      const totalGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2)
+      const resendApiKey = process.env.RESEND_API_KEY
+      if (!resendApiKey) {
+        console.error('Storage warning: ' + totalGB + 'GB used but no RESEND_API_KEY to send notification')
+        return
+      }
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'NextGuard Website <noreply@next-guard.com>',
+          to: [STORAGE_NOTIFY_EMAIL],
+          subject: `[NextGuard] R2 Storage Warning: ${totalGB}GB used (threshold: 800GB)`,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h2 style="color:#f59e0b;">R2 Storage Warning</h2><p>The NextGuard R2 storage bucket <strong>${BUCKET}</strong> has reached <strong>${totalGB} GB</strong>, exceeding the 800GB warning threshold.</p><p>Please review and clean up unnecessary files to avoid excessive storage costs.</p><p style="margin-top:20px;color:#94a3b8;font-size:12px;">This is an automated notification from NextGuard Website.</p></div>`,
+        }),
+      })
+      await writeLog({ type: 'system', action: 'storage-warning', size: totalSize.toString(), message: totalGB + 'GB used, notification sent to ' + STORAGE_NOTIFY_EMAIL })
+    }
+  } catch (e) { console.error('Storage check error:', e) }
+}
+
   try {
     const downloadUrl = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 600 })
     const scanRes = await fetch('https://www.virustotal.com/api/v3/urls', {
@@ -218,6 +259,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, virus: true, message: scanResult.message }, { status: 400 })
     }
     await writeLog({ type: 'file', action: 'upload', key, size, ip, status: 'success', scan: scanResult.message })
+        checkStorageAndNotify() // fire-and-forget storage check
     return NextResponse.json({ success: true, scan: scanResult.message })
   }
 
