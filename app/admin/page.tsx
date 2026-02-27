@@ -288,7 +288,7 @@ export default function AdminPage() {
     try {
       const r = await fetch("/api/news-feed/collect?secret=nextguard-collect-2024")
       const collectData = await r.json()
-      const nr = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const nr = await fetch("/api/news-feed/admin")
       if (nr.ok) {
         const data = await nr.json()
         setNewsArticles(data.articles || [])
@@ -298,20 +298,20 @@ export default function AdminPage() {
 
   async function updateNewsStatus(id: string, status: string) {
     try {
-      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const r = await fetch("/api/news-feed/admin")
       const data = await r.json()
       const articles = (data.articles || []).map((a: any) => a.id === id ? { ...a, status } : a)
-      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
 
   async function publishAllPending() {
     try {
-      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const r = await fetch("/api/news-feed/admin")
       const data = await r.json()
       const articles = (data.articles || []).map((a: any) => a.status === "pending" ? { ...a, status: "published" } : a)
-      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
@@ -319,10 +319,10 @@ export default function AdminPage() {
   async function deleteNewsArticle(id: string) {
     if (!confirm("Delete this article?")) return
     try {
-      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const r = await fetch("/api/news-feed/admin")
       const data = await r.json()
       const articles = (data.articles || []).filter((a: any) => a.id !== id)
-      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
