@@ -3,8 +3,8 @@ import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, Del
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
-const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || 'NextGuard123'
-const LOG_NPOINT_URL = 'https://api.npoint.io/141c14f9077701d99bc1'
+const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || ''
+const LOG_NPOINT_URL = process.env.NPOINT_LOGS_URL || ''
 const VT_API_KEY = process.env.VIRUSTOTAL_API_KEY || ''
 
 // Prefix constants
