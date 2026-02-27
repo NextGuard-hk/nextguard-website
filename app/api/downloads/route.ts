@@ -29,7 +29,7 @@ function isAdmin(req: NextRequest): boolean {
   return token?.value === sessionSecret
 }
 
-funfunction isDownloadUser(req: NextRequest): boolean {
+function isDownloadUser(req: NextRequest): boolean {
   const downloadSecret = process.env.DOWNLOAD_PASSWORD
   if (!downloadSecret) return false
   const token = req.cookies.get('download_session_token')
