@@ -313,6 +313,7 @@ export async function PATCH(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
+  }
 
   export async function DELETE(req: NextRequest) {
   try {
@@ -328,5 +329,4 @@ export async function PATCH(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
-}
 }
