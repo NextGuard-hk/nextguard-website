@@ -288,7 +288,7 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'rename', key: oldKey, reason: 'renamed to ' + newKey, ip, status: 'success' })
       return NextResponse.json({ success: true, oldKey, newKey })
     } catch (e: any) {
-      await writeLog({ type: 'file', action: 'rename', key: oldKey, ip, status: 'failed', reason: e.message })
+      await writeLog({ type: 'file', action: 'rename', key: oldKey, ip, : e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
@@ -318,7 +318,7 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, reason: 'moved to ' + newPrefix, count: moved.toString(), ip, status: 'success' })
       return NextResponse.json({ success: true, moved })
     } catch (e: any) {
-      await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, ip, status: 'failed', reason: e.message })
+      await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, ip, : e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
@@ -383,7 +383,7 @@ export async function GET(req: NextRequest) {
     try {
       if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
       if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
-        await writeLog({ type: 'file', action: 'download', key, ip, status: 'failed', reason: 'Access denied - not a public file' })
+        await writeLog({ type: 'file', action: 'download', key, ip, : 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
             // R2 Budget enforcement - block downloads if monthly cost >= $200
@@ -399,7 +399,7 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
       return NextResponse.json({ url })
     } catch (e: any) {
-      await writeLog({ type: 'file', action: 'download', key, ip, status: 'failed', reason: e.message })
+      await writeLog({ type: 'file', action: 'download', key, ip, : e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
@@ -465,3 +465,25 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+
+export async function PATCH(req: NextRequest) {
+    try {
+          const body = await req.json()
+          const pw = body.password || ''
+          if (pw !== DOWNLOAD_PASSWORD) {
+                  return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
+                }
+          const res = NextResponse.json({ success: true })
+          res.cookies.set('download_auth', DOWNLOAD_PASSWORD, {
+                  httpOnly: true,
+                  secure: true,
+                  sameSite: 'strict',
+                  path: '/',
+                  maxAge: 60 * 60 * 24,
+                })
+          return res
+        } catch {
+          return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+        }
+  }
