@@ -94,7 +94,7 @@ export default function AdminPage() {
   const [moveTarget, setMoveTarget] = useState("")
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
     const [moveLoading, setMoveLoading] = useState(false)
-  const [r2Budget, setR2Budget] = useState(null)
+  const [r2Budget, setR2Budget] = useState<any>(null)
   const [r2Loading, setR2Loading] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
