@@ -151,7 +151,7 @@ export default function DownloadsPage() {
   const rateLimitPopup = rateLimitMsg ? (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-yellow-600 rounded-2xl p-8 max-w-md w-full text-center">
-        <div className="text-4xl mb-4">\u26a0\ufe0f</div>
+        <div className="text-4xl mb-4">⚠️</div>
         <h3 className="text-xl font-bold text-yellow-400 mb-3">Download Limit Reached</h3>
         <p className="text-zinc-300 mb-6">{rateLimitMsg}</p>
         <button onClick={() => setRateLimitMsg("")} className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg">OK</button>
@@ -229,9 +229,9 @@ export default function DownloadsPage() {
                     <td className="px-4 py-2.5">
                       {item.type === "folder" ? (
                         <button onClick={() => navigateFolder(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">
-                          \ud83d\udcc1 {item.name}
+                          📁 {item.name}
                         </button>
-                      ) : <span className="flex items-center gap-2">\ud83d\udcc4 {item.name}</span>}
+                      ) : <span className="flex items-center gap-2">📄 {item.name}</span>}
                     </td>
                     <td className="px-4 py-2.5 text-zinc-400 text-sm">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
                     <td className="px-4 py-2.5 text-zinc-400 text-sm">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
