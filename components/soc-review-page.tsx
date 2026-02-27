@@ -120,7 +120,7 @@ export function SocReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysisId, resultId, socOverride: verdict, socNotes: notes, reviewedBy: 'SOC Analyst' }),
       })
-      if (r.ok) fetchAnalyses()
+      if (r.ok) { if (selectedAnalysis) { const updated = { ...selectedAnalysis }; const res = updated.results.find(x => x.id === resultId); if (res) { const oldVerdict = res.socOverride || res.verdict; res.socOverride = verdict; res.reviewedBy = 'SOC Analyst'; res.reviewedAt = new Date().toISOString(); if (notes) res.socNotes = notes; if (oldVerdict === 'needs_review') updated.needsReview--; else if (oldVerdict === 'false_positive') updated.falsePositives--; else if (oldVerdict === 'true_positive') updated.truePositives--; if (verdict === 'false_positive') updated.falsePositives++; else if (verdict === 'true_positive') updated.truePositives++; else updated.needsReview++; } setSelectedAnalysis(updated); setAnalyses(prev => prev.map(a => a.id === updated.id ? updated : a)); } }
     } catch {}
   }
 
