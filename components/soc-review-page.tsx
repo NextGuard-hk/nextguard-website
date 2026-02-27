@@ -177,11 +177,11 @@ export function SocReviewPage() {
     const isGzip = file.name.endsWith('.gz') || file.name.endsWith('.tgz')
     if (isGzip) {
       try {
-        const buffer = await file.arrayBuffer()
+          const buffer = await file.slice(0, 10 * 1024 * 1024).arrayBuffer()
         const gzBytes = await decompressGzipBytes(buffer); const text = file.name.endsWith('.tgz') ? extractTextFromTar(gzBytes) : new TextDecoder().decode(gzBytes)
         setUploadContent(text)
       } catch {
-        setUploadError('Failed to decompress .gz/.tgz file')
+        const reader = new FileReader(); reader.onload = (ev) => { setUploadContent(ev.target?.result as string || '') }; reader.readAsText(file.slice(0, 10 * 1024 * 1024))
       }
     } else {
       const reader = new FileReader()
