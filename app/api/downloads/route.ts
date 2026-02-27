@@ -283,7 +283,7 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'rename', key: oldKey, reason: 'renamed to ' + newKey, ip, status: 'success' })
       return NextResponse.json({ success: true, oldKey, newKey })
     } catch (e: any) {
-      await writeLog({ type: 'file', action: 'rename', key: oldKey, ip, : e.message })
+      await writeLog({ type: 'file', action: 'rename', key: oldKey, ip, reason: e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
@@ -313,7 +313,7 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, reason: 'moved to ' + newPrefix, count: moved.toString(), ip, status: 'success' })
       return NextResponse.json({ success: true, moved })
     } catch (e: any) {
-      await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, ip, : e.message })
+      await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, ip, reason: e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
@@ -378,7 +378,7 @@ export async function GET(req: NextRequest) {
     try {
       if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
       if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
-        await writeLog({ type: 'file', action: 'download', key, ip, : 'Access denied - not a public file' })
+        await writeLog({ type: 'file', action: 'download', key, ip, reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
             // R2 Budget enforcement - block downloads if monthly cost >= $200
@@ -394,7 +394,7 @@ export async function GET(req: NextRequest) {
       await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
       return NextResponse.json({ url })
     } catch (e: any) {
-      await writeLog({ type: 'file', action: 'download', key, ip, : e.message })
+      await writeLog({ type: 'file', action: 'download', key, ip, reason: e.message })
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
   }
