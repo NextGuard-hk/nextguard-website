@@ -9,7 +9,7 @@ const SAMPLE_CATEGORIES = [
     samples: [
       { name: 'Standard PII (Baseline)', content: 'Customer Record:\nName: John Chan Wing Kei\nHKID: A123456(7)\nPhone: +852 6789 0000\nCredit Card: 5407 1234 5678 9012\nEmail: john.chan@example.com\nAddress: Flat 12A, Tower 3, Taikoo Shing, Hong Kong' },
       { name: 'Obfuscated PII (Evasion)', content: 'Jo&&@hn Ch&&@an W&&@ing K&&@ei\nHK&&@ID: A1&&@23&&@456(7)\n+85&&@2 678&&@9 00&&@00\n54&&@07 12&&@34 56&&@78 90&&@12\njo&&@hn.ch&&@an@exa&&@mple.com' },
-      { name: 'Spaced Character Evasion', content: 'N a m e: J o h n  C h a n\nH K I D: A 1 2 3 4 5 6 (7)\nP h o n e: + 8 5 2  6 7 8 9  0 0 0 0\nC r e d i t  C a r d: 5 4 0 7  1 2 3 4  5 6 7 8  9 0 1 2' },
+      { name: 'Spaced Character Evasion', content: 'N a m e: J o h n C h a n\nH K I D: A 1 2 3 4 5 6 (7)\nP h o n e: + 8 5 2 6 7 8 9 0 0 0 0\nC r e d i t C a r d: 5 4 0 7 1 2 3 4 5 6 7 8 9 0 1 2' },
       { name: 'Homoglyph Attack', content: 'Name: J\u043ehn Ch\u0430n (using Cyrillic o and a)\nHKID: \u0410123456(7) (Cyrillic A)\nPhone: +852 \u0431789 0000\nCC: 54O7 l234 5678 90l2 (O=zero, l=one)' },
       { name: 'Mixed Language PII', content: '\u59d3\u540d: \u9673\u5927\u6587 (Chan Tai Man)\nHKID: B987654(3)\n\u96fb\u8a71: +852-9876-5432\n\u4fe1\u7528\u5361: 4532-8901-2345-6789\n\u5730\u5740: \u9999\u6e2f\u4e2d\u74b0\u7687\u540e\u5927\u9053\u4e2d18\u865f' },
       { name: 'PII in Code/JSON Format', content: '{"user": {"firstName": "Wing", "lastName": "Chan", "id_number": "C234567(8)", "mobile": "85291234567", "payment": {"card": "4111111111111111", "exp": "12/27", "cvv": "123"}}}' },
@@ -52,6 +52,18 @@ const SAMPLE_CATEGORIES = [
       { name: 'Clean Business Report', content: 'Q4 2025 Performance Summary:\nRevenue grew 15.3% YoY to HKD 127M driven by APAC expansion.\nNew enterprise clients: 23 (target: 20)\nCustomer retention: 94.2%\nR&D investment increased to 18% of revenue.\nHeadcount: 342 FTE across 5 offices.\nNo material compliance incidents reported.' },
     ]
   },
+  {
+    category: 'Policy Keywords',
+    icon: '\ud83d\udcdd',
+    description: 'Test sensitive keyword and classification detection',
+    samples: [
+      { name: 'Single Keyword: confidential', content: 'confidential' },
+      { name: 'Single Keyword: secret', content: 'secret' },
+      { name: 'Classification in Context', content: 'This document is classified as CONFIDENTIAL and should not be shared externally.' },
+      { name: 'Password in Text', content: 'Please use password: Admin123! to access the internal portal.' },
+      { name: 'Mixed Keywords', content: 'INTERNAL ONLY - Do not distribute\nThis secret project codenamed Phoenix is classified.\nAll documents marked confidential must be encrypted.' },
+    ]
+  },
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +71,7 @@ function ResultPanel({ title, result, loading, error, color }: { title: string; 
   if (loading) return (<div className="flex-1 min-w-0"><h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3><div className="flex items-center justify-center h-64"><div className="text-zinc-400 animate-pulse">Analyzing...</div></div></div>)
   if (error) return (<div className="flex-1 min-w-0"><h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3><div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">{error}</div></div>)
   if (!result) return (<div className="flex-1 min-w-0"><h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3><div className="text-zinc-500 text-center py-16">Select a sample and click Scan</div></div>)
+  const isHybrid = title.includes('Hybrid')
   const isTraditional = title.includes('Traditional')
   return (
     <div className="flex-1 min-w-0">
@@ -69,21 +82,24 @@ function ResultPanel({ title, result, loading, error, color }: { title: string; 
           <span className={`text-xl font-bold ${result.detected ? 'text-red-400' : 'text-green-400'}`}>{result.verdict || (result.detected ? 'DETECTED' : 'CLEAN')}</span>
         </div>
         {result.method && <div className="text-xs text-zinc-400 mb-2">Method: {result.method}</div>}
-        {!isTraditional && result.risk_level && <div className="text-sm text-zinc-300 mb-1">Risk Level: <span className={`font-bold ${result.risk_level === 'critical' ? 'text-red-400' : result.risk_level === 'high' ? 'text-orange-400' : 'text-yellow-400'}`}>{result.risk_level?.toUpperCase()}</span></div>}
-        {!isTraditional && result.evasion_detected && <div className="text-sm text-orange-400 font-bold mb-1">Evasion Technique Detected!</div>}
-        {!isTraditional && result.summary && <div className="text-sm text-zinc-300 mt-2">{result.summary}</div>}
+        {result.recommended_action && result.detected && <div className="text-sm text-zinc-300 mb-1">Action: <span className={`font-bold ${result.recommended_action === 'BLOCK' ? 'text-red-400' : result.recommended_action === 'QUARANTINE' ? 'text-orange-400' : 'text-yellow-400'}`}>{result.recommended_action}</span></div>}
+        {result.risk_level && <div className="text-sm text-zinc-300 mb-1">Risk Level: <span className={`font-bold ${result.risk_level === 'critical' ? 'text-red-400' : result.risk_level === 'high' ? 'text-orange-400' : result.risk_level === 'medium' ? 'text-yellow-400' : 'text-green-400'}`}>{result.risk_level?.toUpperCase()}</span></div>}
+        {result.evasion_detected && <div className="text-sm text-orange-400 font-bold mb-1">Evasion Technique Detected!</div>}
+        {result.summary && <div className="text-sm text-zinc-300 mt-2">{result.summary}</div>}
+        {isHybrid && result.pattern_engine && <div className="text-xs text-zinc-500 mt-2">Pattern Engine: {result.pattern_engine.detected ? `${result.pattern_engine.findingCount} finding(s), ${result.pattern_engine.totalMatches} match(es)` : 'Clean'} | AI Engine: {result.ai_engine?.detected ? `${result.ai_engine.findingCount} finding(s)` : 'Clean'}</div>}
+        {isHybrid && result.ai_engine?.summary && <div className="text-xs text-zinc-400 mt-1">AI: {result.ai_engine.summary}</div>}
         {isTraditional && !result.detected && <div className="text-sm text-zinc-300 mt-2">No pattern matches found.</div>}
         {isTraditional && result.totalMatches !== undefined && <div className="text-sm text-zinc-300">Total Matches: {result.totalMatches}</div>}
       </div>
       {result.findings && result.findings.length > 0 && (<div className="space-y-2"><div className="text-sm font-bold text-zinc-300 mb-2">Findings ({result.findings.length}):</div>
-          {result.findings.map((f: any, i: number) => (<div key={i} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
-              {isTraditional ? (<><div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-cyan-400">{f.rule}</span><span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-black'}`}>{f.action}</span></div><div className="text-xs text-zinc-400">Type: {f.type}</div><div className="text-xs text-zinc-300 mt-1">Matches: {f.matches?.join(', ')}</div></>
-              ) : (<><div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-cyan-400">{f.type}</span><span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-black'}`}>{f.action}</span></div>
-                  {f.original_text && <div className="text-xs text-zinc-400">Found: <code className="bg-zinc-900 px-1 rounded">{f.original_text}</code></div>}
-                  {f.decoded_value && <div className="text-xs text-green-400 mt-1">Decoded: <code className="bg-zinc-900 px-1 rounded font-bold">{f.decoded_value}</code></div>}
-                  {f.confidence !== undefined && <div className="text-xs text-zinc-400 mt-1">Confidence: {f.confidence}%</div>}
-                  {f.evasion_technique && f.evasion_technique !== 'none' && <div className="text-xs text-orange-400 mt-1">Evasion: {f.evasion_technique}</div>}</>)}
-            </div>))}</div>)}
+        {result.findings.map((f: any, i: number) => (<div key={i} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+          {(isTraditional || (isHybrid && f.source === 'pattern')) ? (<><div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-cyan-400">{f.rule || f.type}</span><div className="flex gap-1">{f.source && <span className={`text-xs px-2 py-0.5 rounded font-bold ${f.source === 'pattern' ? 'bg-orange-700 text-white' : f.source === 'ai' ? 'bg-cyan-700 text-white' : 'bg-purple-700 text-white'}`}>{f.source.toUpperCase()}</span>}<span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : f.action === 'QUARANTINE' ? 'bg-yellow-600 text-black' : 'bg-blue-600 text-white'}`}>{f.action}</span></div></div>{f.severity && <div className="text-xs text-zinc-400">Severity: {f.severity}</div>}<div className="text-xs text-zinc-300 mt-1">Matches: {f.matches?.join(', ')}</div></>
+          ) : (<><div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-cyan-400">{f.type}</span><div className="flex gap-1">{f.source && <span className={`text-xs px-2 py-0.5 rounded font-bold ${f.source === 'pattern' ? 'bg-orange-700 text-white' : f.source === 'ai' ? 'bg-cyan-700 text-white' : 'bg-purple-700 text-white'}`}>{f.source.toUpperCase()}</span>}<span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : f.action === 'QUARANTINE' ? 'bg-yellow-600 text-black' : 'bg-blue-600 text-white'}`}>{f.action}</span></div></div>
+            {f.original_text && <div className="text-xs text-zinc-400">Found: <code className="bg-zinc-900 px-1 rounded">{f.original_text}</code></div>}
+            {f.decoded_value && <div className="text-xs text-green-400 mt-1">Decoded: <code className="bg-zinc-900 px-1 rounded font-bold">{f.decoded_value}</code></div>}
+            {f.confidence !== undefined && <div className="text-xs text-zinc-400 mt-1">Confidence: {f.confidence}%</div>}
+            {f.evasion_technique && f.evasion_technique !== 'none' && <div className="text-xs text-orange-400 mt-1">Evasion: {f.evasion_technique}</div>}</>)}
+        </div>))}</div>)}
     </div>
   )
 }
@@ -92,17 +108,20 @@ export default function AIDLPDemo() {
   const [content, setContent] = useState('')
   const [tradResult, setTradResult] = useState<any>(null)
   const [aiResult, setAiResult] = useState<any>(null)
+  const [hybridResult, setHybridResult] = useState<any>(null)
   const [tradLoading, setTradLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
+  const [hybridLoading, setHybridLoading] = useState(false)
   const [tradError, setTradError] = useState('')
   const [aiError, setAiError] = useState('')
+  const [hybridError, setHybridError] = useState('')
   const [activeCategory, setActiveCategory] = useState(0)
   const [selectedSample, setSelectedSample] = useState('')
   async function runScan() {
     if (!content.trim()) return
-    setTradResult(null); setAiResult(null)
-    setTradError(''); setAiError('')
-    setTradLoading(true); setAiLoading(true)
+    setTradResult(null); setAiResult(null); setHybridResult(null)
+    setTradError(''); setAiError(''); setHybridError('')
+    setTradLoading(true); setAiLoading(true); setHybridLoading(true)
     try {
       const r1 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'traditional' }) })
       const d1 = await r1.json()
@@ -113,14 +132,19 @@ export default function AIDLPDemo() {
       const d2 = await r2.json()
       setAiResult(d2)
     } catch (e: any) { setAiError(e.message) } finally { setAiLoading(false) }
+    try {
+      const r3 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'hybrid' }) })
+      const d3 = await r3.json()
+      setHybridResult(d3)
+    } catch (e: any) { setHybridError(e.message) } finally { setHybridLoading(false) }
   }
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <span className="inline-block bg-cyan-900/50 text-cyan-400 text-xs font-bold px-3 py-1 rounded-full mb-4">AI DLP Demo</span>
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Traditional DLP vs AI-Powered DLP</h1>
-          <p className="text-zinc-400 max-w-3xl mx-auto">Compare pattern-based DLP (Forcepoint / Symantec / Proofpoint / McAfee style) against NextGuard AI LLM detection. Traditional DLP uses Regex, Dictionary, and Phrase matching. AI DLP understands context, detects evasion techniques, and identifies obfuscated PII &amp; GDPR data.</p>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Traditional DLP vs AI DLP vs Hybrid DLP</h1>
+          <p className="text-zinc-400 max-w-3xl mx-auto">Compare pattern-based DLP against AI LLM detection and NextGuard Hybrid mode. Traditional DLP uses Regex & Dictionary. AI DLP understands context and detects evasion. Hybrid combines both for maximum coverage — pattern keywords are always enforced while AI catches what patterns miss.</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
           <div className="flex flex-wrap gap-2 mb-4">
@@ -128,46 +152,57 @@ export default function AIDLPDemo() {
           </div>
           <p className="text-xs text-zinc-500 mb-3">{SAMPLE_CATEGORIES[activeCategory].description}</p>
           <div className="flex flex-wrap gap-2 mb-4">
-            {SAMPLE_CATEGORIES[activeCategory].samples.map((s, si) => (<button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setTradResult(null); setAiResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>))}
+            {SAMPLE_CATEGORIES[activeCategory].samples.map((s, si) => (<button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setTradResult(null); setAiResult(null); setHybridResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>))}
           </div>
           <textarea value={content} onChange={e => setContent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono text-sm min-h-[120px] mb-4" placeholder="Select a sample above or paste your own content to scan..." />
-          <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{tradLoading || aiLoading ? 'Scanning...' : 'Scan Content'}</button>
+          <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading || hybridLoading} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{tradLoading || aiLoading || hybridLoading ? 'Scanning...' : 'Scan Content'}</button>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <ResultPanel title="Traditional DLP (Pattern-Based)" result={tradResult} loading={tradLoading} error={tradError} color="text-orange-400" />
           </div>
           <div className="bg-zinc-900 border border-cyan-800 rounded-xl p-6">
-            <ResultPanel title="AI LLM Detection (NextGuard)" result={aiResult} loading={aiLoading} error={aiError} color="text-cyan-400" />
+            <ResultPanel title="AI LLM Detection" result={aiResult} loading={aiLoading} error={aiError} color="text-cyan-400" />
+          </div>
+          <div className="bg-zinc-900 border border-green-700 rounded-xl p-6 ring-2 ring-green-600/30">
+            <ResultPanel title="Hybrid DLP (NextGuard)" result={hybridResult} loading={hybridLoading} error={hybridError} color="text-green-400" />
           </div>
         </div>
         <div className="mt-8 bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <h3 className="text-lg font-bold text-white mb-4">How It Works</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <h4 className="text-orange-400 font-bold mb-2">Traditional DLP (Forcepoint / Symantec / Proofpoint / McAfee)</h4>
+              <h4 className="text-orange-400 font-bold mb-2">Traditional DLP (Forcepoint / Symantec / Proofpoint)</h4>
               <ul className="text-sm text-zinc-400 space-y-1">
                 <li>- Regex patterns for credit cards, HKID, SSN, IBAN</li>
                 <li>- Dictionary-based keyword matching</li>
                 <li>- Phrase detection for known patterns</li>
-                <li>- Luhn algorithm for card validation</li>
-                <li className="text-red-400 font-bold">- CANNOT detect obfuscated data (Jo&amp;&amp;@hn)</li>
+                <li className="text-red-400 font-bold">- CANNOT detect obfuscated data (Jo&&@hn)</li>
                 <li className="text-red-400 font-bold">- CANNOT read Base64 encoded PII</li>
                 <li className="text-red-400 font-bold">- CANNOT understand context or intent</li>
-                <li className="text-red-400 font-bold">- Easily bypassed with character insertion</li>
               </ul>
             </div>
             <div>
-              <h4 className="text-cyan-400 font-bold mb-2">AI-Powered DLP (NextGuard)</h4>
+              <h4 className="text-cyan-400 font-bold mb-2">AI-Powered DLP (LLM Only)</h4>
               <ul className="text-sm text-zinc-400 space-y-1">
                 <li>- LLM understands context and meaning</li>
-                <li>- Detects PII even with obfuscation characters</li>
-                <li>- Identifies evasion techniques automatically</li>
+                <li>- Detects PII even with obfuscation</li>
                 <li>- Decodes Base64, reverse text, leetspeak</li>
-                <li className="text-green-400 font-bold">- CAN detect Jo&amp;&amp;@hn as &quot;John&quot;</li>
-                <li className="text-green-400 font-bold">- CAN read PII across multiple languages</li>
-                <li className="text-green-400 font-bold">- CAN identify GDPR special category data</li>
-                <li className="text-green-400 font-bold">- Understands intent, not just patterns</li>
+                <li className="text-green-400 font-bold">- CAN detect Jo&&@hn as "John"</li>
+                <li className="text-yellow-400 font-bold">- May miss simple keyword policies</li>
+                <li className="text-yellow-400 font-bold">- Single keyword like "confidential" may not trigger</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-green-400 font-bold mb-2">Hybrid DLP (NextGuard)</h4>
+              <ul className="text-sm text-zinc-400 space-y-1">
+                <li>- Pattern engine runs first (instant, zero-cost)</li>
+                <li>- AI engine runs in parallel for context analysis</li>
+                <li>- Results merged: union of all findings</li>
+                <li>- Strictest action always applied</li>
+                <li className="text-green-400 font-bold">- Keywords ALWAYS enforced (Pattern)</li>
+                <li className="text-green-400 font-bold">- Evasion ALWAYS caught (AI)</li>
+                <li className="text-green-400 font-bold">- Best of both worlds, zero blind spots</li>
               </ul>
             </div>
           </div>
