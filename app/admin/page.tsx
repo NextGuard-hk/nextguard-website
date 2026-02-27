@@ -130,6 +130,13 @@ export default function AdminPage() {
 
   async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return
+        const MAX_FILE_SIZE = 20 * 1024 * 1024 * 1024 // 20GB limit
+    for (let f = 0; f < files.length; f++) {
+      if (files[f].size > MAX_FILE_SIZE) {
+        alert('File "' + files[f].name + '" exceeds 20GB limit (' + formatSize(files[f].size) + '). Maximum upload size is 20GB per file.')
+        return
+      }
+    }
     setUploading(true)
     setUploadProgress(0)
     try {
