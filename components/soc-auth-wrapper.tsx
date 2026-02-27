@@ -57,7 +57,7 @@ export default function SocAuthWrapper({ children }: { children: React.ReactNode
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="h-7 w-7 text-cyan-400" />
-            <h1 className="text-2xl font-bold text-white">SOC Review</h1>
+            <h1 className="text-2xl font-bold text-white">AI SOC</h1>
           </div>
           <p className="text-zinc-400 mb-6 text-sm">
             Access NextGuard SOC analysis dashboard
@@ -76,7 +76,7 @@ export default function SocAuthWrapper({ children }: { children: React.ReactNode
               value={password}
               onChange={e => setPassword(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none mb-4"
-              placeholder="Enter SOC review password"
+              placeholder="Enter AI SOC password"
               required
             />
             <button
@@ -84,7 +84,7 @@ export default function SocAuthWrapper({ children }: { children: React.ReactNode
               disabled={loading}
               className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-cyan-800 text-white font-medium py-2.5 rounded-lg transition-colors"
             >
-              {loading ? "Verifying..." : "Access SOC Review"}
+              {loading ? "Verifying..." : "Access AI SOC"}
             </button>
           </form>
         </div>
