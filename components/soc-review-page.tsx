@@ -67,6 +67,45 @@ async function decompressGzip(buffer: ArrayBuffer) {
   return new TextDecoder().decode(merged)
 }
 
+async function decompressGzipBytes(buffer: ArrayBuffer): Promise<Uint8Array> {
+  const ds = new DecompressionStream('gzip')
+  const writer = ds.writable.getWriter()
+  writer.write(new Uint8Array(buffer))
+  writer.close()
+  const reader = ds.readable.getReader()
+  const chunks: Uint8Array[] = []
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+  }
+  const totalLen = chunks.reduce((s, c) => s + c.length, 0)
+  const merged = new Uint8Array(totalLen)
+  let offset = 0
+  for (const c of chunks) { merged.set(c, offset); offset += c.length }
+  return merged
+}
+
+function extractTextFromTar(bytes: Uint8Array): string {
+  const decoder = new TextDecoder('utf-8', { fatal: false })
+  const texts: string[] = []
+  let offset = 0
+  while (offset + 512 <= bytes.length) {
+    const header = bytes.slice(offset, offset + 512)
+    const name = decoder.decode(header.slice(0, 100)).replace(/\0/g, '').trim()
+    if (!name) break
+    const sizeStr = decoder.decode(header.slice(124, 136)).replace(/\0/g, '').trim()
+    const size = parseInt(sizeStr, 8) || 0
+    offset += 512
+    if (size > 0 && offset + size <= bytes.length) {
+      const fileData = bytes.slice(offset, offset + size)
+      texts.push(decoder.decode(fileData))
+    }
+    offset += Math.ceil(size / 512) * 512
+  }
+  return texts.join('\n')
+}
+
 export function SocReviewPage() {
   const [analyses, setAnalyses] = useState<SyslogAnalysis[]>([])
   const [loading, setLoading] = useState(true)
@@ -139,7 +178,7 @@ export function SocReviewPage() {
     if (isGzip) {
       try {
         const buffer = await file.arrayBuffer()
-        const text = await decompressGzip(buffer)
+        const gzBytes = await decompressGzipBytes(buffer); const text = file.name.endsWith('.tgz') ? extractTextFromTar(gzBytes) : new TextDecoder().decode(gzBytes)
         setUploadContent(text)
       } catch {
         setUploadError('Failed to decompress .gz/.tgz file')
