@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const LOG_NPOINT_URL = 'https://api.npoint.io/141c14f9077701d99bc1';
+const LOG_NPOINT_URL = process.env.NPOINT_LOGS_URL || '';
 
 async function writeLog(entry: Record<string, string>) {
   try {
