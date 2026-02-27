@@ -259,7 +259,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, virus: true, message: scanResult.message }, { status: 400 })
     }
     await writeLog({ type: 'file', action: 'upload', key, size, ip, status: 'success', scan: scanResult.message })
-        checkStorageAndNotify() // fire-and-forget storage check
+        // checkStorageAndNotify() // TODO: fix function scope storage check
     return NextResponse.json({ success: true, scan: scanResult.message })
   }
 
