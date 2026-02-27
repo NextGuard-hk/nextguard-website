@@ -55,7 +55,7 @@ const DLP_RULES = {
   },
   sensitive_keywords: {
     name: 'Sensitive Keywords',
-    dictionary: ['confidential', 'secret', 'classified', 'internal only', 'do not distribute', 'password', 'ssn', 'social security'],
+    dictionary: ['confidential', 'secret', 'classified', 'internal only', 'do not distribute', 'password', 'ssn', 'social security', '機密', '秘密', '絕密', '內部', '限閱', '禁止分發', '密碼', '個人資料', '敏感', '保密', '不得外傳', '僅供內部'],
     type: 'dictionary',
     severity: 'high',
     action: 'QUARANTINE',
