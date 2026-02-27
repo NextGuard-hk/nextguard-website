@@ -87,6 +87,10 @@ export default function AdminPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+    const [renameItem, setRenameItem] = useState<{path: string; name: string; type: string} | null>(null)
+  const [renameValue, setRenameValue] = useState("")
+  const [moveItem, setMoveItem] = useState<{path: string; name: string; type: string} | null>(null)
+  const [moveTarget, setMoveTarget] = useState("")
 
   useEffect(() => { checkAuth() }, [])
 
@@ -351,6 +355,46 @@ export default function AdminPage() {
     fetchDownloads(parts.length > 0 ? parts.join("/") + "/" : "")
   }
 
+    async function handleRename() {
+    if (!renameItem || !renameValue.trim()) return
+    try {
+      const oldPath = renameItem.path
+      let newPath: string
+      if (renameItem.type === 'folder') {
+        const parentPath = oldPath.replace(/[^/]+\/$/, '')
+        const newFolderPath = parentPath + renameValue.trim() + '/'
+        const r = await fetch('/api/downloads?action=move-folder&oldPrefix=' + encodeURIComponent(oldPath) + '&newPrefix=' + encodeURIComponent(newFolderPath))
+        if (!r.ok) throw new Error('Rename folder failed')
+      } else {
+        const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/') + 1)
+        newPath = parentPath + renameValue.trim()
+        const r = await fetch('/api/downloads?action=rename&oldKey=' + encodeURIComponent(oldPath) + '&newKey=' + encodeURIComponent(newPath))
+        if (!r.ok) throw new Error('Rename failed')
+      }
+      setRenameItem(null)
+      setRenameValue('')
+      fetchDownloads(dlPath)
+    } catch (e: any) { alert('Rename failed: ' + e.message) }
+  }
+
+  async function handleMove() {
+    if (!moveItem || !moveTarget.trim()) return
+    try {
+      if (moveItem.type === 'folder') {
+        const newPrefix = moveTarget.trim().replace(/\/$/, '') + '/' + moveItem.name + '/'
+        const r = await fetch('/api/downloads?action=move-folder&oldPrefix=' + encodeURIComponent(moveItem.path) + '&newPrefix=' + encodeURIComponent(newPrefix))
+        if (!r.ok) throw new Error('Move folder failed')
+      } else {
+        const newKey = moveTarget.trim().replace(/\/$/, '') + '/' + moveItem.name
+        const r = await fetch('/api/downloads?action=rename&oldKey=' + encodeURIComponent(moveItem.path) + '&newKey=' + encodeURIComponent(newKey))
+        if (!r.ok) throw new Error('Move failed')
+      }
+      setMoveItem(null)
+      setMoveTarget('')
+      fetchDownloads(dlPath)
+    } catch (e: any) { alert('Move failed: ' + e.message) }
+  }
+
   const filteredLogs = logFilter === "all" ? logs : logs.filter((l: any) => l.type === logFilter)
 
   if (checking) return (<div className="min-h-screen bg-zinc-950 flex items-center justify-center"><p className="text-zinc-400">Checking authentication...</p></div>)
@@ -466,7 +510,7 @@ export default function AdminPage() {
                 <thead><tr className="text-zinc-400 border-b border-zinc-800"><th className="pb-3 pr-4">Name</th><th className="pb-3 pr-4">Size</th><th className="pb-3 pr-4">Modified</th><th className="pb-3">Actions</th></tr></thead>
                 <tbody>
                   {dlPath && <tr className="border-b border-zinc-800/50"><td colSpan={4} className="py-2"><button onClick={dlGoUp} className="text-cyan-400 hover:text-cyan-300">.. (up)</button></td></tr>}
-                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3">{item.type === "folder" && <button onClick={() => handleDownloadFolder(item.path, item.name)} disabled={uploading} className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1 rounded-md text-xs mr-2 disabled:opacity-50">Download ZIP</button>}{item.type === "file" && <button onClick={async () => { const r = await fetch("/api/downloads?action=download&key=" + encodeURIComponent(item.path)); const d = await r.json(); if (d.url) window.open(d.url, "_blank") }} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs mr-2">Download</button>}<button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
+                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3">{item.type === "folder" && <button onClick={() => handleDownloadFolder(item.path, item.name)} disabled={uploading} className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1 rounded-md text-xs mr-2 disabled:opacity-50">Download ZIP</button>}{item.type === "file" && <button onClick={async () => { const r = await fetch("/api/downloads?action=download&key=" + encodeURIComponent(item.path)); const d = await r.json(); if (d.url) window.open(d.url, "_blank") }} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs mr-2">Download</button>}<button onClick={() => } className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
                 </tbody>
               </table>
             )}
@@ -476,6 +520,37 @@ export default function AdminPage() {
         {tab === "logs" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <div className="flex items-center gap-4 mb-4">
+              
+      {/* Rename Modal */}
+      {renameItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setRenameItem(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white mb-4">Rename {renameItem.type === 'folder' ? 'Folder' : 'File'}</h3>
+            <p className="text-zinc-400 text-sm mb-2">Current: {renameItem.name}</p>
+            <input type="text" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none mb-4" placeholder="New name" autoFocus />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setRenameItem(null)} className="px-4 py-2 rounded-lg text-zinc-400 hover:text-white">Cancel</button>
+              <button onClick={handleRename} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg">Rename</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move Modal */}
+      {moveItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setMoveItem(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white mb-4">Move {moveItem.type === 'folder' ? 'Folder' : 'File'}</h3>
+            <p className="text-zinc-400 text-sm mb-2">Moving: {moveItem.name}</p>
+            <input type="text" value={moveTarget} onChange={(e) => setMoveTarget(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none mb-2" placeholder="Destination path (e.g. public/docs/)" autoFocus />
+            <p className="text-zinc-500 text-xs mb-4">Enter the destination folder path (e.g. public/archive/ or internal/backup/)</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setMoveItem(null)} className="px-4 py-2 rounded-lg text-zinc-400 hover:text-white">Cancel</button>
+              <button onClick={handleMove} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg">Move</button>
+            </div>
+          </div>
+        </div>
+      )}
               <span className="text-zinc-400 text-sm">Filter:</span>
               {["all", "login", "file"].map(f => (<button key={f} onClick={() => setLogFilter(f)} className={"px-3 py-1.5 rounded-md text-xs font-medium transition-colors " + (logFilter === f ? "bg-cyan-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white")}>{f === "all" ? "All" : f === "login" ? "Login" : "File Ops"}</button>))}
               <span className="text-zinc-500 text-xs ml-auto">{filteredLogs.length} records</span>
