@@ -313,4 +313,20 @@ export async function PATCH(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
+
+  export async function DELETE(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { analysisId } = body
+    if (!analysisId) return NextResponse.json({ error: 'Missing analysisId' }, { status: 400 })
+    const analyses = await getStoredAnalyses()
+    const index = analyses.findIndex(a => a.id === analysisId)
+    if (index === -1) return NextResponse.json({ error: 'Analysis not found' }, { status: 404 })
+    analyses.splice(index, 1)
+    await saveAnalyses(analyses)
+    return NextResponse.json({ success: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
 }
