@@ -3,7 +3,7 @@ import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/clien
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
-const SYSLOG_NPOINT = 'https://api.npoint.io/3c0f8088efc551bd10d0'
+const SYSLOG_NPOINT = process.env.NPOINT_SYSLOG_URL || ''
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 
 const S3 = new S3Client({
