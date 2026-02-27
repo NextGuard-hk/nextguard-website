@@ -224,7 +224,25 @@ export function SocReviewPage() {
     }
   }
 
-  async function handleDeleteAnalysis(analysisId: string) {     if (!confirm('Delete this analysis record?')) return     try {       const r = await fetch('/api/syslog-analysis', {         method: 'DELETE',         headers: { 'Content-Type': 'application/json' },         body: JSON.stringify({ analysisId }),       })       if (r.ok) {         await fetchAnalyses()         if (selectedAnalysis?.id === analysisId) setSelectedAnalysis(analyses.length > 1 ? analyses[0] : null)       }     } catch {}   }   function toggleEvent(id: string) {
+    async function handleDeleteAnalysis(analysisId: string) {
+    if (!confirm('Delete this analysis record?')) return
+    try {
+      const r = await fetch('/api/syslog-analysis', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysisId }),
+      })
+      if (r.ok) {
+        await fetchAnalyses()
+        if (selectedAnalysis?.id === analysisId) {
+          setSelectedAnalysis(analyses.length > 1 ? analyses[0] : null)
+        }
+      }
+    } catch {}
+  }
+
+  function toggleEvent(id: string) {
+
     setExpandedEvents(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
