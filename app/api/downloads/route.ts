@@ -193,6 +193,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
+    if (action === 'list-recursive') {
+          if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+                const prefix = searchParams.get('prefix') || ''
+                      try {
+                              const allFiles: { key: string; size: number }[] = []
+                                      let ct: string | undefined
+                                              do {
+                                                        const data = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: ct }))
+                                                                  for (const obj of (data.Contents || [])) { if (obj.Key && !obj.Key.endsWith('.keep')) allFiles.push({ key: obj.Key, size: obj.Size || 0 }) }
+                                                        ct = data.NextContinuationToken
+                                                                } while (ct)
+                                                      const urls = await Promise.all(allFiles.map(async (f) => ({ key: f.key, size: f.size, url: await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: f.key }), { expiresIn: 3600 }) })))
+                                                              return NextResponse.json({ files: urls })
+                                                                    } catch (e: any) {
+                              return NextResponse.json({ error: e.message }, { status: 500 })
+                                    }
+        }
   if (action === 'download') {
     if (pw !== DOWNLOAD_PASSWORD && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
