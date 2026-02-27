@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
       const corsPolicy = {
         rules: [{
           allowed: {
-            origins: ['*'],
+            origins: ['https://next-guard.com'],
             methods: ['GET', 'PUT', 'POST', 'HEAD'],
             headers: ['*'],
           },
@@ -335,7 +335,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!action || action === 'list') {
-    if (pw !== DOWNLOAD_PASSWORD && !admin) {
+    if (pw !== DOWNLOAD_PASSWORD && !isDownloadUser(req) && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     try {
@@ -363,7 +363,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (action === 'download') {
-    if (pw !== DOWNLOAD_PASSWORD && !admin) {
+    if (pw !== DOWNLOAD_PASSWORD && !isDownloadUser(req) && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const ip = req.headers.get('x-forwarded-for') || 'unknown'
