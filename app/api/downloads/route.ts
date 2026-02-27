@@ -271,7 +271,7 @@ export async function GET(req: NextRequest) {
     if (!oldKey || !newKey) return NextResponse.json({ error: 'Missing oldKey or newKey' }, { status: 400 })
     const ip = req.headers.get('x-forwarded-for') || 'unknown'
     try {
-      await S3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${encodeURIComponent(oldKey)}`, Key: newKey }))
+      await S3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${oldKey.split('/').map(s => encodeURIComponent(s)).join('/')}`, Key: newKey }))
       await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: oldKey }))
       await writeLog({ type: 'file', action: 'rename', key: oldKey, reason: 'renamed to ' + newKey, ip, status: 'success' })
       return NextResponse.json({ success: true, oldKey, newKey })
@@ -296,7 +296,7 @@ export async function GET(req: NextRequest) {
         for (const obj of list.Contents || []) {
           if (obj.Key) {
             const newObjKey = newPrefix + obj.Key.slice(oldPrefix.length)
-            await S3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${encodeURIComponent(obj.Key)}`, Key: newObjKey }))
+            await S3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${obj.Key!.split('/').map(s => encodeURIComponent(s)).join('/')}`, Key: newObjKey }))
             await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
             moved++
           }
