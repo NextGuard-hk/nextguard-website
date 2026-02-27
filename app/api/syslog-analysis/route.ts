@@ -9,7 +9,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 const BUCKET = 'nextguard-downloads'
 const SYSLOG_NPOINT = process.env.NPOINT_SYSLOG_URL || ''
 const LLM_API_KEY = process.env.PERPLEXITY_API_KEY || process.env.OPENAI_API_KEY || ''
-const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ? 'https://api.perplexity.ai/chat/completions' : LLM_ENDPOINT
+const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ? 'https://api.perplexity.ai/chat/completions' : 'https://api.openai.com/v1/chat/completions'
 const LLM_MODEL = process.env.PERPLEXITY_API_KEY ? 'sonar' : 'gpt-4o-mini'
 
 const S3 = new S3Client({
