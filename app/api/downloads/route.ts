@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3'
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
@@ -261,6 +261,77 @@ export async function GET(req: NextRequest) {
     await writeLog({ type: 'file', action: 'upload', key, size, ip, status: 'success', scan: scanResult.message })
         // checkStorageAndNotify() // TODO: fix function scope storage check
     return NextResponse.json({ success: true, scan: scanResult.message })
+  }
+
+    // Rename/Move file - admin only (copy + delete)
+  if (action === 'rename') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const oldKey = searchParams.get('oldKey')
+    const newKey = searchParams.get('newKey')
+    if (!oldKey || !newKey) return NextResponse.json({ error: 'Missing oldKey or newKey' }, { status: 400 })
+    const ip = req.headers.get('x-forwarded-for') || 'unknown'
+    try {
+      await S3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${oldKey}`, Key: newKey }))
+      await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: oldKey }))
+      await writeLog({ type: 'file', action: 'rename', key: oldKey, reason: 'renamed to ' + newKey, ip, status: 'success' })
+      return NextResponse.json({ success: true, oldKey, newKey })
+    } catch (e: any) {
+      await writeLog({ type: 'file', action: 'rename', key: oldKey, ip, status: 'failed', reason: e.message })
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // Move folder - admin only (copy all objects + delete originals)
+  if (action === 'move-folder') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const oldPrefix = searchParams.get('oldPrefix')
+    const newPrefix = searchParams.get('newPrefix')
+    if (!oldPrefix || !newPrefix) return NextResponse.json({ error: 'Missing oldPrefix or newPrefix' }, { status: 400 })
+    const ip = req.headers.get('x-forwarded-for') || 'unknown'
+    try {
+      let continuationToken: string | undefined
+      let moved = 0
+      do {
+        const list = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: oldPrefix, ContinuationToken: continuationToken }))
+        for (const obj of list.Contents || []) {
+          if (obj.Key) {
+            const newObjKey = newPrefix + obj.Key.slice(oldPrefix.length)
+            await S3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${obj.Key}`, Key: newObjKey }))
+            await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
+            moved++
+          }
+        }
+        continuationToken = list.NextContinuationToken
+      } while (continuationToken)
+      await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, reason: 'moved to ' + newPrefix, count: moved.toString(), ip, status: 'success' })
+      return NextResponse.json({ success: true, moved })
+    } catch (e: any) {
+      await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, ip, status: 'failed', reason: e.message })
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // List all files recursively - admin only (for folder download)
+  if (action === 'list-recursive') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const prefix = searchParams.get('prefix') || ''
+    try {
+      let continuationToken: string | undefined
+      const files: { key: string; url: string; size: number }[] = []
+      do {
+        const list = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: continuationToken }))
+        for (const obj of list.Contents || []) {
+          if (obj.Key && !obj.Key.endsWith('.keep')) {
+            const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: obj.Key }), { expiresIn: 3600 })
+            files.push({ key: obj.Key, url, size: obj.Size || 0 })
+          }
+        }
+        continuationToken = list.NextContinuationToken
+      } while (continuationToken)
+      return NextResponse.json({ files })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
   }
 
   if (!action || action === 'list') {
