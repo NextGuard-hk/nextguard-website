@@ -322,7 +322,7 @@ export async function GET(req: NextRequest) {
         const list = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: continuationToken }))
         for (const obj of list.Contents || []) {
           if (obj.Key && !obj.Key.endsWith('.keep')) {
-            const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: obj.Key }), { expiresIn: 3600 })
+            const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: obj.Key }), { expiresIn: 120 })
             files.push({ key: obj.Key, url, size: obj.Size || 0 })
           }
         }
@@ -383,7 +383,7 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ error: 'Download temporarily unavailable - monthly bandwidth budget exceeded. Please try again next month.', budgetExceeded: true }, { status: 503 })
         }
       }
-      const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseContentDisposition: `attachment; filename="${key.split('/').pop()}"` }), { expiresIn: 3600 })
+      const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseContentDisposition: `attachment; filename="${key.split('/').pop()}"` }), { expiresIn: 120 })
       await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
       return NextResponse.json({ url })
     } catch (e: any) {
