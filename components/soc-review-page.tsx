@@ -114,9 +114,11 @@ export function SocReviewPage() {
       const r = await fetch('/api/syslog-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: uploadContent, fileName: uploadFileName || undefined }),
+        body: JSON.stringify({ content: uploadContent.split('
+').slice(0, 2000).join('
+'), fileName: uploadFileName || undefined }),
       })
-      const data = await r.json()
+      const text = await r.text(); let data: any; try { data = JSON.parse(text) } catch { data = { error: text || 'Server error: response was not JSON' } }
       if (r.ok && data.success) {
         setShowUpload(false)
         setUploadContent('')
