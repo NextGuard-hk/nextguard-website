@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
-const NPOINT_ID = "ea9aac6e3aff30bb0dfa"
+const NPOINT_ID = process.env.NPOINT_NEWSFEED_ID || ""
 const NPOINT_API = `https://api.npoint.io/${NPOINT_ID}`
 
 async function checkAuth(): Promise<boolean> {
