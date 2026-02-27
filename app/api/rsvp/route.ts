@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const NPOINT_URL = 'https://api.npoint.io/20f0b0ac01ead865a619';
+const NPOINT_URL = process.env.NPOINT_RSVP_URL || '';
 const NOTIFY_EMAIL = 'oscar@next-guard.com';
 
 async function sendNotification(entry: Record<string, string>) {
