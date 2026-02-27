@@ -53,11 +53,11 @@ jobs:
           DATE=$(date +'%Y-%m-%d')
           mkdir -p backups
           # Backup contacts DB
-          curl -s "https://api.npoint.io/c02d0f460449e1d7f8f3" > backups/contacts-${DATE}.json
+          curl -s "${{ secrets.NPOINT_CONTACTS_URL }}" > backups/contacts-${DATE}.json
           # Backup RSVP DB
-          curl -s "https://api.npoint.io/20f0b0ac01ead865a619" > backups/rsvp-${DATE}.json
+          curl -s "${{ secrets.NPOINT_RSVP_URL }}" > backups/rsvp-${DATE}.json
           # Backup logs DB
-          curl -s "https://api.npoint.io/141c14f9077701d99bc1" > backups/logs-${DATE}.json
+          curl -s "${{ secrets.NPOINT_LOGS_URL }}" > backups/logs-${DATE}.json
           echo "Database backups saved:"
           ls -la backups/
 
