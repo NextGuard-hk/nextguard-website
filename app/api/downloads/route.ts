@@ -374,6 +374,15 @@ export async function GET(req: NextRequest) {
         await writeLog({ type: 'file', action: 'download', key, ip, status: 'failed', reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
+            // R2 Budget enforcement - block downloads if monthly cost >= $200
+      const budgetRes = await fetch(new URL('/api/r2-budget', req.url))
+      if (budgetRes.ok) {
+        const budget = await budgetRes.json()
+        if (budget.budgetExceeded) {
+          await writeLog({ type: 'file', action: 'download', key, ip, status: 'blocked', reason: 'R2 monthly budget exceeded ($' + budget.totalCostUSD + ' / $' + budget.budgetLimitUSD + ')' })
+          return NextResponse.json({ error: 'Download temporarily unavailable - monthly bandwidth budget exceeded. Please try again next month.', budgetExceeded: true }, { status: 503 })
+        }
+      }
       const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 })
       await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
       return NextResponse.json({ url })
