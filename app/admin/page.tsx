@@ -192,7 +192,7 @@ export default function AdminPage() {
                   const listData = await listRes.json()
                   const files = listData.files || []
                   if (files.length === 0) { alert('No files in folder'); return }
-                  const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default
+                  if (!(window as any).JSZip) { await new Promise<void>((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'; s.onload = () => res(); s.onerror = () => rej(new Error('Failed to load JSZip')); document.head.appendChild(s) }) }; const JSZip = (window as any).JSZip
                   const zip = new JSZip()
                   for (let i = 0; i < files.length; i++) {
                             const f = files[i]
