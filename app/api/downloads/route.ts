@@ -383,7 +383,7 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({ error: 'Download temporarily unavailable - monthly bandwidth budget exceeded. Please try again next month.', budgetExceeded: true }, { status: 503 })
         }
       }
-      const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 })
+      const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseContentDisposition: `attachment; filename="${key.split('/').pop()}"` }), { expiresIn: 3600 })
       await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
       return NextResponse.json({ url })
     } catch (e: any) {
