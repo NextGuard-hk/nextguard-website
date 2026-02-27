@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const NPOINT_URL = "https://api.npoint.io/141c14f9077701d99bc1"
+const NPOINT_URL = process.env.NPOINT_LOGS_URL || ""
 const MAX_LOGS = 500
 
 function isAdmin(req: NextRequest): boolean {
