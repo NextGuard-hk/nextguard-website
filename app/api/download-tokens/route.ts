@@ -103,6 +103,61 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ tokens })
   }
 
+
+    // Create token via GET (admin)
+  if (action === 'create') {
+    if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const company = req.nextUrl.searchParams.get('company')
+    const contact = req.nextUrl.searchParams.get('contact')
+    const email = req.nextUrl.searchParams.get('email')
+    const type = req.nextUrl.searchParams.get('type') || 'customer'
+    if (!company || !contact || !email) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const tokenType = type as 'customer' | 'partner' | 'poc'
+    const defaultExpiry = tokenType === 'poc' ? 90 : 180
+    const expiresAt = new Date(Date.now() + defaultExpiry * 24 * 60 * 60 * 1000).toISOString()
+    const newToken: DownloadToken = {
+      id: 'dt-' + Date.now(),
+      token: generateToken(),
+      company, contact, email,
+      type: tokenType,
+      scope: ['software', 'hotfix', 'manual', 'iso'],
+      createdAt: new Date().toISOString(),
+      expiresAt,
+      active: true,
+      maxDownloadsPerHour: 8,
+      maxDownloadsPerDay: 15,
+      maxBytesPerDay: 15 * 1024 * 1024 * 1024,
+      downloads: [],
+      disclaimerAccepted: false,
+    }
+    const tokens = await getTokens()
+    tokens.push(newToken)
+    await saveTokens(tokens)
+    return NextResponse.json({ success: true, token: newToken })
+  }
+
+  // Toggle token active/inactive (admin)
+  if (action === 'toggle') {
+    if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const id = req.nextUrl.searchParams.get('id')
+    const active = req.nextUrl.searchParams.get('active') === 'true'
+    const tokens = await getTokens()
+    const found = tokens.find(t => t.id === id)
+    if (!found) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    found.active = active
+    await saveTokens(tokens)
+    return NextResponse.json({ success: true })
+  }
+
+  // Delete token (admin)
+  if (action === 'delete') {
+    if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const id = req.nextUrl.searchParams.get('id')
+    const tokens = await getTokens()
+    const filtered = tokens.filter(t => t.id !== id)
+    await saveTokens(filtered)
+    return NextResponse.json({ success: true })
+  }
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
 
