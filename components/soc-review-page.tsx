@@ -177,9 +177,18 @@ export function SocReviewPage() {
     const isGzip = file.name.endsWith('.gz') || file.name.endsWith('.tgz')
     if (isGzip) {
       try {
-                    const buffer = await file.arrayBuffer()
-        const gzBytes = await decompressGzipBytes(buffer); const text = file.name.endsWith('.tgz') ? extractTextFromTar(gzBytes) : new TextDecoder().decode(gzBytes)
-        setUploadContent(text)
+          const ds = new DecompressionStream('gzip')
+          const decompStream = file.stream().pipeThrough(ds)
+          const rdr = decompStream.getReader()
+          const chunks: Uint8Array[] = []
+          let totalSize = 0
+          const MAX = 20 * 1024 * 1024
+          try { while (true) { const { done, value } = await rdr.read(); if (done) break; chunks.push(value); totalSize += value.length; if (totalSize >= MAX) { await rdr.cancel(); break } } } catch { await rdr.cancel() }
+          const merged = new Uint8Array(Math.min(totalSize, MAX))
+          let off = 0
+          for (const c of chunks) { const len = Math.min(c.length, merged.length - off); merged.set(c.subarray(0, len), off); off += len; if (off >= merged.length) break }
+          const text = file.name.endsWith('.tgz') ? extractTextFromTar(merged) : new TextDecoder().decode(merged)
+          setUploadContent(text)
       } catch {
                   setUploadError('Failed to decompress file. Please try uploading an uncompressed .log or .txt file instead.')
       }
