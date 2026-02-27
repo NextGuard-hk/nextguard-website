@@ -650,7 +650,7 @@ export default function AdminPage() {
                     <div><div className="text-2xl font-bold text-red-400">{analysisResult.truePositives}</div><div className="text-xs text-zinc-500">True Positive</div></div>
                     <div><div className="text-2xl font-bold text-yellow-400">{analysisResult.needsReview}</div><div className="text-xs text-zinc-500">Needs Review</div></div>
                   </div>
-                                    <p className="text-center mt-4 text-sm text-zinc-400">View detailed results on the <a href="/soc-review" className="text-cyan-400 hover:text-cyan-300 underline">SOC Review Dashboard</a></p>
+                                    <p className="text-center mt-4 text-sm text-zinc-400">View detailed results on the <a href="/soc-review" className="text-cyan-400 hover:text-cyan-300 underline">AI SOC Dashboard</a></p>
                 </div>
               )}
             </div>
