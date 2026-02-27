@@ -36,6 +36,92 @@ function isDownloadUser(req: NextRequest): boolean {
   return token?.value === downloadSecret
 }
 
+// Token-based authentication
+const TOKENS_NPOINT_URL = process.env.NPOINT_TOKENS_URL || ''
+
+interface DownloadToken {
+  id: string
+  token: string
+  company: string
+  contact: string
+  email: string
+  type: string
+  scope: string[]
+  createdAt: string
+  expiresAt: string
+  active: boolean
+  maxDownloadsPerHour: number
+  maxDownloadsPerDay: number
+  maxBytesPerDay: number
+  downloads: { key: string; timestamp: string; size: number; ip: string }[]
+  disclaimerAccepted: boolean
+}
+
+async function getTokens(): Promise<DownloadToken[]> {
+  if (!TOKENS_NPOINT_URL) return []
+  try {
+    const res = await fetch(TOKENS_NPOINT_URL, { cache: 'no-store' })
+    const data = await res.json()
+    return data.tokens || []
+  } catch {
+    return []
+  }
+}
+
+async function saveTokens(tokens: DownloadToken[]) {
+  if (!TOKENS_NPOINT_URL) return
+  await fetch(TOKENS_NPOINT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tokens }),
+  })
+}
+
+async function validateToken(tokenStr: string): Promise<{ valid: boolean; token?: DownloadToken; error?: string }> {
+  const tokens = await getTokens()
+  const found = tokens.find(t => t.token === tokenStr)
+  if (!found) return { valid: false, error: 'Invalid token' }
+  if (!found.active) return { valid: false, error: 'Token has been deactivated' }
+  if (found.expiresAt && new Date(found.expiresAt) < new Date()) {
+    return { valid: false, error: 'Token has expired' }
+  }
+  return { valid: true, token: found }
+}
+
+function checkRateLimits(token: DownloadToken): { allowed: boolean; error?: string } {
+  const now = new Date()
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const recentDownloads = token.downloads || []
+  const hourlyCount = recentDownloads.filter(d => new Date(d.timestamp) > oneHourAgo).length
+  const dailyCount = recentDownloads.filter(d => new Date(d.timestamp) > oneDayAgo).length
+  const dailyBytes = recentDownloads.filter(d => new Date(d.timestamp) > oneDayAgo).reduce((sum, d) => sum + (d.size || 0), 0)
+  if (hourlyCount >= token.maxDownloadsPerHour) {
+    return { allowed: false, error: `Hourly download limit reached (${token.maxDownloadsPerHour}/hour). Please try again later.` }
+  }
+  if (dailyCount >= token.maxDownloadsPerDay) {
+    return { allowed: false, error: `Daily download limit reached (${token.maxDownloadsPerDay}/day). Please try again tomorrow.` }
+  }
+  if (dailyBytes >= token.maxBytesPerDay) {
+    const limitGB = (token.maxBytesPerDay / (1024 * 1024 * 1024)).toFixed(0)
+    return { allowed: false, error: `Daily bandwidth limit reached (${limitGB}GB/day). Please try again tomorrow.` }
+  }
+  return { allowed: true }
+}
+
+async function recordTokenDownload(tokenStr: string, key: string, size: number, ip: string) {
+  const tokens = await getTokens()
+  const found = tokens.find(t => t.token === tokenStr)
+  if (found) {
+    if (!found.downloads) found.downloads = []
+    found.downloads.push({ key, timestamp: new Date().toISOString(), size, ip })
+    // Keep only last 30 days of records
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    found.downloads = found.downloads.filter(d => new Date(d.timestamp) > thirtyDaysAgo)
+    await saveTokens(tokens)
+  }
+}
+
 async function writeLog(entry: Record<string, string>) {
   try {
     const logEntry = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...entry };
@@ -342,7 +428,9 @@ export async function GET(req: NextRequest) {
   }
 
   if (!action || action === 'list') {
-    if (!isDownloadUser(req) && !admin) {
+    const tokenParam = searchParams.get('token') || req.headers.get('x-download-token') || ''     const tokenResult = tokenParam ? await validateToken(tokenParam) : { valid: false }     if (!isDownloadUser(req) && !admin && !tokenResult.valid) {
+          const tokenResult = tokenParam ? await validateToken(tokenParam) : { valid: false }
+    if (!isDownloadUser(req) && !admin && !tokenResult.valid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     try {
@@ -370,7 +458,9 @@ export async function GET(req: NextRequest) {
   }
 
   if (action === 'download') {
-    if (!isDownloadUser(req) && !admin) {
+    const dlTokenParam = searchParams.get('token') || req.headers.get('x-download-token') || ''     const dlTokenResult = dlTokenParam ? await validateToken(dlTokenParam) : { valid: false }     if (!isDownloadUser(req) && !admin && !dlTokenResult.valid) {
+          const dlTokenResult = dlTokenParam ? await validateToken(dlTokenParam) : { valid: false }
+    if (!isDownloadUser(req) && !admin && !dlTokenResult.valid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const ip = req.headers.get('x-forwarded-for') || 'unknown'
@@ -381,6 +471,19 @@ export async function GET(req: NextRequest) {
               if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
         await writeLog({ type: 'file', action: 'download', key, ip, reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+      }
+
+            // Token-based rate limiting
+      if (dlTokenResult.valid && dlTokenResult.token) {
+        const rateCheck = checkRateLimits(dlTokenResult.token)
+        if (!rateCheck.allowed) {
+          await writeLog({ type: 'file', action: 'download', key, ip, status: 'rate-limited', reason: rateCheck.error || 'Rate limit exceeded' })
+          return NextResponse.json({ error: rateCheck.error, rateLimited: true }, { status: 429 })
+        }
+        // Check disclaimer acceptance
+        if (!dlTokenResult.token.disclaimerAccepted) {
+          return NextResponse.json({ error: 'Disclaimer must be accepted before downloading', disclaimerRequired: true }, { status: 403 })
+        }
       }
             // R2 Budget enforcement - block downloads if monthly cost >= $200
       const budgetRes = await fetch(new URL('/api/r2-budget', req.url))
@@ -393,6 +496,11 @@ export async function GET(req: NextRequest) {
       }
       const url = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseContentDisposition: `attachment; filename="${key.split('/').pop()}"` }), { expiresIn: 120 })
       await writeLog({ type: 'file', action: 'download', key, ip, status: 'success' })
+            // Record download for token rate limiting
+      if (dlTokenResult.valid && dlTokenParam) {
+        const fileSize = parseInt(searchParams.get('size') || '0')
+        await recordTokenDownload(dlTokenParam, key, fileSize, ip)
+      }
       return NextResponse.json({ url })
     } catch (e: any) {
       await writeLog({ type: 'file', action: 'download', key, ip, reason: e.message })
@@ -466,6 +574,35 @@ export async function DELETE(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
     try {
           const body = await req.json()
+
+          // Token-based authentication + disclaimer acceptance
+    const tokenStr = body.token || ''
+    const acceptDisclaimer = body.acceptDisclaimer || false
+    if (tokenStr) {
+      const tokenValidation = await validateToken(tokenStr)
+      if (!tokenValidation.valid) {
+        return NextResponse.json({ error: tokenValidation.error || 'Invalid token' }, { status: 401 })
+      }
+      // Accept disclaimer if requested
+      if (acceptDisclaimer && tokenValidation.token) {
+        const allTokens = await getTokens()
+        const found = allTokens.find(t => t.token === tokenStr)
+        if (found) {
+          found.disclaimerAccepted = true
+          await saveTokens(allTokens)
+        }
+      }
+      const res = NextResponse.json({ success: true, tokenAuth: true, company: tokenValidation.token?.company })
+      res.cookies.set('download_session_token', DOWNLOAD_PASSWORD, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 60 * 60 * 24,
+      })
+      return res
+    }
+
           const pw = body.password || ''
           if (pw !== DOWNLOAD_PASSWORD) {
                   return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
