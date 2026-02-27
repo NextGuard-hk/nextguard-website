@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const NPOINT_ID = "ea9aac6e3aff30bb0dfa"
+const NPOINT_ID = process.env.NPOINT_NEWSFEED_ID || ""
 const NPOINT_API = `https://api.npoint.io/${NPOINT_ID}`
-const COLLECT_SECRET = process.env.CRON_SECRET || "nextguard-collect-2024"
+const COLLECT_SECRET = process.env.CRON_SECRET || ""
 
 interface RSSItem {
   title: string
