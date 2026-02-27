@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const BUCKET = 'nextguard-downloads'
@@ -46,9 +46,7 @@ async function writeLog(entry: Record<string, string>) {
 async function scanWithVirusTotal(key: string): Promise<{ safe: boolean; message: string }> {
   if (!VT_API_KEY) return { safe: true, message: 'Virus scanning not configured (no API key)' }
   try {
-    // Generate a temporary download URL for VirusTotal to fetch
     const downloadUrl = await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 600 })
-    // Submit URL to VirusTotal for scanning
     const scanRes = await fetch('https://www.virustotal.com/api/v3/urls', {
       method: 'POST',
       headers: { 'x-apikey': VT_API_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -58,7 +56,6 @@ async function scanWithVirusTotal(key: string): Promise<{ safe: boolean; message
     const scanData = await scanRes.json()
     const analysisId = scanData?.data?.id
     if (!analysisId) return { safe: true, message: 'No analysis ID returned' }
-    // Poll for results (wait up to 60s)
     for (let i = 0; i < 12; i++) {
       await new Promise(r => setTimeout(r, 5000))
       const resultRes = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
@@ -95,7 +92,7 @@ export async function GET(req: NextRequest) {
     const accountId = process.env.R2_ACCOUNT_ID
     const cfApiToken = process.env.CLOUDFLARE_API_TOKEN
     if (!accountId || !cfApiToken) {
-      return NextResponse.json({ error: 'Missing R2_ACCOUNT_ID or CLOUDFLARE_API_TOKEN env var. Please add CLOUDFLARE_API_TOKEN (with R2 edit permissions) in Vercel Environment Variables.' }, { status: 500 })
+      return NextResponse.json({ error: 'Missing R2_ACCOUNT_ID or CLOUDFLARE_API_TOKEN env var.' }, { status: 500 })
     }
     try {
       const corsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${BUCKET}/cors`
@@ -112,10 +109,7 @@ export async function GET(req: NextRequest) {
       }
       const res = await fetch(corsUrl, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${cfApiToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${cfApiToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(corsPolicy),
       })
       const data = await res.json()
@@ -129,7 +123,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Presigned upload URL - admin only
+  // Presigned upload URL - admin only (for files < 5GB)
   if (action === 'presign-upload') {
     if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
     const key = searchParams.get('key')
@@ -137,11 +131,75 @@ export async function GET(req: NextRequest) {
     if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
     try {
       const url = await getSignedUrl(S3, new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: key,
-        ContentType: contentType,
+        Bucket: BUCKET, Key: key, ContentType: contentType,
       }), { expiresIn: 3600 })
       return NextResponse.json({ url, key })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // Multipart upload: create - admin only
+  if (action === 'multipart-create') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const key = searchParams.get('key')
+    const contentType = searchParams.get('contentType') || 'application/octet-stream'
+    if (!key) return NextResponse.json({ error: 'Missing key' }, { status: 400 })
+    try {
+      const result = await S3.send(new CreateMultipartUploadCommand({
+        Bucket: BUCKET, Key: key, ContentType: contentType,
+      }))
+      return NextResponse.json({ uploadId: result.UploadId, key })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // Multipart upload: presign a single part - admin only
+  if (action === 'multipart-presign') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const key = searchParams.get('key')
+    const uploadId = searchParams.get('uploadId')
+    const partNumber = searchParams.get('partNumber')
+    if (!key || !uploadId || !partNumber) return NextResponse.json({ error: 'Missing key, uploadId or partNumber' }, { status: 400 })
+    try {
+      const url = await getSignedUrl(S3, new UploadPartCommand({
+        Bucket: BUCKET, Key: key, UploadId: uploadId, PartNumber: parseInt(partNumber),
+      }), { expiresIn: 3600 })
+      return NextResponse.json({ url })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // Multipart upload: complete - admin only
+  if (action === 'multipart-complete') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const key = searchParams.get('key')
+    const uploadId = searchParams.get('uploadId')
+    const partsParam = searchParams.get('parts')
+    if (!key || !uploadId || !partsParam) return NextResponse.json({ error: 'Missing key, uploadId or parts' }, { status: 400 })
+    try {
+      const parts = JSON.parse(decodeURIComponent(partsParam)) as { ETag: string; PartNumber: number }[]
+      await S3.send(new CompleteMultipartUploadCommand({
+        Bucket: BUCKET, Key: key, UploadId: uploadId,
+        MultipartUpload: { Parts: parts },
+      }))
+      return NextResponse.json({ success: true, key })
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
+  // Multipart upload: abort - admin only
+  if (action === 'multipart-abort') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const key = searchParams.get('key')
+    const uploadId = searchParams.get('uploadId')
+    if (!key || !uploadId) return NextResponse.json({ error: 'Missing key or uploadId' }, { status: 400 })
+    try {
+      await S3.send(new AbortMultipartUploadCommand({ Bucket: BUCKET, Key: key, UploadId: uploadId }))
+      return NextResponse.json({ success: true })
     } catch (e: any) {
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
@@ -153,10 +211,8 @@ export async function GET(req: NextRequest) {
     const key = searchParams.get('key') || 'unknown'
     const size = searchParams.get('size') || '0'
     const ip = req.headers.get('x-forwarded-for') || 'unknown'
-    // Run virus scan
     const scanResult = await scanWithVirusTotal(key)
     if (!scanResult.safe) {
-      // Delete the infected file from R2
       try { await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })) } catch {}
       await writeLog({ type: 'file', action: 'upload-blocked', key, size, ip, status: 'virus-detected', reason: scanResult.message })
       return NextResponse.json({ success: false, virus: true, message: scanResult.message }, { status: 400 })
@@ -193,23 +249,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-    if (action === 'list-recursive') {
-          if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-                const prefix = searchParams.get('prefix') || ''
-                      try {
-                              const allFiles: { key: string; size: number }[] = []
-                                      let ct: string | undefined
-                                              do {
-                                                        const data = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: ct }))
-                                                                  for (const obj of (data.Contents || [])) { if (obj.Key && !obj.Key.endsWith('.keep')) allFiles.push({ key: obj.Key, size: obj.Size || 0 }) }
-                                                        ct = data.NextContinuationToken
-                                                                } while (ct)
-                                                      const urls = await Promise.all(allFiles.map(async (f) => ({ key: f.key, size: f.size, url: await getSignedUrl(S3, new GetObjectCommand({ Bucket: BUCKET, Key: f.key }), { expiresIn: 3600 }) })))
-                                                              return NextResponse.json({ files: urls })
-                                                                    } catch (e: any) {
-                              return NextResponse.json({ error: e.message }, { status: 500 })
-                                    }
-        }
   if (action === 'download') {
     if (pw !== DOWNLOAD_PASSWORD && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -249,9 +288,7 @@ export async function POST(req: NextRequest) {
     }
     const buffer = Buffer.from(await file.arrayBuffer())
     await S3.send(new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: buffer,
+      Bucket: BUCKET, Key: key, Body: buffer,
       ContentType: file.type || 'application/octet-stream',
     }))
     await writeLog({ type: 'file', action: 'upload', key, size: file.size.toString(), ip, status: 'success' })
@@ -274,7 +311,9 @@ export async function DELETE(req: NextRequest) {
       let continuationToken: string | undefined
       let deleted = 0
       do {
-        const list = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: key, ContinuationToken: continuationToken }))
+        const list = await S3.send(new ListObjectsV2Command({
+          Bucket: BUCKET, Prefix: key, ContinuationToken: continuationToken
+        }))
         const objects = list.Contents || []
         for (const obj of objects) {
           if (obj.Key) { await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key })); deleted++ }
