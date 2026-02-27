@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const NPOINT_URL = "https://api.npoint.io/ea9aac6e3aff30bb0dfa"
+const NPOINT_URL = process.env.NPOINT_NEWSFEED_URL || ""
 
 const IMPORTANCE_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 }
 
