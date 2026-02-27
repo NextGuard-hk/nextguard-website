@@ -357,6 +357,7 @@ export default function AdminPage() {
 
     async function handleRename() {
     if (!renameItem || !renameValue.trim()) return
+    setRenameLoading(true)
     try {
       const oldPath = renameItem.path
       let newPath: string
@@ -374,18 +375,19 @@ export default function AdminPage() {
       setRenameItem(null)
       setRenameValue('')
       fetchDownloads(dlPath)
-    } catch (e: any) { alert('Rename failed: ' + e.message) }
+    } catch (e: any) { alert('Rename failed: ' + e.message) } finally { setRenameLoading(false) }
   }
 
   async function handleMove() {
     if (!moveItem || !moveTarget.trim()) return
     try {
+            const target = moveTarget.trim().replace(/\/$/, ''); const dest = (target.startsWith('public/') || target.startsWith('internal/')) ? target : uploadMode + '/' + target
       if (moveItem.type === 'folder') {
-        const newPrefix = moveTarget.trim().replace(/\/$/, '') + '/' + moveItem.name + '/'
+        const newPrefix = dest.replace(/\/$/, '') + '/' + moveItem.name + '/'
         const r = await fetch('/api/downloads?action=move-folder&oldPrefix=' + encodeURIComponent(moveItem.path) + '&newPrefix=' + encodeURIComponent(newPrefix))
         if (!r.ok) throw new Error('Move folder failed')
       } else {
-        const newKey = moveTarget.trim().replace(/\/$/, '') + '/' + moveItem.name
+        const newKey = dest.replace(/\/$/, '') + '/' + moveItem.name
         const r = await fetch('/api/downloads?action=rename&oldKey=' + encodeURIComponent(moveItem.path) + '&newKey=' + encodeURIComponent(newKey))
         if (!r.ok) throw new Error('Move failed')
       }
@@ -526,7 +528,7 @@ export default function AdminPage() {
             <input type="text" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none mb-4" placeholder="New name" autoFocus />
             <div className="flex justify-end gap-3">
               <button onClick={() => setRenameItem(null)} className="px-4 py-2 rounded-lg text-zinc-400 hover:text-white">Cancel</button>
-              <button onClick={handleRename} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg">Rename</button>
+              <button onClick={handleRename} disabled={renameLoading} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg">{renameLoading ? 'Renaming...' : 'Rename'}</button>
             </div>
           </div>
         </div>
