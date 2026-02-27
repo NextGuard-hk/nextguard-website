@@ -27,6 +27,7 @@ export default function DownloadsPage() {
   const [currentPath, setCurrentPath] = useState("")
   const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState<string | null>(null)
+    const [budgetError, setBudgetError] = useState("")
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -77,6 +78,11 @@ export default function DownloadsPage() {
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
+      } else {
+        const d = await r.json()
+        if (d.budgetExceeded) {
+          setBudgetError("Downloads are temporarily unavailable - monthly bandwidth budget has been reached. Please try again next month.")
+        }
       }
     } catch {} finally { setDownloading(null) }
   }
@@ -136,6 +142,7 @@ export default function DownloadsPage() {
           ))}
         </div>
 
+                {budgetError && <div className="bg-red-900/30 border border-red-800 rounded-lg px-4 py-3 text-red-300 text-sm mb-4">{budgetError}</div>}
         {/* File List */}
         <div className="overflow-x-auto">
           {loading ? (
