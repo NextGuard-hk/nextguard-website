@@ -92,6 +92,7 @@ export default function AdminPage() {
   const [moveItem, setMoveItem] = useState<{path: string; name: string; type: string} | null>(null)
     const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
+    const [createFolderLoading, setCreateFolderLoading] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
 
@@ -216,6 +217,7 @@ export default function AdminPage() {
 
   async function createFolder() {
     if (!newFolder.trim()) return
+        setCreateFolderLoading(true)
     const key = dlPath + newFolder.trim() + "/.keep"
     try {
       const presignRes = await fetch("/api/downloads?action=presign-upload&key=" + encodeURIComponent(key) + "&contentType=text/plain")
@@ -224,7 +226,7 @@ export default function AdminPage() {
       await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: '' })
       await fetch("/api/downloads?action=confirm-upload&key=" + encodeURIComponent(key) + "&size=0")
       setNewFolder(""); fetchDownloads(dlPath)
-    } catch {}
+    } catch {} finally { setCreateFolderLoading(false) }
   }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -502,7 +504,7 @@ export default function AdminPage() {
             )}
             <div className="flex gap-2 mb-4">
               <input type="text" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="New folder name" />
-              <button onClick={createFolder} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">Create Folder</button>
+              <button onClick={createFolder} disabled={createFolderLoading} className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-sm">{createFolderLoading ? 'Creating...' : 'Create Folder'}</button>
             </div>
             <div className="flex gap-1 mb-4 text-sm">
               <button onClick={() => fetchDownloads("")} className="text-cyan-400 hover:text-cyan-300">Root</button>
