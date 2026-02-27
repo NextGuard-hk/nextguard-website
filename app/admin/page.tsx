@@ -223,9 +223,9 @@ export default function AdminPage() {
   async function fetchNews() {
     setNewsLoading(true)
     try {
-      const r = await fetch("/api/news-feed/collect?secret=nextguard-collect-2024")
+      const r = await fetch("/api/news-feed/collect")
       const collectData = await r.json()
-      const nr = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const nr = await fetch("/api/news-feed/admin")
       if (nr.ok) {
         const data = await nr.json()
         setNewsArticles(data.articles || [])
@@ -235,20 +235,20 @@ export default function AdminPage() {
 
   async function updateNewsStatus(id: string, status: string) {
     try {
-      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const r = await fetch("/api/news-feed/admin")
       const data = await r.json()
       const articles = (data.articles || []).map((a: any) => a.id === id ? { ...a, status } : a)
-      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
 
   async function publishAllPending() {
     try {
-      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const r = await fetch("/api/news-feed/admin")
       const data = await r.json()
       const articles = (data.articles || []).map((a: any) => a.status === "pending" ? { ...a, status: "published" } : a)
-      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
@@ -256,10 +256,10 @@ export default function AdminPage() {
   async function deleteNewsArticle(id: string) {
     if (!confirm("Delete this article?")) return
     try {
-      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
+      const r = await fetch("/api/news-feed/admin")
       const data = await r.json()
       const articles = (data.articles || []).filter((a: any) => a.id !== id)
-      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
@@ -374,7 +374,7 @@ export default function AdminPage() {
         {tab === "rsvp" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <div className="flex justify-end mb-4">
-              <button onClick={() => window.open("/api/rsvp?password=NextGuard123&format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
+              <button onClick={() => window.open("/api/rsvp?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
