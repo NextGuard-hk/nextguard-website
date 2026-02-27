@@ -131,7 +131,7 @@ async function checkStorageAndNotify() {
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
   const action = searchParams.get('action')
-  const pw = searchParams.get('pw')
+  // pw param removed for security
   const admin = isAdmin(req)
 
   // Setup CORS for R2 bucket via Cloudflare REST API - admin only
@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: data.errors?.[0]?.message || 'Cloudflare API error', details: data.errors }, { status: 500 })
       }
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
       }), { expiresIn: 3600 })
       return NextResponse.json({ url, key })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -199,7 +199,7 @@ export async function GET(req: NextRequest) {
       }))
       return NextResponse.json({ uploadId: result.UploadId, key })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
       }), { expiresIn: 3600 })
       return NextResponse.json({ url })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -235,7 +235,7 @@ export async function GET(req: NextRequest) {
       }))
       return NextResponse.json({ success: true, key })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -249,7 +249,7 @@ export async function GET(req: NextRequest) {
       await S3.send(new AbortMultipartUploadCommand({ Bucket: BUCKET, Key: key, UploadId: uploadId }))
       return NextResponse.json({ success: true })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -284,7 +284,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, oldKey, newKey })
     } catch (e: any) {
       await writeLog({ type: 'file', action: 'rename', key: oldKey, ip, reason: e.message })
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -314,7 +314,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, moved })
     } catch (e: any) {
       await writeLog({ type: 'file', action: 'move-folder', key: oldPrefix, ip, reason: e.message })
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -337,12 +337,12 @@ export async function GET(req: NextRequest) {
       } while (continuationToken)
       return NextResponse.json({ files })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
   if (!action || action === 'list') {
-    if (pw !== DOWNLOAD_PASSWORD && !isDownloadUser(req) && !admin) {
+    if (!isDownloadUser(req) && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     try {
@@ -365,19 +365,19 @@ export async function GET(req: NextRequest) {
       }))
       return NextResponse.json({ items: [...folders, ...files] })
     } catch (e: any) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
   if (action === 'download') {
-    if (pw !== DOWNLOAD_PASSWORD && !isDownloadUser(req) && !admin) {
+    if (!isDownloadUser(req) && !admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const ip = req.headers.get('x-forwarded-for') || 'unknown'
     const key = searchParams.get('key') || 'unknown'
     try {
       if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
-      if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
+      if (key.includes('..') || key.startsWith('/')) return NextResponse.json({ error: 'Invalid key' }, { status: 400 })       if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
         await writeLog({ type: 'file', action: 'download', key, ip, reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
@@ -395,7 +395,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ url })
     } catch (e: any) {
       await writeLog({ type: 'file', action: 'download', key, ip, reason: e.message })
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 
@@ -424,7 +424,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, key })
   } catch (e: any) {
     await writeLog({ type: 'file', action: 'upload', key, ip, status: 'failed', reason: e.message })
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -457,7 +457,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (e: any) {
     await writeLog({ type: 'file', action: 'delete', key, ip, status: 'failed', reason: e.message })
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
