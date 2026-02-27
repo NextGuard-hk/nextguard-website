@@ -183,6 +183,7 @@ export default function AdminPage() {
     } catch {}
   }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function handleDownloadFolder(folderPath: string, folderName: string) {
           try {
                   setUploading(true)
@@ -192,7 +193,16 @@ export default function AdminPage() {
                   const listData = await listRes.json()
                   const files = listData.files || []
                   if (files.length === 0) { alert('No files in folder'); return }
-                  if (!(window as any).JSZip) { await new Promise<void>((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'; s.onload = () => res(); s.onerror = () => rej(new Error('Failed to load JSZip')); document.head.appendChild(s) }) }; const JSZip = (window as any).JSZip
+                  if (!(window as any).JSZip) {
+                            await new Promise((res: any, rej: any) => {
+                                        const s = document.createElement('script')
+                                        s.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
+                                        s.onload = () => res(null)
+                                        s.onerror = () => rej(new Error('Failed to load JSZip'))
+                                        document.head.appendChild(s)
+                                      })
+                          }
+                  const JSZip = (window as any).JSZip
                   const zip = new JSZip()
                   for (let i = 0; i < files.length; i++) {
                             const f = files[i]
@@ -223,9 +233,9 @@ export default function AdminPage() {
   async function fetchNews() {
     setNewsLoading(true)
     try {
-      const r = await fetch("/api/news-feed/collect")
+      const r = await fetch("/api/news-feed/collect?secret=nextguard-collect-2024")
       const collectData = await r.json()
-      const nr = await fetch("/api/news-feed/admin")
+      const nr = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
       if (nr.ok) {
         const data = await nr.json()
         setNewsArticles(data.articles || [])
@@ -235,20 +245,20 @@ export default function AdminPage() {
 
   async function updateNewsStatus(id: string, status: string) {
     try {
-      const r = await fetch("/api/news-feed/admin")
+      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
       const data = await r.json()
       const articles = (data.articles || []).map((a: any) => a.id === id ? { ...a, status } : a)
-      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
 
   async function publishAllPending() {
     try {
-      const r = await fetch("/api/news-feed/admin")
+      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
       const data = await r.json()
       const articles = (data.articles || []).map((a: any) => a.status === "pending" ? { ...a, status: "published" } : a)
-      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
@@ -256,10 +266,10 @@ export default function AdminPage() {
   async function deleteNewsArticle(id: string) {
     if (!confirm("Delete this article?")) return
     try {
-      const r = await fetch("/api/news-feed/admin")
+      const r = await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa")
       const data = await r.json()
       const articles = (data.articles || []).filter((a: any) => a.id !== id)
-      await fetch("/api/news-feed/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
+      await fetch("https://api.npoint.io/ea9aac6e3aff30bb0dfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ articles }) })
       setNewsArticles(articles)
     } catch {}
   }
@@ -374,7 +384,7 @@ export default function AdminPage() {
         {tab === "rsvp" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <div className="flex justify-end mb-4">
-              <button onClick={() => window.open("/api/rsvp?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
+              <button onClick={() => window.open("/api/rsvp?password=NextGuard123&format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -417,7 +427,7 @@ export default function AdminPage() {
                 <thead><tr className="text-zinc-400 border-b border-zinc-800"><th className="pb-3 pr-4">Name</th><th className="pb-3 pr-4">Size</th><th className="pb-3 pr-4">Modified</th><th className="pb-3">Actions</th></tr></thead>
                 <tbody>
                   {dlPath && <tr className="border-b border-zinc-800/50"><td colSpan={4} className="py-2"><button onClick={dlGoUp} className="text-cyan-400 hover:text-cyan-300">.. (up)</button></td></tr>}
-                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3">{{item.type === "folder" && <button onClick={() => handleDownloadFolder(item.path, item.name)} disabled={uploading} className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1 rounded-md text-xs mr-2 disabled:opacity-50">Download ZIP</button>}{item.type === "file" && <button onClick={async () => { const r = await fetch("/api/downloads?action=download&key=" + encodeURIComponent(item.path)); const d = await r.json(); if (d.url) window.open(d.url, "_blank") }} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs mr-2">Download</button>}<button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
+                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3">{item.type === "folder" && <button onClick={() => handleDownloadFolder(item.path, item.name)} disabled={uploading} className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1 rounded-md text-xs mr-2 disabled:opacity-50">Download ZIP</button>}{item.type === "file" && <button onClick={async () => { const r = await fetch("/api/downloads?action=download&key=" + encodeURIComponent(item.path)); const d = await r.json(); if (d.url) window.open(d.url, "_blank") }} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs mr-2">Download</button>}<button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
                 </tbody>
               </table>
             )}
