@@ -93,7 +93,7 @@ export default function AdminPage() {
     const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
-    const [moveLoading, setMoveLoading] = useState(false)
+    const [moveLoading, setMoveLoading] = useState(false)   const [r2Budget, setR2Budget] = useState<any>(null)   const [r2Loading, setR2Loading] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
 
@@ -276,6 +276,10 @@ export default function AdminPage() {
     setLogsLoading(true)
     try { const r = await fetch("/api/logs"); if (r.ok) { const d = await r.json(); setLogs(d.logs || []) } } catch {} finally { setLogsLoading(false) }
   }
+    async function fetchR2Budget() {
+    setR2Loading(true)
+    try { const r = await fetch('/api/r2-budget'); if (r.ok) { const d = await r.json(); setR2Budget(d) } } catch {} finally { setR2Loading(false) }
+  }
 
   async function fetchNews() {
     setNewsLoading(true)
@@ -451,7 +455,7 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6 flex-wrap">
           <button onClick={() => setTab("contacts")} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "contacts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Contacts ({contacts.length})</button>
           <button onClick={() => setTab("rsvp")} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "rsvp" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>RSVP ({rsvps.length})</button>
-          <button onClick={() => { setTab("downloads"); fetchDownloads(uploadMode + "/") }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Uploads</button>
+          <button onClick={() => { setTab("downloads"); fetchR2Budget(); fetchDownloads(uploadMode + "/") }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "downloads" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Uploads</button>
           <button onClick={() => { setTab("logs"); fetchLogs() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Logs</button>
           <button onClick={() => { setTab("news"); fetchNews() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>News</button>
                           <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Syslog</button>
@@ -487,6 +491,26 @@ export default function AdminPage() {
 
         {tab === "downloads" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                    {/* R2 Storage & Budget Dashboard */}
+        {r2Budget && (
+          <div className="mb-6 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-bold text-sm">R2 Storage & Budget</h3>
+              <button onClick={fetchR2Budget} disabled={r2Loading} className="text-cyan-400 hover:text-cyan-300 text-xs disabled:opacity-50">{r2Loading ? 'Loading...' : 'Refresh'}</button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div><div className="text-xl font-bold text-white">{r2Budget.usage?.storageGB?.toFixed(2)} GB</div><div className="text-xs text-zinc-500">Storage Used</div></div>
+              <div><div className="text-xl font-bold text-cyan-400">{r2Budget.usage?.totalObjects}</div><div className="text-xs text-zinc-500">Total Objects</div></div>
+              <div><div className="text-xl font-bold text-green-400">{r2Budget.usage?.monthlyDownloads}</div><div className="text-xs text-zinc-500">Downloads (Month)</div></div>
+              <div><div className="text-xl font-bold text-yellow-400">{r2Budget.usage?.monthlyUploads}</div><div className="text-xs text-zinc-500">Uploads (Month)</div></div>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex-1 bg-zinc-700 rounded-full h-2"><div className={"h-2 rounded-full transition-all " + (r2Budget.budgetExceeded ? "bg-red-500" : r2Budget.totalCostUSD > 150 ? "bg-yellow-500" : "bg-green-500")} style={{width: Math.min(100, (r2Budget.totalCostUSD / r2Budget.budgetLimitUSD) * 100) + '%'}}></div></div>
+              <span className={"text-xs font-medium " + (r2Budget.budgetExceeded ? "text-red-400" : "text-zinc-400")}>${r2Budget.totalCostUSD} / ${r2Budget.budgetLimitUSD} USD</span>
+            </div>
+            {r2Budget.budgetExceeded && <div className="mt-2 text-red-400 text-xs font-medium">⚠ Budget exceeded! Downloads are blocked.</div>}
+          </div>
+        )}
             <input ref={fileInputRef} type="file" multiple onChange={(e) => handleUpload(e.target.files)} className="hidden" />
             <div className="flex gap-2 mb-4">
               <button onClick={() => { setUploadMode("public"); fetchDownloads("public/") }} className={"flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors " + (uploadMode === "public" ? "bg-green-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white")}>Public</button>
