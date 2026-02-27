@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { PageHeader } from "./page-header"
 import { AnimateIn } from "./animate-in"
-import { Shield, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Search, ChevronDown, ChevronRight, RefreshCw, Upload, X, Loader2 } from "lucide-react"
+import { Shield, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Search, ChevronDown, ChevronRight, RefreshCw, Upload, X, Loader2, Play } from "lucide-react"
 
 interface AnalysisResult {
   id: string
@@ -47,6 +47,24 @@ const verdictConfig: Record<string, { label: string; color: string; bg: string; 
   true_positive: { label: 'True Positive', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30', icon: XCircle },
   needs_review: { label: 'Needs Review', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/30', icon: AlertTriangle },
 }
+
+const DEMO_SYSLOG_LINES = [
+  'Jan 15 08:23:41 fw-hk-01 dlp-engine[4521]: ALERT policy="Credit Card Detection" action=block src_user="john.chan@company.com" dst="external-drive" file="Q4-expenses.xlsx" match_count=3 severity=high detail="Credit card numbers detected in spreadsheet being copied to USB"',
+  'Jan 15 08:25:12 fw-hk-01 dlp-engine[4521]: ALERT policy="PII Detection" action=monitor src_user="mary.wong@company.com" dst="outlook.office365.com" file="employee-list.csv" match_count=15 severity=medium detail="Hong Kong ID numbers detected in email attachment"',
+  'Jan 15 09:01:33 fw-hk-01 dlp-engine[4521]: ALERT policy="Source Code Protection" action=block src_user="dev-build@company.com" dst="github.com" file="build-output.log" match_count=0 severity=low detail="Automated CI/CD pipeline uploading build logs to repository"',
+  'Jan 15 09:15:07 fw-hk-01 sshd[2241]: Failed password for admin from 203.198.45.12 port 52341 ssh2',
+  'Jan 15 09:15:09 fw-hk-01 sshd[2241]: Failed password for admin from 203.198.45.12 port 52342 ssh2',
+  'Jan 15 09:15:11 fw-hk-01 sshd[2241]: Failed password for admin from 203.198.45.12 port 52343 ssh2',
+  'Jan 15 09:30:22 fw-hk-01 dlp-engine[4521]: ALERT policy="Confidential Document" action=block src_user="alex.li@company.com" dst="wetransfer.com" file="Project-Alpha-Contract-FINAL.pdf" match_count=5 severity=critical detail="Confidential watermarked document being uploaded to file sharing site"',
+  'Jan 15 10:12:45 fw-hk-01 dlp-engine[4521]: ALERT policy="Credit Card Detection" action=monitor src_user="accounting-system@company.com" dst="payment-gateway.bank.com" file="batch-payment-20260115.enc" match_count=200 severity=medium detail="Encrypted payment batch file sent to authorized banking gateway"',
+  'Jan 15 10:45:18 fw-hk-01 kernel: [UFW BLOCK] IN=eth0 OUT= MAC=00:1a:2b:3c:4d:5e SRC=185.220.101.42 DST=10.0.1.100 PROTO=TCP DPT=3389 SPT=44821',
+  'Jan 15 11:02:55 fw-hk-01 dlp-engine[4521]: ALERT policy="PII Detection" action=monitor src_user="hr-portal@company.com" dst="internal-backup.company.com" file="annual-review-data.zip" match_count=50 severity=low detail="HR system scheduled backup containing employee records to authorized internal backup server"',
+  'Jan 15 11:30:00 fw-hk-01 dlp-engine[4521]: ALERT policy="Source Code Protection" action=block src_user="peter.zhang@company.com" dst="pastebin.com" file="database-schema.sql" match_count=1 severity=high detail="Database schema with table structures being pasted to public site"',
+  'Jan 15 12:05:33 fw-hk-01 postfix/smtpd[20903]: warning: unknown[91.234.56.78]: SASL LOGIN authentication failed',
+  'Jan 15 13:22:10 fw-hk-01 dlp-engine[4521]: ALERT policy="Financial Data" action=monitor src_user="cfo@company.com" dst="boardvantage.com" file="Board-Meeting-Financials-Q4.pptx" match_count=8 severity=medium detail="Financial presentation uploaded to authorized board portal by CFO"',
+  'Jan 15 14:01:45 fw-hk-01 dlp-engine[4521]: ALERT policy="Confidential Document" action=block src_user="temp-staff-01@company.com" dst="personal-gmail.com" file="client-database-export.csv" match_count=1200 severity=critical detail="Temporary staff sending bulk client database to personal email"',
+  'Jan 15 14:30:22 fw-hk-01 dlp-engine[4521]: ALERT policy="Source Code Protection" action=monitor src_user="dev-ops@company.com" dst="artifactory.company.com" file="release-v3.2.1.tar.gz" match_count=0 severity=low detail="DevOps deploying release package to authorized internal artifact repository"',
+].join('\n')
 
 function isTextContent(bytes: Uint8Array): boolean {
   const sample = bytes.slice(0, Math.min(512, bytes.length))
@@ -97,6 +115,7 @@ export function SocReviewPage() {
   const [uploadFileName, setUploadFileName] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [demoLoading, setDemoLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { fetchAnalyses() }, [])
@@ -120,8 +139,33 @@ export function SocReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysisId, resultId, socOverride: verdict, socNotes: notes, reviewedBy: 'SOC Analyst' }),
       })
-      if (r.ok) { if (selectedAnalysis) { const updated = { ...selectedAnalysis }; const res = updated.results.find(x => x.id === resultId); if (res) { const oldVerdict = res.socOverride || res.verdict; res.socOverride = verdict; res.reviewedBy = 'SOC Analyst'; res.reviewedAt = new Date().toISOString(); if (notes) res.socNotes = notes; if (oldVerdict === 'needs_review') updated.needsReview--; else if (oldVerdict === 'false_positive') updated.falsePositives--; else if (oldVerdict === 'true_positive') updated.truePositives--; if (verdict === 'false_positive') updated.falsePositives++; else if (verdict === 'true_positive') updated.truePositives++; else updated.needsReview++; } setSelectedAnalysis(updated); setAnalyses(prev => prev.map(a => a.id === updated.id ? updated : a)); } }
+      if (r.ok) fetchAnalyses()
     } catch {}
+  }
+
+  async function handleDemoAnalysis() {
+    setDemoLoading(true)
+    setUploadError('')
+    try {
+      const r = await fetch('/api/syslog-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: DEMO_SYSLOG_LINES, fileName: 'demo-dlp-syslog-2026-01-15.log' }),
+      })
+      const text = await r.text()
+      let data: any
+      try { data = JSON.parse(text) } catch { data = { error: text || 'Server error' } }
+      if (r.ok && data.success) {
+        await fetchAnalyses()
+        if (data.analysis) setSelectedAnalysis(data.analysis)
+      } else {
+        setUploadError(data.error || 'Demo analysis failed')
+        setShowUpload(true)
+      }
+    } catch (e: any) {
+      setUploadError(e.message || 'Demo analysis failed')
+      setShowUpload(true)
+    } finally { setDemoLoading(false) }
   }
 
   async function handleUpload() {
@@ -134,19 +178,13 @@ export function SocReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: uploadContent.split('\n').slice(0, 2000).join('\n'), fileName: uploadFileName || undefined }),
       })
-      const text = await r.text(); let data: any; try { data = JSON.parse(text) } catch { data = { error: text || 'Server error: response was not JSON' } }
+      const text = await r.text(); let data: any; try { data = JSON.parse(text) } catch { data = { error: text || 'Server error' } }
       if (r.ok && data.success) {
-        setShowUpload(false)
-        setUploadContent('')
-        setUploadFileName('')
+        setShowUpload(false); setUploadContent(''); setUploadFileName('')
         await fetchAnalyses()
         if (data.analysis) setSelectedAnalysis(data.analysis)
-      } else {
-        setUploadError(data.error || 'Upload failed')
-      }
-    } catch (e: any) {
-      setUploadError(e.message || 'Upload failed')
-    } finally { setUploading(false) }
+      } else { setUploadError(data.error || 'Upload failed') }
+    } catch (e: any) { setUploadError(e.message || 'Upload failed') } finally { setUploading(false) }
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -169,35 +207,16 @@ export function SocReviewPage() {
           while (true) {
             const { done, value } = await rdr.read()
             if (done) break
-            chunks.push(value)
-            totalSize += value.length
+            chunks.push(value); totalSize += value.length
             if (totalSize >= MAX_DECOMP) { await rdr.cancel(); break }
           }
         } catch { try { await rdr.cancel() } catch {} }
         const merged = new Uint8Array(Math.min(totalSize, MAX_DECOMP))
         let off = 0
-        for (const c of chunks) {
-          const len = Math.min(c.length, merged.length - off)
-          merged.set(c.subarray(0, len), off)
-          off += len
-          if (off >= merged.length) break
-        }
-        let text = ''
-        if (file.name.endsWith('.tgz') || file.name.endsWith('.tar.gz')) {
-          text = extractTextFromTar(merged)
-        } else {
-          text = new TextDecoder('utf-8', { fatal: false }).decode(merged)
-        }
-        if (!text.trim()) {
-          setUploadError('No readable text found in the archive. The file may contain only binary data.')
-          setUploadContent('')
-        } else {
-          setUploadContent(text)
-        }
-      } catch (err: any) {
-        setUploadError('Failed to decompress: ' + (err.message || 'Unknown error') + '. Try uploading an uncompressed .log file.')
-        setUploadContent('')
-      }
+        for (const c of chunks) { const len = Math.min(c.length, merged.length - off); merged.set(c.subarray(0, len), off); off += len; if (off >= merged.length) break }
+        let text = file.name.endsWith('.tgz') || file.name.endsWith('.tar.gz') ? extractTextFromTar(merged) : new TextDecoder('utf-8', { fatal: false }).decode(merged)
+        if (!text.trim()) { setUploadError('No readable text found in archive.'); setUploadContent('') } else { setUploadContent(text) }
+      } catch (err: any) { setUploadError('Failed to decompress: ' + (err.message || 'Unknown error')); setUploadContent('') }
     } else {
       const reader = new FileReader()
       reader.onload = (ev) => { setUploadContent(ev.target?.result as string || '') }
@@ -220,8 +239,23 @@ export function SocReviewPage() {
 
   return (
     <>
-              <PageHeader badge="AI SOC" headline="Syslog Analysis Dashboard" subheadline="AI-powered false positive detection for SOC analysts" />
+      <PageHeader title="SOC Review" subtitle="Syslog Analysis Dashboard" description="AI-powered false positive detection for SOC analysts" />
       <div className="max-w-6xl mx-auto px-4 pb-16">
+
+      {/* Demo Banner */}
+      <AnimateIn>
+        <div className="mb-8 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-2xl p-6">
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-white mb-1">Try AI-Powered Syslog Analysis</h3>
+              <p className="text-sm text-zinc-400">Click the button to analyze 15 sample DLP syslog events with AI. The AI will classify each event as False Positive, True Positive, or Needs Review with confidence scores and reasoning.</p>
+            </div>
+            <button onClick={handleDemoAnalysis} disabled={demoLoading} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 disabled:from-zinc-600 disabled:to-zinc-600 text-white px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap shadow-lg shadow-cyan-500/20">
+              {demoLoading ? <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing with AI...</> : <><Play className="w-5 h-5" /> Run Demo Analysis</>}
+            </button>
+          </div>
+        </div>
+      </AnimateIn>
 
       {showUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -236,7 +270,7 @@ export function SocReviewPage() {
             </div>
             <div>
               <label className="text-sm text-zinc-400 block mb-1">Syslog Content</label>
-              <textarea value={uploadContent} onChange={e => setUploadContent(e.target.value)} placeholder={"Paste syslog lines here...\n\nExample:\nJun 21 09:15:22 fw-hk-01 kernel: DLP policy violation: USB storage device detected"} rows={10} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono" />
+              <textarea value={uploadContent} onChange={e => setUploadContent(e.target.value)} placeholder={"Paste syslog lines here..."} rows={10} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono" />
             </div>
             <div className="flex items-center gap-3">
               <input ref={fileInputRef} type="file" accept=".log,.txt,.csv,.syslog,.gz,.tgz" onChange={handleFileSelect} className="hidden" />
@@ -300,7 +334,7 @@ export function SocReviewPage() {
         <div className="text-center py-12">
           <Shield className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
           <p className="text-zinc-400">No syslog analyses available yet.</p>
-          <p className="text-zinc-600 text-sm mt-1">Click "Upload Syslog" above to analyze your first log file.</p>
+          <p className="text-zinc-600 text-sm mt-1">Click "Run Demo Analysis" above to try AI-powered syslog analysis.</p>
         </div>
       ) : (
         <div className="space-y-3">
