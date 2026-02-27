@@ -377,7 +377,8 @@ export async function GET(req: NextRequest) {
     const key = searchParams.get('key') || 'unknown'
     try {
       if (key === 'unknown') return NextResponse.json({ error: 'Missing key' }, { status: 400 })
-      if (key.includes('..') || key.startsWith('/')) return NextResponse.json({ error: 'Invalid key' }, { status: 400 })       if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
+      if (key.includes('..') || key.startsWith('/')) return NextResponse.json({ error: 'Invalid key' }, { status: 400 }) 
+              if (!admin && !key.startsWith(PUBLIC_PREFIX)) {
         await writeLog({ type: 'file', action: 'download', key, ip, reason: 'Access denied - not a public file' })
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
