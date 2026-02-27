@@ -375,7 +375,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
             // R2 Budget enforcement - block downloads if monthly cost >= $200
-      const budgetRes = await fetch(new URL('/api/r2-budget', req.url))
+      const budgetRes = await fetch(new URL('/api/r2-budget?pw=' + encodeURIComponent(pw || ''), req.url))
       if (budgetRes.ok) {
         const budget = await budgetRes.json()
         if (budget.budgetExceeded) {
