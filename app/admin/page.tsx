@@ -93,7 +93,7 @@ export default function AdminPage() {
     const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
-    const [moveLoading, setMoveLoading] = useState(false)   const [r2Budget, setR2Budget] = useState<any>(null)   const [r2Loading, setR2Loading] = useState(false)
+    const [moveLoading, setMoveLoading] = useState(false)   const [r2Budget, setR2Budget] = useState(null)   const [r2Loading, setR2Loading] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
 
@@ -447,7 +447,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
           <div className="flex gap-2">
-            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") fetchDownloads(dlPath); if (tab === "logs") fetchLogs() }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
+            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") { fetchDownloads(dlPath); fetchR2Budget() }; if (tab === "logs") fetchLogs() }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
             <button onClick={handleLogout} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm">Logout</button>
           </div>
         </div>
@@ -498,11 +498,12 @@ export default function AdminPage() {
               <h3 className="text-white font-bold text-sm">R2 Storage & Budget</h3>
               <button onClick={fetchR2Budget} disabled={r2Loading} className="text-cyan-400 hover:text-cyan-300 text-xs disabled:opacity-50">{r2Loading ? 'Loading...' : 'Refresh'}</button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
               <div><div className="text-xl font-bold text-white">{r2Budget.usage?.storageGB?.toFixed(2)} GB</div><div className="text-xs text-zinc-500">Storage Used</div></div>
               <div><div className="text-xl font-bold text-cyan-400">{r2Budget.usage?.totalObjects}</div><div className="text-xs text-zinc-500">Total Objects</div></div>
               <div><div className="text-xl font-bold text-green-400">{r2Budget.usage?.monthlyDownloads}</div><div className="text-xs text-zinc-500">Downloads (Month)</div></div>
               <div><div className="text-xl font-bold text-yellow-400">{r2Budget.usage?.monthlyUploads}</div><div className="text-xs text-zinc-500">Uploads (Month)</div></div>
+                                  <div><div className="text-xl font-bold text-purple-400">{r2Budget.usage?.monthlyListCalls}</div><div className="text-xs text-zinc-500">List Ops (Month)</div></div>
             </div>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex-1 bg-zinc-700 rounded-full h-2"><div className={"h-2 rounded-full transition-all " + (r2Budget.budgetExceeded ? "bg-red-500" : r2Budget.totalCostUSD > 150 ? "bg-yellow-500" : "bg-green-500")} style={{width: Math.min(100, (r2Budget.totalCostUSD / r2Budget.budgetLimitUSD) * 100) + '%'}}></div></div>
