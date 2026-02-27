@@ -93,6 +93,7 @@ export default function AdminPage() {
     const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
+    const [moveLoading, setMoveLoading] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
 
@@ -383,6 +384,7 @@ export default function AdminPage() {
 
   async function handleMove() {
     if (!moveItem || !moveTarget.trim()) return
+        setMoveLoading(true)
     try {
             const target = moveTarget.trim().replace(/\/$/, ''); const dest = (target.startsWith('public/') || target.startsWith('internal/')) ? target : uploadMode + '/' + target
       if (moveItem.type === 'folder') {
@@ -397,7 +399,7 @@ export default function AdminPage() {
       setMoveItem(null)
       setMoveTarget('')
       fetchDownloads(dlPath)
-    } catch (e: any) { alert('Move failed: ' + e.message) }
+    } catch (e: any) { alert('Move failed: ' + e.message) } finally { setMoveLoading(false) }
   }
 
   const filteredLogs = logFilter === "all" ? logs : logs.filter((l: any) => l.type === logFilter)
@@ -547,7 +549,7 @@ export default function AdminPage() {
             <p className="text-zinc-500 text-xs mb-4">Enter the destination folder path (e.g. public/archive/ or internal/backup/)</p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setMoveItem(null)} className="px-4 py-2 rounded-lg text-zinc-400 hover:text-white">Cancel</button>
-              <button onClick={handleMove} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg">Move</button>
+              <button onClick={handleMove} disabled={moveLoading} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg">{moveLoading ? 'Moving...' : 'Move'}</button>
             </div>
           </div>
         </div>
