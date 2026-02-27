@@ -1,35 +1,64 @@
 'use client'
 import { useState } from 'react'
 
-const SAMPLES = [
-  { name: 'Normal PII', content: 'Customer: John Chan\nPhone: +852 6789 0000\nCredit Card: 5407 1234 5678 9012\nEmail: john.chan@example.com' },
-  { name: 'Obfuscated PII (Evasion)', content: 'Jo&&@hn Ch&&@an +85&&@2 678&&@9 0000 54&&@07 12&&@34 56&&@78 90&&@12' },
-  { name: 'Mixed Evasion', content: 'N-a-m-e: J*o*h*n C#h#a#n\nP.h.o" + "n.e: +8_5_2 6_7_8_9 0_0_0_0\nC.C: 5~4~0~7 1~2~3~4 5~6~7~8 9~0~1~2' },
-  { name: 'Clean Text (No PII)', content: 'The quarterly report shows revenue growth of 15% in APAC region.\nNew product launch scheduled for Q3.' },
+const SAMPLE_CATEGORIES = [
+  {
+    category: 'PII Detection',
+    icon: '\ud83d\udd10',
+    description: 'Personal Identifiable Information detection scenarios',
+    samples: [
+      { name: 'Standard PII (Baseline)', content: 'Customer Record:\nName: John Chan Wing Kei\nHKID: A123456(7)\nPhone: +852 6789 0000\nCredit Card: 5407 1234 5678 9012\nEmail: john.chan@example.com\nAddress: Flat 12A, Tower 3, Taikoo Shing, Hong Kong' },
+      { name: 'Obfuscated PII (Evasion)', content: 'Jo&&@hn Ch&&@an W&&@ing K&&@ei\nHK&&@ID: A1&&@23&&@456(7)\n+85&&@2 678&&@9 00&&@00\n54&&@07 12&&@34 56&&@78 90&&@12\njo&&@hn.ch&&@an@exa&&@mple.com' },
+      { name: 'Spaced Character Evasion', content: 'N a m e: J o h n  C h a n\nH K I D: A 1 2 3 4 5 6 (7)\nP h o n e: + 8 5 2  6 7 8 9  0 0 0 0\nC r e d i t  C a r d: 5 4 0 7  1 2 3 4  5 6 7 8  9 0 1 2' },
+      { name: 'Homoglyph Attack', content: 'Name: J\u043ehn Ch\u0430n (using Cyrillic o and a)\nHKID: \u0410123456(7) (Cyrillic A)\nPhone: +852 \u0431789 0000\nCC: 54O7 l234 5678 90l2 (O=zero, l=one)' },
+      { name: 'Mixed Language PII', content: '\u59d3\u540d: \u9673\u5927\u6587 (Chan Tai Man)\nHKID: B987654(3)\n\u96fb\u8a71: +852-9876-5432\n\u4fe1\u7528\u5361: 4532-8901-2345-6789\n\u5730\u5740: \u9999\u6e2f\u4e2d\u74b0\u7687\u540e\u5927\u9053\u4e2d18\u865f' },
+      { name: 'PII in Code/JSON Format', content: '{"user": {"firstName": "Wing", "lastName": "Chan", "id_number": "C234567(8)", "mobile": "85291234567", "payment": {"card": "4111111111111111", "exp": "12/27", "cvv": "123"}}}' },
+    ]
+  },
+  {
+    category: 'GDPR Compliance',
+    icon: '\ud83c\uddea\ud83c\uddfa',
+    description: 'EU General Data Protection Regulation scenarios',
+    samples: [
+      { name: 'EU Citizen Data (Standard)', content: 'GDPR Subject Data:\nName: Hans M\u00fcller\nNationality: German\nPassport: C01X00T47\nIBAN: DE89 3704 0044 0532 0130 00\nEmail: hans.mueller@beispiel.de\nDOB: 15/03/1985\nHealth: Type 2 Diabetes, prescribed Metformin 500mg' },
+      { name: 'GDPR Evasion (Obfuscated)', content: 'Ha&&@ns Mu&&@ller\nPassp&&@ort: C0&&@1X0&&@0T47\nIB&&@AN: DE&&@89 37&&@04 00&&@44 05&&@32 01&&@30 00\nDO&&@B: 15/0&&@3/19&&@85\nHea&&@lth: Ty&&@pe 2 Dia&&@betes' },
+      { name: 'Multi-Country GDPR PII', content: 'EU Customer Database Export:\n1. Marie Dubois (France) - SSN: 2 85 01 75 108 042 36 - IBAN: FR76 3000 6000 0112 3456 7890 189\n2. Giuseppe Rossi (Italy) - CF: RSSGPP85M15H501Z - IBAN: IT60 X054 2811 1010 0000 0123 456\n3. Ana Silva (Portugal) - NIF: 123456789 - IBAN: PT50 0002 0123 1234 5678 9015 4' },
+      { name: 'GDPR Special Category Data', content: 'Patient Transfer Note (Confidential):\nPatient: Sofia Andersen, DOB: 22/06/1990\nDanish CPR: 220690-1234\nDiagnosis: Bipolar Disorder Type II\nMedication: Lithium 900mg daily\nReligion: Muslim (dietary requirements noted)\nTrade Union: Member of 3F since 2015\nBiometric: Fingerprint ID enrolled for ward access' },
+      { name: 'GDPR Data in Spreadsheet Format', content: 'employee_id,full_name,email,national_id,salary_eur,health_condition\nEMP001,Klaus Weber,k.weber@firma.de,DE-1234567890,85000,Asthma\nEMP002,Elena Popov,e.popov@firma.de,BG-9901011234,62000,None\nEMP003,Pierre Martin,p.martin@firma.de,FR-185017510804236,91000,Hypertension' },
+    ]
+  },
+  {
+    category: 'Advanced Evasion',
+    icon: '\ud83d\udee1\ufe0f',
+    description: 'Techniques that bypass traditional Regex/Pattern DLP',
+    samples: [
+      { name: 'Base64 Encoded PII', content: 'Please process this customer record:\nData: Sm9obiBDaGFuLCBIS0lEOiBBMTIzNDU2KDcpLCBDQzogNTQwNy0xMjM0LTU2NzgtOTAxMg==\n(This is base64 encoded PII that pattern-based DLP cannot read)' },
+      { name: 'Reverse Text Evasion', content: 'Customer info (read backwards):\n2109-8765-4321-7045 :draC tiderC\n0000 9876 258+ :enohP\n)7(654321A :DIKH\nnaK gniW nahC nhoJ :emaN' },
+      { name: 'Leetspeak/Symbol Substitution', content: 'Cu5t0m3r: J0hn_Ch4n\nHK!D: @123456(7)\nPh0n3: +852.6789.0000\nCr3d!t_C4rd: five-four-zero-seven 1234 5678 9012\n3m4!l: john[dot]chan[at]example[dot]com' },
+      { name: 'Contextual PII (No Direct Pattern)', content: 'Meeting notes: Discussed the Wong account. The client born in the year of the dragon, 1988, March 15th. His government ID ends with the lucky number 8, full sequence A-one-two-three-four-five-six-eight. Prefers contact on his HK mobile starting with nine-one-two, then three-four-five-six-seven-eight-nine.' },
+      { name: 'Steganographic Text', content: 'The Joyful Orchestra Harmonized Naturally. Creating Harmonious Art Naturally.\nHis Kingdom Identity Document: Alpha 1 2 3 4 5 6 (7)\nPlease Have One Nice Experience: +Eight Five Two, 6789-0000\nCool Card: 5407_1234_5678_9012\n(First letters of first sentence spell JOHN CHAN)' },
+      { name: 'Multilingual Evasion', content: 'Kundendaten (\u5ba2\u6237\u6570\u636e):\nName/\u540d\u524d: \u30e8\u30cf\u30cd\u30b9 M\u00fcller (Johannes)\nReisepass/\u62a4\u7167: C01X00T47\nBankverbindung: D-E-8-9 3704 0044 0532 0130 00\nGesundheit/\u5065\u5eb7: \u7cd6\u5c3f\u75c5 (Diabetes mellitus Typ 2)' },
+    ]
+  },
+  {
+    category: 'Industry Scenarios',
+    icon: '\ud83c\udfe2',
+    description: 'Real-world DLP scenarios from financial, healthcare, HR',
+    samples: [
+      { name: 'Financial Data Leak', content: 'URGENT - Wire Transfer Details:\nBeneficiary: Chan Wing Kei Holdings Ltd\nAccount: 012-345-678901-234\nSWIFT: HSBCHKHH\nAmount: HKD 2,500,000\nPurpose: Q4 Dividend Payment\nAuthorized by: CFO James Wong (Staff ID: FIN-0042)\nApproval Code: WTX-2026-0228-HK' },
+      { name: 'Healthcare Record Leak', content: 'CONFIDENTIAL - Patient Discharge Summary\nPatient: WONG Siu Ming (M, 67)\nHKID: D876543(2)\nAdmission: 15-Feb-2026, Queen Mary Hospital\nDiagnosis: Acute Myocardial Infarction (STEMI)\nProcedure: PCI with DES to LAD\nMedications: Aspirin 80mg, Clopidogrel 75mg, Atorvastatin 40mg\nFollow-up: Cardiology OPD 2 weeks\nInsurance: Policy# AIA-HK-9988776' },
+      { name: 'HR Payroll Data', content: 'Monthly Payroll - February 2026 (RESTRICTED)\n\nEMP-101, Chan Tai Man, HKID: E567890(1), Basic: HKD 45,000, MPF: HKD 1,500, Net: HKD 43,500, HSBC 400-123456-001\nEMP-102, Wong Mei Ling, HKID: F234567(8), Basic: HKD 52,000, MPF: HKD 1,500, Net: HKD 50,500, BOC 012-987654-321\nEMP-103, Lee Ka Fai, HKID: G345678(9), Basic: HKD 38,000, MPF: HKD 1,500, Net: HKD 36,500, SCB 123-456789-012' },
+      { name: 'GenAI Prompt Leak', content: 'ChatGPT prompt from user:\n"Help me write a cover letter. My details: Li Wei, HKID H456789(0), I graduated from HKU in 2020. My phone is 852-6543-2100. I currently earn HKD 55,000/month at HSBC account 583-123456-838. My manager Mr. David Chen (HKID K789012(3)) can be contacted at david.chen@hsbc.com.hk"' },
+      { name: 'Clean Business Report', content: 'Q4 2025 Performance Summary:\nRevenue grew 15.3% YoY to HKD 127M driven by APAC expansion.\nNew enterprise clients: 23 (target: 20)\nCustomer retention: 94.2%\nR&D investment increased to 18% of revenue.\nHeadcount: 342 FTE across 5 offices.\nNo material compliance incidents reported.' },
+    ]
+  },
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ResultPanel({ title, result, loading, error, color }: { title: string; result: any; loading: boolean; error: string; color: string }) {
-  if (loading) return (
-    <div className="flex-1 min-w-0">
-      <h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3>
-      <div className="flex items-center justify-center h-64">
-        <div className="text-zinc-400 animate-pulse">Analyzing...</div>
-      </div>
-    </div>
-  )
-  if (error) return (
-    <div className="flex-1 min-w-0">
-      <h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3>
-      <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">{error}</div>
-    </div>
-  )
-  if (!result) return (
-    <div className="flex-1 min-w-0">
-      <h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3>
-      <div className="text-zinc-500 text-center py-16">Click &quot;Scan Content&quot; to analyze</div>
-    </div>
-  )
+  if (loading) return (<div className="flex-1 min-w-0"><h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3><div className="flex items-center justify-center h-64"><div className="text-zinc-400 animate-pulse">Analyzing...</div></div></div>)
+  if (error) return (<div className="flex-1 min-w-0"><h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3><div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">{error}</div></div>)
+  if (!result) return (<div className="flex-1 min-w-0"><h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3><div className="text-zinc-500 text-center py-16">Select a sample and click Scan</div></div>)
   const isTraditional = title.includes('Traditional')
   return (
     <div className="flex-1 min-w-0">
@@ -41,41 +70,20 @@ function ResultPanel({ title, result, loading, error, color }: { title: string; 
         </div>
         {result.method && <div className="text-xs text-zinc-400 mb-2">Method: {result.method}</div>}
         {!isTraditional && result.risk_level && <div className="text-sm text-zinc-300 mb-1">Risk Level: <span className={`font-bold ${result.risk_level === 'critical' ? 'text-red-400' : result.risk_level === 'high' ? 'text-orange-400' : 'text-yellow-400'}`}>{result.risk_level?.toUpperCase()}</span></div>}
-        {!isTraditional && result.evasion_detected && <div className="text-sm text-orange-400 font-bold mb-1">\u26A0\uFE0F Evasion Technique Detected!</div>}
+        {!isTraditional && result.evasion_detected && <div className="text-sm text-orange-400 font-bold mb-1">Evasion Technique Detected!</div>}
         {!isTraditional && result.summary && <div className="text-sm text-zinc-300 mt-2">{result.summary}</div>}
-        {isTraditional && !result.detected && <div className="text-sm text-zinc-300 mt-2">No pattern matches found. Content appears clean.</div>}
+        {isTraditional && !result.detected && <div className="text-sm text-zinc-300 mt-2">No pattern matches found.</div>}
         {isTraditional && result.totalMatches !== undefined && <div className="text-sm text-zinc-300">Total Matches: {result.totalMatches}</div>}
       </div>
-      {result.findings && result.findings.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-bold text-zinc-300 mb-2">Findings ({result.findings.length}):</div>
-          {result.findings.map((f: any, i: number) => (
-            <div key={i} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
-              {isTraditional ? (
-                <>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-bold text-cyan-400">{f.rule}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : f.action === 'QUARANTINE' ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-black'}`}>{f.action}</span>
-                  </div>
-                  <div className="text-xs text-zinc-400">Type: {f.type}</div>
-                  <div className="text-xs text-zinc-300 mt-1">Matches: {f.matches?.join(', ')}</div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-bold text-cyan-400">{f.type}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : f.action === 'QUARANTINE' ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-black'}`}>{f.action}</span>
-                  </div>
+      {result.findings && result.findings.length > 0 && (<div className="space-y-2"><div className="text-sm font-bold text-zinc-300 mb-2">Findings ({result.findings.length}):</div>
+          {result.findings.map((f: any, i: number) => (<div key={i} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+              {isTraditional ? (<><div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-cyan-400">{f.rule}</span><span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-black'}`}>{f.action}</span></div><div className="text-xs text-zinc-400">Type: {f.type}</div><div className="text-xs text-zinc-300 mt-1">Matches: {f.matches?.join(', ')}</div></>
+              ) : (<><div className="flex items-center justify-between mb-1"><span className="text-sm font-bold text-cyan-400">{f.type}</span><span className={`text-xs px-2 py-0.5 rounded font-bold ${f.action === 'BLOCK' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-black'}`}>{f.action}</span></div>
                   {f.original_text && <div className="text-xs text-zinc-400">Found: <code className="bg-zinc-900 px-1 rounded">{f.original_text}</code></div>}
                   {f.decoded_value && <div className="text-xs text-green-400 mt-1">Decoded: <code className="bg-zinc-900 px-1 rounded font-bold">{f.decoded_value}</code></div>}
                   {f.confidence !== undefined && <div className="text-xs text-zinc-400 mt-1">Confidence: {f.confidence}%</div>}
-                  {f.evasion_technique && f.evasion_technique !== 'none' && <div className="text-xs text-orange-400 mt-1">Evasion: {f.evasion_technique}</div>}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                  {f.evasion_technique && f.evasion_technique !== 'none' && <div className="text-xs text-orange-400 mt-1">Evasion: {f.evasion_technique}</div>}</>)}
+            </div>))}</div>)}
     </div>
   )
 }
@@ -88,7 +96,8 @@ export default function AIDLPDemo() {
   const [aiLoading, setAiLoading] = useState(false)
   const [tradError, setTradError] = useState('')
   const [aiError, setAiError] = useState('')
-
+  const [activeCategory, setActiveCategory] = useState(0)
+  const [selectedSample, setSelectedSample] = useState('')
   async function runScan() {
     if (!content.trim()) return
     setTradResult(null); setAiResult(null)
@@ -105,22 +114,23 @@ export default function AIDLPDemo() {
       setAiResult(d2)
     } catch (e: any) { setAiError(e.message) } finally { setAiLoading(false) }
   }
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <span className="inline-block bg-cyan-900/50 text-cyan-400 text-xs font-bold px-3 py-1 rounded-full mb-4">AI DLP Demo</span>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Traditional DLP vs AI-Powered DLP</h1>
-          <p className="text-zinc-400 max-w-2xl mx-auto">See how traditional pattern-based DLP fails to detect obfuscated PII, while AI LLM detection identifies evasion attempts</p>
+          <p className="text-zinc-400 max-w-3xl mx-auto">Compare pattern-based DLP (Forcepoint / Symantec / Proofpoint / McAfee style) against NextGuard AI LLM detection. Traditional DLP uses Regex, Dictionary, and Phrase matching. AI DLP understands context, detects evasion techniques, and identifies obfuscated PII &amp; GDPR data.</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
           <div className="flex flex-wrap gap-2 mb-4">
-            {SAMPLES.map((s, i) => (
-              <button key={i} onClick={() => setContent(s.content)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg text-sm transition-colors">{s.name}</button>
-            ))}
+            {SAMPLE_CATEGORIES.map((cat, ci) => (<button key={ci} onClick={() => setActiveCategory(ci)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeCategory === ci ? 'bg-cyan-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>{cat.icon} {cat.category}</button>))}
           </div>
-          <textarea value={content} onChange={e => setContent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono text-sm min-h-[120px] mb-4" placeholder="Enter or paste content to scan for PII..." />
+          <p className="text-xs text-zinc-500 mb-3">{SAMPLE_CATEGORIES[activeCategory].description}</p>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {SAMPLE_CATEGORIES[activeCategory].samples.map((s, si) => (<button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setTradResult(null); setAiResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>))}
+          </div>
+          <textarea value={content} onChange={e => setContent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono text-sm min-h-[120px] mb-4" placeholder="Select a sample above or paste your own content to scan..." />
           <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{tradLoading || aiLoading ? 'Scanning...' : 'Scan Content'}</button>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -135,22 +145,28 @@ export default function AIDLPDemo() {
           <h3 className="text-lg font-bold text-white mb-4">How It Works</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h4 className="text-orange-400 font-bold mb-2">Traditional DLP</h4>
+              <h4 className="text-orange-400 font-bold mb-2">Traditional DLP (Forcepoint / Symantec / Proofpoint / McAfee)</h4>
               <ul className="text-sm text-zinc-400 space-y-1">
-                <li>- Uses Regex patterns to match credit cards, phones, IDs</li>
+                <li>- Regex patterns for credit cards, HKID, SSN, IBAN</li>
                 <li>- Dictionary-based keyword matching</li>
                 <li>- Phrase detection for known patterns</li>
-                <li className="text-red-400 font-bold">- CANNOT detect obfuscated data (e.g., Jo&&@hn)</li>
+                <li>- Luhn algorithm for card validation</li>
+                <li className="text-red-400 font-bold">- CANNOT detect obfuscated data (Jo&amp;&amp;@hn)</li>
+                <li className="text-red-400 font-bold">- CANNOT read Base64 encoded PII</li>
+                <li className="text-red-400 font-bold">- CANNOT understand context or intent</li>
                 <li className="text-red-400 font-bold">- Easily bypassed with character insertion</li>
               </ul>
             </div>
             <div>
               <h4 className="text-cyan-400 font-bold mb-2">AI-Powered DLP (NextGuard)</h4>
               <ul className="text-sm text-zinc-400 space-y-1">
-                <li>- Uses LLM to understand context and meaning</li>
+                <li>- LLM understands context and meaning</li>
                 <li>- Detects PII even with obfuscation characters</li>
                 <li>- Identifies evasion techniques automatically</li>
-                <li className="text-green-400 font-bold">- CAN detect Jo&&@hn as &quot;John&quot;</li>
+                <li>- Decodes Base64, reverse text, leetspeak</li>
+                <li className="text-green-400 font-bold">- CAN detect Jo&amp;&amp;@hn as &quot;John&quot;</li>
+                <li className="text-green-400 font-bold">- CAN read PII across multiple languages</li>
+                <li className="text-green-400 font-bold">- CAN identify GDPR special category data</li>
                 <li className="text-green-400 font-bold">- Understands intent, not just patterns</li>
               </ul>
             </div>
