@@ -174,6 +174,19 @@ export function SocReviewPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadFileName(file.name)
+        const MAX_BROWSER_SIZE = 20 * 1024 * 1024
+    if (file.size > MAX_BROWSER_SIZE) {
+      setUploading(true); setUploadError(''); setShowUpload(true); setUploadContent('Uploading large file to server for analysis...')
+      try {
+        const fd = new FormData(); fd.append('file', file)
+        const r = await fetch('/api/syslog-analysis/upload', { method: 'POST', body: fd })
+        const txt = await r.text(); let data: any; try { data = JSON.parse(txt) } catch { data = { error: txt || 'Server error' } }
+        if (r.ok && data.success) { setShowUpload(false); setUploadContent(''); setUploadFileName(''); await fetchAnalyses(); if (data.analysis) setSelectedAnalysis(data.analysis) }
+        else { setUploadError(data.error || 'Upload failed') }
+      } catch (e: any) { setUploadError(e.message || 'Upload failed') }
+      finally { setUploading(false); setUploadContent('') }
+      return
+    }
     const isGzip = file.name.endsWith('.gz') || file.name.endsWith('.tgz')
     if (isGzip) {
       try {
