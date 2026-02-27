@@ -183,6 +183,38 @@ export default function AdminPage() {
     } catch {}
   }
 
+    async function handleDownloadFolder(folderPath: string, folderName: string) {
+          try {
+                  setUploading(true)
+                  setUploadFileName('Preparing download: ' + folderName + '...')
+                  setUploadProgress(0)
+                  const listRes = await fetch('/api/downloads?action=list-recursive&prefix=' + encodeURIComponent(folderPath))
+                  const listData = await listRes.json()
+                  const files = listData.files || []
+                  if (files.length === 0) { alert('No files in folder'); return }
+                  const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default
+                  const zip = new JSZip()
+                  for (let i = 0; i < files.length; i++) {
+                            const f = files[i]
+                            setUploadFileName('Downloading: ' + f.key.replace(folderPath, ''))
+                            setUploadProgress(Math.round(((i + 0.5) / files.length) * 100))
+                            const resp = await fetch(f.url)
+                            const blob = await resp.blob()
+                            zip.file(f.key.replace(folderPath, ''), blob)
+                          }
+                  setUploadFileName('Creating ZIP...')
+                  setUploadProgress(95)
+                  const content = await zip.generateAsync({ type: 'blob' })
+                  const url = URL.createObjectURL(content)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = folderName + '.zip'
+                  a.click()
+                  URL.revokeObjectURL(url)
+                } catch (e: any) { alert('Download failed: ' + e.message) }
+          finally { setUploading(false); setUploadProgress(0); setUploadFileName('') }
+        }
+
   async function fetchLogs() {
     setLogsLoading(true)
     try { const r = await fetch("/api/logs"); if (r.ok) { const d = await r.json(); setLogs(d.logs || []) } } catch {} finally { setLogsLoading(false) }
@@ -385,7 +417,7 @@ export default function AdminPage() {
                 <thead><tr className="text-zinc-400 border-b border-zinc-800"><th className="pb-3 pr-4">Name</th><th className="pb-3 pr-4">Size</th><th className="pb-3 pr-4">Modified</th><th className="pb-3">Actions</th></tr></thead>
                 <tbody>
                   {dlPath && <tr className="border-b border-zinc-800/50"><td colSpan={4} className="py-2"><button onClick={dlGoUp} className="text-cyan-400 hover:text-cyan-300">.. (up)</button></td></tr>}
-                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3">{item.type === "file" && <button onClick={async () => { const r = await fetch("/api/downloads?action=download&key=" + encodeURIComponent(item.path)); const d = await r.json(); if (d.url) window.open(d.url, "_blank") }} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs mr-2">Download</button>}<button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
+                  {dlItems.filter((item: any) => item.name !== ".keep").map((item: any) => (<tr key={item.path} className="border-b border-zinc-800/50"><td className="py-3 pr-4">{item.type === "folder" ? <button onClick={() => fetchDownloads(item.path)} className="text-white hover:text-cyan-400">{'\ud83d\udcc1'} {item.name}</button> : <span className="text-zinc-300">{'\ud83d\udcc4'} {item.name}</span>}</td><td className="py-3 pr-4 text-zinc-400">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td><td className="py-3 pr-4 text-zinc-500">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td><td className="py-3">{{item.type === "folder" && <button onClick={() => handleDownloadFolder(item.path, item.name)} disabled={uploading} className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1 rounded-md text-xs mr-2 disabled:opacity-50">Download ZIP</button>}{item.type === "file" && <button onClick={async () => { const r = await fetch("/api/downloads?action=download&key=" + encodeURIComponent(item.path)); const d = await r.json(); if (d.url) window.open(d.url, "_blank") }} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs mr-2">Download</button>}<button onClick={() => handleDelete(item.path)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-md text-xs">Delete</button></td></tr>))}
                 </tbody>
               </table>
             )}
