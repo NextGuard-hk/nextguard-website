@@ -23,6 +23,15 @@ const S3 = new S3Client({
 })
 
 export async function GET(req: NextRequest) {
+    // Auth: admin cookie or download password required
+    const sessionSecret = process.env.CONTACT_SESSION_SECRET
+    const adminToken = req.cookies.get('contact_admin_token')
+    const isAdmin = sessionSecret && adminToken?.value === sessionSecret
+    const pw = req.nextUrl.searchParams.get('pw')
+    const hasPw = pw && pw === (process.env.DOWNLOAD_PASSWORD || '')
+    if (!isAdmin && !hasPw) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   try {
     // 1. Calculate storage
     let totalBytes = 0
