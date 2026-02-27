@@ -90,6 +90,7 @@ export default function AdminPage() {
     const [renameItem, setRenameItem] = useState<{path: string; name: string; type: string} | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [moveItem, setMoveItem] = useState<{path: string; name: string; type: string} | null>(null)
+    const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
 
   useEffect(() => { checkAuth() }, [])
