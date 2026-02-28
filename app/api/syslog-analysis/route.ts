@@ -1,17 +1,18 @@
 // Increase body size limit for large syslog uploads
 export const runtime = 'nodejs'
 export const maxDuration = 300
-
 import { NextRequest, NextResponse } from 'next/server'
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-
 const BUCKET = 'nextguard-downloads'
 const SYSLOG_NPOINT = process.env.NPOINT_SYSLOG_URL || ''
+const AI_USAGE_NPOINT = process.env.NPOINT_AI_USAGE_URL || ''
 const LLM_API_KEY = process.env.PERPLEXITY_API_KEY || process.env.OPENAI_API_KEY || ''
 const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ? 'https://api.perplexity.ai/chat/completions' : 'https://api.openai.com/v1/chat/completions'
 const LLM_MODEL = process.env.PERPLEXITY_API_KEY ? 'sonar' : 'gpt-4o-mini'
-
+// Perplexity sonar pricing: ~$1 per 1M input tokens, $1 per 1M output tokens
+const COST_PER_1K_INPUT = process.env.PERPLEXITY_API_KEY ? 0.001 : 0.00015
+const COST_PER_1K_OUTPUT = process.env.PERPLEXITY_API_KEY ? 0.001 : 0.0006
 const S3 = new S3Client({
   region: 'auto',
   endpoint: process.env.R2_ENDPOINT || '',
@@ -20,14 +21,12 @@ const S3 = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
   },
 })
-
 function isAdmin(req: NextRequest): boolean {
   const sessionSecret = process.env.CONTACT_SESSION_SECRET
   if (!sessionSecret) return false
   const token = req.cookies.get('contact_admin_token')
   return token?.value === sessionSecret
 }
-
 interface SyslogEvent {
   id: string
   timestamp: string
@@ -37,7 +36,6 @@ interface SyslogEvent {
   message: string
   raw: string
 }
-
 interface AnalysisResult {
   id: string
   eventId: string
@@ -51,7 +49,6 @@ interface AnalysisResult {
   socOverride?: string
   socNotes?: string
 }
-
 interface SyslogAnalysis {
   id: string
   fileName: string
@@ -65,47 +62,77 @@ interface SyslogAnalysis {
   results: AnalysisResult[]
   status: 'pending' | 'analyzing' | 'completed' | 'error'
 }
-
+interface UsageRecord {
+  id: string
+  timestamp: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  costUSD: number
+  analysisId: string
+  fileName: string
+  eventCount: number
+}
+interface UsageData {
+  monthlyBudgetUSD: number
+  usageRecords: UsageRecord[]
+  monthlySummary: Record<string, { totalCostUSD: number; totalInputTokens: number; totalOutputTokens: number; requestCount: number }>
+}
 function parseSyslogLine(line: string, index: number): SyslogEvent | null {
   const trimmed = line.trim()
   if (!trimmed || trimmed.startsWith('#')) return null
   const syslogRegex = /^(\S+\s+\d+\s+[\d:]+)\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$/
   const match = trimmed.match(syslogRegex)
   if (match) {
-    return {
-      id: `evt-${index}-${Date.now()}`,
-      timestamp: match[1],
-      host: match[2],
-      facility: match[3],
-      severity: 'info',
-      message: match[5],
-      raw: trimmed,
-    }
+    return { id: `evt-${index}-${Date.now()}`, timestamp: match[1], host: match[2], facility: match[3], severity: 'info', message: match[5], raw: trimmed }
   }
   const csvParts = trimmed.split(',')
   if (csvParts.length >= 3) {
-    return {
-      id: `evt-${index}-${Date.now()}`,
-      timestamp: csvParts[0]?.trim() || new Date().toISOString(),
-      host: csvParts[1]?.trim() || 'unknown',
-      facility: csvParts[2]?.trim() || 'unknown',
-      severity: csvParts[3]?.trim() || 'info',
-      message: csvParts.slice(4).join(',').trim() || trimmed,
-      raw: trimmed,
-    }
+    return { id: `evt-${index}-${Date.now()}`, timestamp: csvParts[0]?.trim() || new Date().toISOString(), host: csvParts[1]?.trim() || 'unknown', facility: csvParts[2]?.trim() || 'unknown', severity: csvParts[3]?.trim() || 'info', message: csvParts.slice(4).join(',').trim() || trimmed, raw: trimmed }
   }
-  return {
-    id: `evt-${index}-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    host: 'unknown',
-    facility: 'raw',
-    severity: 'info',
-    message: trimmed,
-    raw: trimmed,
-  }
+  return { id: `evt-${index}-${Date.now()}`, timestamp: new Date().toISOString(), host: 'unknown', facility: 'raw', severity: 'info', message: trimmed, raw: trimmed }
 }
-
-async function analyzeWithLLM(events: SyslogEvent[]): Promise<AnalysisResult[]> {
+async function getUsageData(): Promise<UsageData> {
+  if (!AI_USAGE_NPOINT) return { monthlyBudgetUSD: 10, usageRecords: [], monthlySummary: {} }
+  try {
+    const res = await fetch(AI_USAGE_NPOINT, { cache: 'no-store' })
+    if (res.ok) return await res.json()
+  } catch {}
+  return { monthlyBudgetUSD: 10, usageRecords: [], monthlySummary: {} }
+}
+async function saveUsageData(data: UsageData) {
+  if (!AI_USAGE_NPOINT) return
+  try {
+    await fetch(AI_USAGE_NPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  } catch {}
+}
+function getCurrentMonth(): string {
+  return new Date().toISOString().slice(0, 7) // YYYY-MM
+}
+async function checkBudget(): Promise<{ allowed: boolean; currentSpend: number; budget: number; remaining: number }> {
+  const data = await getUsageData()
+  const month = getCurrentMonth()
+  const summary = data.monthlySummary[month]
+  const currentSpend = summary?.totalCostUSD || 0
+  const budget = data.monthlyBudgetUSD || 10
+  const remaining = budget - currentSpend
+  return { allowed: remaining > 0, currentSpend, budget, remaining }
+}
+async function recordUsage(record: Omit<UsageRecord, 'id'>) {
+  if (!AI_USAGE_NPOINT) return
+  const data = await getUsageData()
+  const newRecord: UsageRecord = { ...record, id: `ur-${Date.now()}-${Math.random().toString(36).slice(2,8)}` }
+  data.usageRecords = [...(data.usageRecords || []).slice(-999), newRecord]
+  const month = getCurrentMonth()
+  if (!data.monthlySummary) data.monthlySummary = {}
+  if (!data.monthlySummary[month]) data.monthlySummary[month] = { totalCostUSD: 0, totalInputTokens: 0, totalOutputTokens: 0, requestCount: 0 }
+  data.monthlySummary[month].totalCostUSD += record.costUSD
+  data.monthlySummary[month].totalInputTokens += record.inputTokens
+  data.monthlySummary[month].totalOutputTokens += record.outputTokens
+  data.monthlySummary[month].requestCount += 1
+  await saveUsageData(data)
+}
+async function analyzeWithLLM(events: SyslogEvent[], analysisId: string, fileName: string): Promise<AnalysisResult[]> {
   if (!LLM_API_KEY) {
     return events.map(evt => ({
       id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
@@ -113,12 +140,26 @@ async function analyzeWithLLM(events: SyslogEvent[]): Promise<AnalysisResult[]> 
       verdict: 'needs_review' as const,
       confidence: 0,
       reasoning: 'LLM API key not configured. Manual review required.',
-      recommendation: 'Configure OPENAI_API_KEY environment variable for automated analysis.',
+      recommendation: 'Configure PERPLEXITY_API_KEY or OPENAI_API_KEY environment variable.',
+      analyzedAt: new Date().toISOString(),
+    }))
+  }
+  const budget = await checkBudget()
+  if (!budget.allowed) {
+    return events.map(evt => ({
+      id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      eventId: evt.id,
+      verdict: 'needs_review' as const,
+      confidence: 0,
+      reasoning: `Monthly AI budget exceeded. Spent: $${budget.currentSpend.toFixed(4)} / Budget: $${budget.budget.toFixed(2)}. Manual review required.`,
+      recommendation: 'Contact admin to increase monthly AI budget.',
       analyzedAt: new Date().toISOString(),
     }))
   }
   const batchSize = 10
   const results: AnalysisResult[] = []
+  let totalInputTokens = 0
+  let totalOutputTokens = 0
   for (let i = 0; i < events.length; i += batchSize) {
     const batch = events.slice(i, i + batchSize)
     const prompt = `You are a cybersecurity SOC analyst specializing in DLP (Data Loss Prevention) syslog analysis. Analyze each syslog event below and determine if it is a FALSE POSITIVE, TRUE POSITIVE, or NEEDS REVIEW.\n\nFor each event, respond in JSON array format with objects containing:\n- eventIndex (number, 0-based index in this batch)\n- verdict: "false_positive", "true_positive", or "needs_review"\n- confidence: 0-100\n- reasoning: brief explanation\n- recommendation: what SOC should do\n\nEvents:\n${batch.map((e, idx) => `[${idx}] ${e.raw}`).join('\n')}\n\nRespond with ONLY a JSON array, no other text.`
@@ -126,95 +167,60 @@ async function analyzeWithLLM(events: SyslogEvent[]): Promise<AnalysisResult[]> 
       const res = await fetch(LLM_ENDPOINT, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${LLM_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: LLM_MODEL,
-          messages: [{ role: 'system', content: 'You are a DLP security analyst. Respond only with valid JSON.' }, { role: 'user', content: prompt }],
-          temperature: 0.1,
-          max_tokens: 2000,
-        }),
+        body: JSON.stringify({ model: LLM_MODEL, messages: [{ role: 'system', content: 'You are a DLP security analyst. Respond only with valid JSON.' }, { role: 'user', content: prompt }], temperature: 0.1, max_tokens: 2000 }),
       })
       if (res.ok) {
         const data = await res.json()
+        const usage = data.usage || {}
+        const inTok = usage.prompt_tokens || Math.ceil(prompt.length / 4)
+        const outTok = usage.completion_tokens || 500
+        totalInputTokens += inTok
+        totalOutputTokens += outTok
         const content = data.choices?.[0]?.message?.content || '[]'
         const jsonMatch = content.match(/\[([\s\S]*?)\]/)
         const parsed = jsonMatch ? JSON.parse(`[${jsonMatch[1]}]`) : []
         for (const item of parsed) {
           const evt = batch[item.eventIndex]
           if (evt) {
-            results.push({
-              id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-              eventId: evt.id,
-              verdict: item.verdict || 'needs_review',
-              confidence: item.confidence || 50,
-              reasoning: item.reasoning || 'Analysis completed',
-              recommendation: item.recommendation || 'Review event details',
-              analyzedAt: new Date().toISOString(),
-            })
+            results.push({ id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, eventId: evt.id, verdict: item.verdict || 'needs_review', confidence: item.confidence || 50, reasoning: item.reasoning || 'Analysis completed', recommendation: item.recommendation || 'Review event details', analyzedAt: new Date().toISOString() })
           }
         }
         const analyzed = new Set(parsed.map((p: any) => batch[p.eventIndex]?.id))
         for (const evt of batch) {
           if (!analyzed.has(evt.id)) {
-            results.push({
-              id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-              eventId: evt.id,
-              verdict: 'needs_review',
-              confidence: 0,
-              reasoning: 'LLM did not return analysis for this event',
-              recommendation: 'Manual review required',
-              analyzedAt: new Date().toISOString(),
-            })
+            results.push({ id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, eventId: evt.id, verdict: 'needs_review', confidence: 0, reasoning: 'LLM did not return analysis for this event', recommendation: 'Manual review required', analyzedAt: new Date().toISOString() })
           }
         }
       } else {
         for (const evt of batch) {
-          results.push({
-            id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-            eventId: evt.id,
-            verdict: 'needs_review',
-            confidence: 0,
-            reasoning: `LLM API error: ${res.status}`,
-            recommendation: 'Manual review required',
-            analyzedAt: new Date().toISOString(),
-          })
+          results.push({ id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, eventId: evt.id, verdict: 'needs_review', confidence: 0, reasoning: `LLM API error: ${res.status}`, recommendation: 'Manual review required', analyzedAt: new Date().toISOString() })
         }
       }
     } catch (err: any) {
       for (const evt of batch) {
-        results.push({
-          id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-          eventId: evt.id,
-          verdict: 'needs_review',
-          confidence: 0,
-          reasoning: `Analysis error: ${err.message}`,
-          recommendation: 'Manual review required',
-          analyzedAt: new Date().toISOString(),
-        })
+        results.push({ id: `ar-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, eventId: evt.id, verdict: 'needs_review', confidence: 0, reasoning: `Analysis error: ${err.message}`, recommendation: 'Manual review required', analyzedAt: new Date().toISOString() })
       }
     }
   }
+  if (totalInputTokens > 0 || totalOutputTokens > 0) {
+    const costUSD = (totalInputTokens / 1000) * COST_PER_1K_INPUT + (totalOutputTokens / 1000) * COST_PER_1K_OUTPUT
+    await recordUsage({ timestamp: new Date().toISOString(), model: LLM_MODEL, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUSD, analysisId, fileName, eventCount: events.length })
+  }
   return results
 }
-
 async function getStoredAnalyses(): Promise<SyslogAnalysis[]> {
   try {
     const res = await fetch(SYSLOG_NPOINT, { cache: 'no-store' })
     if (res.ok) {
-      const data = await res.json()
-      return data.analyses || []
+      const d = await res.json()
+      return d.analyses || []
     }
   } catch {}
   return []
 }
-
 async function saveAnalyses(analyses: SyslogAnalysis[]) {
-  await fetch(SYSLOG_NPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ analyses: analyses.slice(-50) }),
-  })
+  await fetch(SYSLOG_NPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analyses: analyses.slice(-50) }) })
 }
-
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action')
   const admin = isAdmin(req)
@@ -233,9 +239,22 @@ export async function GET(req: NextRequest) {
     const analyses = await getStoredAnalyses()
     return NextResponse.json({ analyses })
   }
+  if (action === 'ai-usage') {
+    const usageData = await getUsageData()
+    const budgetStatus = await checkBudget()
+    return NextResponse.json({ ...usageData, budgetStatus })
+  }
+  if (action === 'update-budget') {
+    if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+    const newBudget = parseFloat(req.nextUrl.searchParams.get('budget') || '0')
+    if (!newBudget || newBudget <= 0) return NextResponse.json({ error: 'Invalid budget' }, { status: 400 })
+    const data = await getUsageData()
+    data.monthlyBudgetUSD = newBudget
+    await saveUsageData(data)
+    return NextResponse.json({ success: true, monthlyBudgetUSD: newBudget })
+  }
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -243,14 +262,11 @@ export async function POST(req: NextRequest) {
     let syslogContent = ''
     let syslogFileName = ''
     let syslogFilePath = ''
-
     if (content) {
-      // Direct text upload - no admin required for demo
       syslogContent = content
       syslogFileName = fileName || `upload-${new Date().toISOString().slice(0,10)}.log`
       syslogFilePath = `upload/${syslogFileName}`
     } else if (filePath) {
-      // R2 file - admin required
       if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
       const obj = await S3.send(new GetObjectCommand({ Bucket: BUCKET, Key: filePath }))
       syslogContent = await obj.Body?.transformToString() || ''
@@ -259,7 +275,6 @@ export async function POST(req: NextRequest) {
     } else {
       return NextResponse.json({ error: 'Missing filePath or content' }, { status: 400 })
     }
-
     const lines = syslogContent.split('\n')
     const events: SyslogEvent[] = []
     for (let i = 0; i < lines.length; i++) {
@@ -267,23 +282,12 @@ export async function POST(req: NextRequest) {
       if (evt) events.push(evt)
     }
     if (events.length === 0) return NextResponse.json({ error: 'No valid syslog events found in the uploaded content' }, { status: 400 })
-    const results = await analyzeWithLLM(events)
+    const analysisId = `sa-${Date.now()}`
+    const results = await analyzeWithLLM(events, analysisId, syslogFileName)
     const fp = results.filter(r => r.verdict === 'false_positive').length
     const tp = results.filter(r => r.verdict === 'true_positive').length
     const nr = results.filter(r => r.verdict === 'needs_review').length
-    const analysis: SyslogAnalysis = {
-      id: `sa-${Date.now()}`,
-      fileName: syslogFileName,
-      filePath: syslogFilePath,
-      analyzedAt: new Date().toISOString(),
-      totalEvents: events.length,
-      falsePositives: fp,
-      truePositives: tp,
-      needsReview: nr,
-      events,
-      results,
-      status: 'completed',
-    }
+    const analysis: SyslogAnalysis = { id: analysisId, fileName: syslogFileName, filePath: syslogFilePath, analyzedAt: new Date().toISOString(), totalEvents: events.length, falsePositives: fp, truePositives: tp, needsReview: nr, events, results, status: 'completed' }
     const existing = await getStoredAnalyses()
     existing.push(analysis)
     await saveAnalyses(existing)
@@ -292,7 +296,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
-
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
@@ -307,15 +310,20 @@ export async function PATCH(req: NextRequest) {
     if (socNotes) result.socNotes = socNotes
     result.reviewedBy = reviewedBy || 'SOC Analyst'
     result.reviewedAt = new Date().toISOString()
-    const oldV = oldVerdict; if (oldV === 'false_positive') analysis.falsePositives--; else if (oldV === 'true_positive') analysis.truePositives--; else if (oldV === 'needs_review') analysis.needsReview--; if (socOverride === 'false_positive') analysis.falsePositives++; else if (socOverride === 'true_positive') analysis.truePositives++; else analysis.needsReview++
+    const oldV = oldVerdict
+    if (oldV === 'false_positive') analysis.falsePositives--
+    else if (oldV === 'true_positive') analysis.truePositives--
+    else if (oldV === 'needs_review') analysis.needsReview--
+    if (socOverride === 'false_positive') analysis.falsePositives++
+    else if (socOverride === 'true_positive') analysis.truePositives++
+    else analysis.needsReview++
     await saveAnalyses(analyses)
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
-  }
-
-  export async function DELETE(req: NextRequest) {
+}
+export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json()
     const { analysisId } = body
