@@ -139,7 +139,7 @@ export default function DownloadsPage() {
   async function loadFiles(path: string) {
     setLoadingFiles(true)
     try {
-      const res = await fetch(`/api/files?path=${encodeURIComponent(PUBLIC_PREFIX + path)}`)
+      const res = await fetch(`/api/downloads?action=list&prefix=${encodeURIComponent(path)}`)
       const data = await res.json()
       setItems(data.items || [])
       setCurrentPath(path)
@@ -156,7 +156,7 @@ export default function DownloadsPage() {
         setPendingDownload(item.path)
         setShowDisclaimer(true)
       } else {
-        window.open(`/api/download?file=${encodeURIComponent(item.path)}`, "_blank")
+        fetch(`/api/downloads?action=download&key=${encodeURIComponent(item.path)}`).then(r=>r.json()).then(d=>{if(d.url)window.open(d.url,"_blank")})
       }
     }
   }
@@ -165,7 +165,7 @@ export default function DownloadsPage() {
     setAgreed(true)
     setShowDisclaimer(false)
     if (pendingDownload) {
-      window.open(`/api/download?file=${encodeURIComponent(pendingDownload)}`, "_blank")
+      fetch(`/api/downloads?action=download&key=${encodeURIComponent(pendingDownload)}`).then(r=>r.json()).then(d=>{if(d.url)window.open(d.url,"_blank")})
       setPendingDownload(null)
     }
   }
