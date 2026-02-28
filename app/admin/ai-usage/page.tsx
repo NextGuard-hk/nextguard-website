@@ -54,10 +54,10 @@ export default function AdminAIUsagePage() {
   const spent = summary?.totalCostUSD || data?.budgetStatus?.currentSpend || 0
   const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0
   const barColor = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-cyan-500"
-  const totalReqs = summary?.requestCount || 0
-  const totalIn = summary?.totalInputTokens || 0
-  const totalOut = summary?.totalOutputTokens || 0
-  const totalCost = summary?.totalCostUSD || 0
+    const totalReqs = (data?.usageRecords || []).length
+    const totalIn = (data?.usageRecords || []).reduce((s: number, r: any) => s + (r.inputTokens || 0), 0)
+    const totalOut = (data?.usageRecords || []).reduce((s: number, r: any) => s + (r.outputTokens || 0), 0)
+    const totalCost = (data?.usageRecords || []).reduce((s: number, r: any) => s + (r.costUSD || 0), 0)
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 pt-24 md:p-8 md:pt-28">
       <div className="max-w-6xl mx-auto">
