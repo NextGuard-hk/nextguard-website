@@ -227,18 +227,48 @@ export default function AIDLPDemo() {
     setPolicy(JSON.parse(JSON.stringify(DEFAULT_POLICY)))
   }
 
+  const [extracting, setExtracting] = useState(false)
+
+  const BINARY_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.pptx', '.jpg', '.jpeg', '.png']
+  const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploadedFileName(file.name)
-    try {
-      const text = await file.text()
-      setContent(text)
-      setSelectedSample('')
-      setTradResult(null); setAiResult(null); setHybridResult(null)
-    } catch {
-      setContent(`[Error reading file: ${file.name}]`)
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`File too large! Maximum size is 5MB. Your file: ${(file.size / 1024 / 1024).toFixed(1)}MB`)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
     }
+    setUploadedFileName(file.name)
+    setTradResult(null); setAiResult(null); setHybridResult(null)
+    const isBinary = BINARY_EXTS.some(ext => file.name.toLowerCase().endsWith(ext))
+    if (isBinary) {
+      setExtracting(true)
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch('/api/extract-text', { method: 'POST', body: formData })
+        const data = await res.json()
+        if (data.error) {
+          setContent(`[Error] ${data.error}`)
+        } else {
+          setContent(data.text)
+        }
+      } catch (err: any) {
+        setContent(`[Error extracting text: ${err.message}]`)
+      } finally {
+        setExtracting(false)
+      }
+    } else {
+      try {
+        const text = await file.text()
+        setContent(text)
+      } catch {
+        setContent(`[Error reading file: ${file.name}]`)
+      }
+    }
+    setSelectedSample('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -371,16 +401,16 @@ export default function AIDLPDemo() {
 
           {/* File Upload */}
           <div className="flex items-center gap-3 mb-4">
-            <input ref={fileInputRef} type="file" accept=".txt,.csv,.json,.xml,.log,.md,.html,.js,.ts,.py,.sql,.yml,.yaml,.env,.cfg,.conf,.ini" onChange={handleFileUpload} className="hidden" />
+            <input ref={fileInputRef} type="file" accept=".txt,.csv,.json,.xml,.log,.md,.html,.js,.ts,.py,.sql,.yml,.yaml,.env,.cfg,.conf,.ini,.pdf,.docx,.xlsx,.xls,.pptx,.jpg,.jpeg,.png" onChange={handleFileUpload} className="hidden" />
             <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
               📂 Upload File
             </button>
-            {uploadedFileName && <span className="text-sm text-cyan-400">📄 {uploadedFileName}</span>}
-            <span className="text-xs text-zinc-600">Supports: .txt, .csv, .json, .xml, .log, .md, .html, .js, .ts, .py, .sql, .yml, .env</span>
+            {uploadedFileName && <span className="text-sm text-cyan-400">📄 {uploadedFileName}</span>}         {extracting && <span className="text-sm text-yellow-400 animate-pulse">Extracting text from file...</span>}
+            <span className="text-xs text-zinc-600">Supports: .pdf, .docx, .xlsx, .pptx, .jpg, .txt, .csv, .json, .xml and more (max 5MB per file)</span>
           </div>
 
           <textarea value={content} onChange={e => setContent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono text-sm min-h-[120px] mb-4" placeholder="Select a sample above, upload a file, or paste your own content to scan..." />
-          <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading || hybridLoading} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{tradLoading || aiLoading || hybridLoading ? 'Scanning...' : 'Scan Content'}</button>
+          <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading || hybridLoading || extracting} || tradLoading || aiLoading || hybridLoading} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{extracting ? 'Extracting text...' : tradLoading || aiLoading || hybridLoading ? 'Scanning...' : 'Scan Content'}</button>
         </div>
 
         {/* Results Grid */}
