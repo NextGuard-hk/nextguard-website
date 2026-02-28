@@ -167,7 +167,7 @@ export default function DownloadsPage() {
 
   function handleItemClick(item: FileItem) {
     if (item.type === "folder") {
-      const newPath = currentPath ? currentPath + "/" + item.name : item.name
+            const newPath = item.path.replace(/^public\//, "")
       loadFiles(newPath)
     } else {
       if (!agreed) {
@@ -189,7 +189,7 @@ export default function DownloadsPage() {
   }
 
   function goUp() {
-    const parts = currentPath.split("/")
+        const parts = currentPath.replace(/\/$/, "").split("/")
     parts.pop()
     loadFiles(parts.join("/"))
   }
