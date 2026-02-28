@@ -122,11 +122,14 @@ export default function AIDLPDemo() {
     setTradResult(null); setAiResult(null); setHybridResult(null)
     setTradError(''); setAiError(''); setHybridError('')
     setTradLoading(true); setAiLoading(true); setHybridLoading(true)
-    // Fire all three scans in parallel - Traditional shows instantly, AI/Hybrid appear when ready
+    // Only 2 API calls: Traditional (instant) + AI (slow). Hybrid computed client-side.
+    // This avoids calling AI twice (once for 'ai' mode and once inside 'hybrid' mode).
+    let tradData: any = null
     ;(async () => {
       try {
         const r1 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'traditional' }) })
         const d1 = await r1.json()
+        tradData = d1
         setTradResult(d1)
       } catch (e: any) { setTradError(e.message) } finally { setTradLoading(false) }
     })()
@@ -135,14 +138,31 @@ export default function AIDLPDemo() {
         const r2 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'ai' }) })
         const d2 = await r2.json()
         setAiResult(d2)
-      } catch (e: any) { setAiError(e.message) } finally { setAiLoading(false) }
-    })()
-    ;(async () => {
-      try {
-        const r3 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'hybrid' }) })
-        const d3 = await r3.json()
-        setHybridResult(d3)
-      } catch (e: any) { setHybridError(e.message) } finally { setHybridLoading(false) }
+        // Compute Hybrid client-side from Traditional + AI results
+        const trad = tradData
+        const ai = d2
+        const mergedFindings: any[] = []
+        if (trad?.findings) { for (const f of trad.findings) { mergedFindings.push({ source: 'pattern', ...f }) } }
+        if (ai?.findings?.length) { for (const f of ai.findings) { mergedFindings.push({ source: 'ai', ...f }) } }
+        const actionPriority: Record<string, number> = { BLOCK: 3, QUARANTINE: 2, AUDIT: 1 }
+        let maxAction = 'AUDIT'
+        for (const f of mergedFindings) { if ((actionPriority[f.action] || 0) > (actionPriority[maxAction] || 0)) maxAction = f.action }
+        const riskPriority: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, none: 0 }
+        let maxRisk = ai?.risk_level || 'none'
+        if (trad?.findings) { for (const f of trad.findings) { if ((riskPriority[f.severity] || 0) > (riskPriority[maxRisk] || 0)) maxRisk = f.severity } }
+        const detected = (trad?.detected || false) || (ai?.detected || false)
+        setHybridResult({
+          detected,
+          verdict: detected ? 'VIOLATION_DETECTED' : 'CLEAN',
+          recommended_action: detected ? maxAction : 'NONE',
+          method: 'Hybrid (Pattern-Based + AI LLM)',
+          risk_level: maxRisk,
+          evasion_detected: ai?.evasion_detected || false,
+          pattern_engine: { detected: trad?.detected || false, totalMatches: trad?.totalMatches || 0, findingCount: trad?.findings?.length || 0 },
+          ai_engine: { detected: ai?.detected || false, risk_level: ai?.risk_level || 'none', findingCount: ai?.findings?.length || 0, summary: ai?.summary || '' },
+          findings: mergedFindings,
+        })
+      } catch (e: any) { setAiError(e.message); setHybridError(e.message) } finally { setAiLoading(false); setHybridLoading(false) }
     })()
   }
 
