@@ -101,10 +101,8 @@ export async function POST(req: NextRequest) {
     if (!user.active) {
       return NextResponse.json({ error: 'Account has been deactivated. Please contact support.' }, { status: 403 })
     }
-    if (!user.emailVerified) {
-      return NextResponse.json({ error: 'Email not verified. Please check your email for the verification code.', needsVerification: true }, { status: 403 })
-    }
-    // Verify password
+            // Note: unverified users can still login via OTP - verify-otp sets emailVerified: true
+// Verify password
     const passwordHash = await hashPassword(password)
     if (passwordHash !== user.passwordHash) {
       recordAttempt(ip)
