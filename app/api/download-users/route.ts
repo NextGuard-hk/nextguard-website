@@ -209,12 +209,12 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
   }
+  }
 
   // GET - Admin list all users
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret')
-  const action = req.nextUrl.searchParams.get('action')
-  if (secret !== 'nextguard-cron-2024-secure') {
+    if (secret !== 'nextguard-cron-2024-secure') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
@@ -267,5 +267,4 @@ export async function PUT(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Operation failed' }, { status: 500 })
   }
-}
 }
