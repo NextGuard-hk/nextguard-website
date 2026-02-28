@@ -468,8 +468,7 @@ export default function AIDLPDemo() {
                 <li>- Phrase detection for known patterns</li>
                 <li className="text-red-400 font-bold">- CANNOT detect obfuscated data (Jo&&@hn)</li>
                 <li className="text-red-400 font-bold">- CANNOT read Base64 encoded PII</li>
-                <li className="text-red-400 font-bold">- Best of both worlds, zero blind spots</li>
-- CANNOT understand context or intent</li>
+                <li className="text-red-400 font-bold">- CANNOT understand context or intent</li>
               <li className="text-red-400 font-bold">- CANNOT read text from images (no OCR)</li>
               </ul>
             </div>
