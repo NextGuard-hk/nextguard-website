@@ -6,6 +6,71 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
+// OCR via OpenAI Vision API
+async function ocrWithVision(base64Image: string, mimeType: string, filename: string): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.PERPLEXITY_API_KEY || ''
+  if (!apiKey) return `[OCR unavailable: no API key configured]\nFilename: ${filename}`
+
+  const isOpenAI = !!process.env.OPENAI_API_KEY
+  const endpoint = isOpenAI
+    ? 'https://api.openai.com/v1/chat/completions'
+    : 'https://api.perplexity.ai/chat/completions'
+  const model = isOpenAI ? 'gpt-4o-mini' : 'sonar'
+
+  // Only OpenAI supports vision - if only Perplexity key, fall back
+  if (!isOpenAI) {
+    return `[OCR requires OpenAI API key. Perplexity API does not support image analysis.]\nFilename: ${filename}`
+  }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an OCR text extraction engine. Extract ALL text visible in the image exactly as it appears. Include all numbers, names, IDs, addresses, and any other text content. Preserve the layout as much as possible. If no text is found, respond with "[No text detected in image]". Do not add commentary - only output the extracted text.',
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`,
+                  detail: 'high',
+                },
+              },
+              {
+                type: 'text',
+                text: 'Extract all text from this image. Output only the extracted text, nothing else.',
+              },
+            ],
+          },
+        ],
+        max_tokens: 4000,
+        temperature: 0,
+      }),
+    })
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      return `[OCR error: ${res.status}]\nFilename: ${filename}`
+    }
+
+    const data = await res.json()
+    const extractedText = data.choices?.[0]?.message?.content?.trim() || '[No text detected]'
+    return `[OCR Extracted Text from: ${filename}]\n${extractedText}`
+  } catch (e: any) {
+    return `[OCR failed: ${e.message}]\nFilename: ${filename}`
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
@@ -49,7 +114,10 @@ export async function POST(req: NextRequest) {
       }
       text = slideTexts.join('\n\n')
     } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
-      text = `[Image file: ${file.name}, size: ${(file.size / 1024).toFixed(1)}KB]\n[Note: Image uploaded for DLP inspection. AI engine will analyze image metadata and filename for sensitive content. For full OCR-based text extraction, an on-premise deployment with Tesseract/PaddleOCR is recommended.]\nFilename: ${file.name}`
+      // OCR: Extract text from image using OpenAI Vision API
+      const mimeType = name.endsWith('.png') ? 'image/png' : 'image/jpeg'
+      const base64 = buffer.toString('base64')
+      text = await ocrWithVision(base64, mimeType, file.name)
     } else if (name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json') || name.endsWith('.xml') || name.endsWith('.log') || name.endsWith('.md') || name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sql') || name.endsWith('.yml') || name.endsWith('.yaml') || name.endsWith('.env') || name.endsWith('.cfg') || name.endsWith('.conf') || name.endsWith('.ini')) {
       text = buffer.toString('utf-8')
     } else {
@@ -57,7 +125,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (!text.trim()) text = '[No text content extracted from file]'
-
     return NextResponse.json({ text, filename: file.name, size: file.size })
   } catch (e: any) {
     return NextResponse.json({ error: `Extraction failed: ${e.message}` }, { status: 500 })
