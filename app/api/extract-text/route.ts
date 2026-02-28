@@ -35,6 +35,44 @@ async function ocrFromImage(buffer: Buffer, filename: string): Promise<string> {
   }
 }
 
+// OCR for scanned/image-based PDFs via OCR.space (supports PDF natively)
+async function ocrFromPdf(buffer: Buffer, filename: string): Promise<string> {
+  try {
+    const base64 = buffer.toString('base64')
+    const body = new URLSearchParams({
+      apikey: process.env.OCR_SPACE_API_KEY || 'helloworld',
+      base64Image: `data:application/pdf;base64,${base64}`,
+      language: 'eng',
+      isOverlayRequired: 'false',
+      OCREngine: '2',
+      filetype: 'PDF',
+      isTable: 'true',
+    })
+    const res = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+    const data = await res.json()
+    if (data.ParsedResults && data.ParsedResults.length > 0) {
+      const text = data.ParsedResults.map((r: any) => r.ParsedText).join('\n').trim()
+      if (text) return `[OCR Extracted Text from PDF: ${filename}]\n${text}`
+    }
+    return `[No text detected in scanned PDF]\nFilename: ${filename}`
+  } catch (e: any) {
+    return `[PDF OCR processing failed]\nFilename: ${filename}\nError: ${e.message}`
+  }
+}
+
+// Check if extracted PDF text is meaningful (not just metadata)
+function isPdfTextMeaningful(text: string): boolean {
+  if (!text) return false
+  // Remove common PDF metadata artifacts
+  const cleaned = text.replace(/font\s*size[:\s]*\d+/gi, '').replace(/\s+/g, ' ').trim()
+  // If less than 20 chars of real content, likely a scanned/image PDF
+  return cleaned.length >= 20
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
@@ -47,9 +85,15 @@ export async function POST(req: NextRequest) {
     let text = ''
 
     if (name.endsWith('.pdf')) {
+      // First try text extraction via pdf-parse
       const pdfParse = (await import('pdf-parse')).default
       const data = await pdfParse(buffer)
       text = data.text
+      // If pdf-parse returned no meaningful text, this is likely a scanned/image PDF
+      // Fall back to OCR
+      if (!isPdfTextMeaningful(text)) {
+        text = await ocrFromPdf(buffer, file.name)
+      }
     } else if (name.endsWith('.docx')) {
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
