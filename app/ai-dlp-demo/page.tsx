@@ -278,7 +278,7 @@ export default function AIDLPDemo() {
         if (data.error) {
           setContent(`[Error] ${data.error}`)
         } else {
-          setContent((data.isScanned) ? `[📄 Scanned file: ${file.name} — OCR text extracted for AI analysis]` : data.text)
+          setContent((data.isScanned) ? `[📄 Scanned file: ${file.name} — OCR text extracted for DLP analysis]` : data.text)
                         setFileRawText(data.rawText || '')
               setFileOcrText(data.ocrText || '')
               setIsScannedFile(data.isScanned || false)
@@ -311,7 +311,7 @@ export default function AIDLPDemo() {
         const r1 = await fetch('/api/ai-dlp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: isScannedFile ? fileRawText : content, mode: 'traditional', policy })
+          body: JSON.stringify({ content: isScannedFile ? (fileOcrText || fileRawText || content) : content, mode: 'traditional', policy })
         })
         const d1 = await r1.json()
         tradData = d1           // Immediately show pattern results in Hybrid panel           const patternFindings = d1.findings ? d1.findings.map((f: any) => ({ source: 'pattern', ...f })) : []           setHybridResult({ detected: d1.detected, verdict: d1.detected ? 'VIOLATION_DETECTED' : 'CLEAN', recommended_action: d1.detected ? d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { BLOCK: 3, QUARANTINE: 2, AUDIT: 1 }; return (p[f.action] || 0) > (p[max] || 0) ? f.action : max }, 'AUDIT') : 'NONE', method: 'Hybrid (Pattern-Based + AI LLM)', risk_level: d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }; return (p[f.severity] || 0) > (p[max] || 0) ? f.severity : max }, 'none') || 'none', evasion_detected: false, pattern_engine: { detected: d1.detected, totalMatches: d1.totalMatches || 0, findingCount: d1.findings?.length || 0 }, ai_engine: { detected: false, risk_level: 'none', findingCount: 0, summary: 'AI analysis in progress...' }, findings: patternFindings })           setHybridLoading(false)
@@ -468,7 +468,9 @@ export default function AIDLPDemo() {
                 <li>- Phrase detection for known patterns</li>
                 <li className="text-red-400 font-bold">- CANNOT detect obfuscated data (Jo&&@hn)</li>
                 <li className="text-red-400 font-bold">- CANNOT read Base64 encoded PII</li>
-                <li className="text-red-400 font-bold">- CANNOT understand context or intent</li>
+                <li className="text-red-400 font-bold">- Best of both worlds, zero blind spots</li>
+- CANNOT understand context or intent</li>
+              <li className="text-red-400 font-bold">- CANNOT read text from images (no OCR)</li>
               </ul>
             </div>
             <div>
@@ -492,6 +494,7 @@ export default function AIDLPDemo() {
                 <li className="text-green-400 font-bold">- Keywords ALWAYS enforced (Pattern)</li>
                 <li className="text-green-400 font-bold">- Evasion ALWAYS caught (AI)</li>
                 <li className="text-green-400 font-bold">- Best of both worlds, zero blind spots</li>
+              <li className="text-green-400 font-bold">- OCR scans images (JPG/PNG) for hidden PII</li>
               </ul>
             </div>
           </div>
