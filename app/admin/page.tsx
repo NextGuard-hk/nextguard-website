@@ -292,7 +292,7 @@ export default function AdminPage() {
   async function fetchNews() {
     setNewsLoading(true)
     try {
-      const r = await fetch("/api/news-feed/collect?secret=nextguard-collect-2024")
+      const r = await fetch("/api/news-feed/collect?secret=nextguard-cron-2024-secure")
       const collectData = await r.json()
       const nr = await fetch("/api/news-feed/admin")
       if (nr.ok) {
@@ -341,7 +341,7 @@ export default function AdminPage() {
   async function triggerCollect() {
     setNewsLoading(true)
     try {
-      const r = await fetch('/api/news-feed/collect?secret=nextguard-collect-2024', { method: 'POST' })
+      const r = await fetch('/api/news-feed/collect?secret=nextguard-cron-2024-secure', { method: 'POST' })
       if (r.ok) { await fetchNews() }
     } catch {} finally { setNewsLoading(false) }
   }
