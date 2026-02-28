@@ -141,7 +141,7 @@ export default function ComparePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-black text-white p-6 pt-24">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">NextGuard DLP Engine Comparison</h1>
         <p className="text-zinc-400 mb-6">Compare Traditional DLP vs AI-Powered DLP (Perplexity Sonar vs Cloudflare Workers AI)</p>
