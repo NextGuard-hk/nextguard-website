@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1")
     const pageSize = parseInt(searchParams.get("pageSize") || "10")
     const tag = searchParams.get("tag") || ""
+    const source = searchParams.get("source") || ""
 
     const res = await fetch(NPOINT_URL, { cache: "no-store" })
     const data = await res.json()
@@ -19,6 +20,11 @@ export async function GET(req: NextRequest) {
     // Filter by tag if provided
     if (tag) {
       news = news.filter((n: any) => n.tags?.includes(tag))
+    }
+
+    // Filter by source if provided
+    if (source) {
+      news = news.filter((n: any) => n.source === source)
     }
 
     // Sort by importance desc, then publishedAt desc
