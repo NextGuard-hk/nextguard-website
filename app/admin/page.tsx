@@ -96,6 +96,8 @@ export default function AdminPage() {
     const [renameItem, setRenameItem] = useState<{path: string; name: string; type: string} | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [moveItem, setMoveItem] = useState<{path: string; name: string; type: string} | null>(null)
+    const [accounts, setAccounts] = useState<any[]>([])
+    const [accountsLoading, setAccountsLoading] = useState(false)
     const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
@@ -433,6 +435,28 @@ export default function AdminPage() {
     } catch {}
   }
 
+    async function fetchAccounts() {
+    setAccountsLoading(true)
+    try {
+      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure')
+      if (r.ok) { const d = await r.json(); setAccounts(d.users || []) }
+    } catch {} finally { setAccountsLoading(false) }
+  }
+
+  async function toggleAccountActive(id: string) {
+    try {
+      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=toggle-active&id=' + encodeURIComponent(id), { method: 'PUT' })
+      if (r.ok) fetchAccounts()
+    } catch {}
+  }
+
+  async function deleteAccount(id: string) {
+    if (!confirm('Delete this account permanently?')) return
+    try {
+      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=delete&id=' + encodeURIComponent(id), { method: 'PUT' })
+      if (r.ok) fetchAccounts()
+    } catch {}
+  }
   
   function dlGoUp() {
     const parts = dlPath.replace(/\/$/, "").split("/").filter(Boolean)
@@ -541,6 +565,7 @@ export default function AdminPage() {
 
         {tab === "contacts" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                      <button onClick={() => { setTab("accounts"); fetchAccounts() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "accounts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Accounts ({accounts.length})</button>
             <div className="flex justify-end mb-4">
               <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
@@ -835,6 +860,54 @@ export default function AdminPage() {
                   </tr>
                 ))}</tbody>
               </table>
+            )}
+          </div>
+        )}
+      
+        {tab === "accounts" && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Registered Accounts</h2>
+              <button onClick={() => fetchAccounts()} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-cyan-400">{accounts.length}</div><div className="text-xs text-zinc-500">Total</div></div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-green-400">{accounts.filter((a: any) => a.active).length}</div><div className="text-xs text-zinc-500">Active</div></div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-yellow-400">{accounts.filter((a: any) => !a.emailVerified).length}</div><div className="text-xs text-zinc-500">Unverified</div></div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-red-400">{accounts.filter((a: any) => !a.active).length}</div><div className="text-xs text-zinc-500">Disabled</div></div>
+            </div>
+            {accountsLoading && accounts.length === 0 ? <p className="text-zinc-400">Loading accounts...</p> : accounts.length === 0 ? <p className="text-zinc-400">No registered accounts yet.</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead><tr className="text-zinc-400 border-b border-zinc-800">
+                    <th className="pb-3 pr-4">Contact</th>
+                    <th className="pb-3 pr-4">Email</th>
+                    <th className="pb-3 pr-4">Company</th>
+                    <th className="pb-3 pr-4">Status</th>
+                    <th className="pb-3 pr-4">Verified</th>
+                    <th className="pb-3 pr-4">Logins</th>
+                    <th className="pb-3 pr-4">Last Login</th>
+                    <th className="pb-3 pr-4">Registered</th>
+                    <th className="pb-3">Actions</th>
+                  </tr></thead>
+                  <tbody>{accounts.slice().sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((a: any) => (
+                    <tr key={a.id} className="border-b border-zinc-800/50">
+                      <td className="py-3 pr-4 text-white">{a.contactName}</td>
+                      <td className="py-3 pr-4 text-zinc-300">{a.email}</td>
+                      <td className="py-3 pr-4 text-white">{a.company}</td>
+                      <td className="py-3 pr-4"><span className={"px-2 py-0.5 rounded text-xs " + (a.active ? "bg-green-900/50 text-green-400" : "bg-red-900/50 text-red-400")}>{a.active ? "Active" : "Disabled"}</span></td>
+                      <td className="py-3 pr-4"><span className={"px-2 py-0.5 rounded text-xs " + (a.emailVerified ? "bg-cyan-900/50 text-cyan-400" : "bg-yellow-900/50 text-yellow-400")}>{a.emailVerified ? "Yes" : "No"}</span></td>
+                      <td className="py-3 pr-4 text-zinc-300">{a.loginCount || 0}</td>
+                      <td className="py-3 pr-4 text-zinc-300 text-xs">{a.lastLogin ? new Date(a.lastLogin).toLocaleString() : "-"}</td>
+                      <td className="py-3 pr-4 text-zinc-300 text-xs">{new Date(a.createdAt).toLocaleDateString()}</td>
+                      <td className="py-3">
+                        <button onClick={() => toggleAccountActive(a.id)} className={(a.active ? "bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400" : "bg-green-600/20 hover:bg-green-600/30 text-green-400") + " px-2 py-1 rounded text-xs mr-1"}>{a.active ? "Disable" : "Enable"}</button>
+                        <button onClick={() => deleteAccount(a.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-2 py-1 rounded text-xs">Delete</button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
