@@ -16,6 +16,7 @@ interface DownloadUser {
   otpExpires?: string
   lastLogin?: string
   loginCount: number
+    mustResetPassword?: boolean
 }
 
 async function writeLog(entry: Record<string, string>) {
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Verification code sent to your email.',
       company: user.company,
+            mustResetPassword: user.mustResetPassword || false,
     })
   } catch (e: any) {
     return NextResponse.json({ error: 'Login failed: ' + (e.message || 'Unknown error') }, { status: 500 })
