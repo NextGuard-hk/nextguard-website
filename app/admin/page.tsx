@@ -90,6 +90,8 @@ export default function AdminPage() {
   const [tokensLoading, setTokensLoading] = useState(false)
   const [showCreateToken, setShowCreateToken] = useState(false)
   const [newToken, setNewToken] = useState({ company: "", contact: "", email: "", type: "customer" })
+    const [tokenRequests, setTokenRequests] = useState<any[]>([])
+  const [requestsLoading, setRequestsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
     const [renameItem, setRenameItem] = useState<{path: string; name: string; type: string} | null>(null)
   const [renameValue, setRenameValue] = useState("")
@@ -401,6 +403,36 @@ export default function AdminPage() {
   }
 
 
+    async function fetchTokenRequests() {
+    setRequestsLoading(true)
+    try {
+      const r = await fetch('/api/download-tokens/request?action=list')
+      if (r.ok) { const d = await r.json(); setTokenRequests(d.requests || []) }
+    } catch {} finally { setRequestsLoading(false) }
+  }
+
+  async function approveRequest(id: string) {
+    if (!confirm('Approve this request and send token via email?')) return
+    try {
+      const r = await fetch('/api/download-tokens/request?action=approve&id=' + encodeURIComponent(id))
+      if (r.ok) {
+        const d = await r.json()
+        alert('Approved! Token: ' + d.token)
+        fetchTokenRequests()
+        fetchTokens()
+      } else { const d = await r.json(); alert(d.error || 'Failed') }
+    } catch { alert('Network error') }
+  }
+
+  async function rejectRequest(id: string) {
+    const reason = prompt('Rejection reason (optional):', 'Your request does not meet our current access criteria.')
+    if (reason === null) return
+    try {
+      const r = await fetch('/api/download-tokens/request?action=reject&id=' + encodeURIComponent(id) + '&reason=' + encodeURIComponent(reason))
+      if (r.ok) { fetchTokenRequests() }
+    } catch {}
+  }
+
   
   function dlGoUp() {
     const parts = dlPath.replace(/\/$/, "").split("/").filter(Boolean)
@@ -504,7 +536,7 @@ export default function AdminPage() {
           <button onClick={() => { setTab("logs"); fetchLogs() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "logs" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Logs</button>
           <button onClick={() => { setTab("news"); fetchNews() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>News</button>
                           <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Syslog</button>
-                        <button onClick={() => { setTab("tokens"); fetchTokens() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "tokens" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Tokens</button>
+                        <button onClick={() => { setTab("tokens"); fetchTokens(); fetchTokenRequests() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "tokens" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Tokens</button>
         </div>
 
         {tab === "contacts" && (
@@ -711,6 +743,36 @@ export default function AdminPage() {
                 <button onClick={() => setShowCreateToken(true)} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm">+ Create Token</button>
               </div>
             </div>
+
+                        {/* Pending Access Requests */}
+            {tokenRequests.filter((r: any) => r.status === 'pending').length > 0 && (
+              <div className="bg-yellow-900/20 border border-yellow-800 rounded-xl p-4 mb-6">
+                <h3 className="text-yellow-400 font-bold mb-3">Pending Access Requests ({tokenRequests.filter((r: any) => r.status === 'pending').length})</h3>
+                <table className="w-full text-sm text-left">
+                  <thead><tr className="text-zinc-400 border-b border-zinc-800">
+                    <th className="pb-2 pr-4">Company</th>
+                    <th className="pb-2 pr-4">Contact</th>
+                    <th className="pb-2 pr-4">Type</th>
+                    <th className="pb-2 pr-4">Reason</th>
+                    <th className="pb-2 pr-4">Date</th>
+                    <th className="pb-2">Actions</th>
+                  </tr></thead>
+                  <tbody>{tokenRequests.filter((r: any) => r.status === 'pending').map((r: any) => (
+                    <tr key={r.id} className="border-b border-zinc-800/50">
+                      <td className="py-2 pr-4 text-white">{r.company}</td>
+                      <td className="py-2 pr-4 text-zinc-300">{r.contact}<br/><span className="text-zinc-500 text-xs">{r.email}</span></td>
+                      <td className="py-2 pr-4"><span className={"px-2 py-0.5 rounded text-xs " + (r.type === 'customer' ? 'bg-blue-600/20 text-blue-400' : r.type === 'partner' ? 'bg-purple-600/20 text-purple-400' : 'bg-orange-600/20 text-orange-400')}>{r.type}</span></td>
+                      <td className="py-2 pr-4 text-zinc-400 text-xs max-w-[200px] truncate">{r.reason || '-'}</td>
+                      <td className="py-2 pr-4 text-zinc-400 text-xs">{r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : '-'}</td>
+                      <td className="py-2">
+                        <button onClick={() => approveRequest(r.id)} className="bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1 rounded text-xs mr-1">Approve</button>
+                        <button onClick={() => rejectRequest(r.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded text-xs">Reject</button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
 
             {showCreateToken && (
               <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 mb-6">
