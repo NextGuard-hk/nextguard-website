@@ -109,35 +109,41 @@ export default function ComparePage() {
     setPplxResult(null); setPplxError(''); setPplxLatency(null); setPplxLoading(true)
     setCfResult(null); setCfError(''); setCfLatency(null); setCfLoading(true)
 
-    // Traditional DLP - client-side regex scan
-    const t0 = performance.now()
-    try {
-      const res = await fetch('/api/ai-dlp-traditional', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
-      const data = await res.json()
-      setTradLatency(Math.round(performance.now() - t0))
-      setTradResult(data)
-    } catch { setTradError('Traditional DLP scan failed') }
-    setTradLoading(false)
+    // Run all 3 engines in PARALLEL so timing is accurate
+    const tradPromise = (async () => {
+      const t0 = performance.now()
+      try {
+        const res = await fetch('/api/ai-dlp-traditional', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
+        const data = await res.json()
+        setTradLatency(Math.round(performance.now() - t0))
+        setTradResult(data)
+      } catch { setTradError('Traditional DLP scan failed') }
+      setTradLoading(false)
+    })()
 
-    // Perplexity Sonar
-    const t1 = performance.now()
-    try {
-      const res = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
-      const data = await res.json()
-      setPplxLatency(Math.round(performance.now() - t1))
-      setPplxResult(data)
-    } catch { setPplxError('Perplexity API error') }
-    setPplxLoading(false)
+    const pplxPromise = (async () => {
+      const t1 = performance.now()
+      try {
+        const res = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
+        const data = await res.json()
+        setPplxLatency(Math.round(performance.now() - t1))
+        setPplxResult(data)
+      } catch { setPplxError('Perplexity API error') }
+      setPplxLoading(false)
+    })()
 
-    // Cloudflare Workers AI
-    const t2 = performance.now()
-    try {
-      const res = await fetch('/api/ai-dlp-cloudflare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
-      const data = await res.json()
-      setCfLatency(Math.round(performance.now() - t2))
-      setCfResult(data)
-    } catch { setCfError('Cloudflare AI error') }
-    setCfLoading(false)
+    const cfPromise = (async () => {
+      const t2 = performance.now()
+      try {
+        const res = await fetch('/api/ai-dlp-cloudflare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
+        const data = await res.json()
+        setCfLatency(Math.round(performance.now() - t2))
+        setCfResult(data)
+      } catch { setCfError('Cloudflare AI error') }
+      setCfLoading(false)
+    })()
+
+    await Promise.all([tradPromise, pplxPromise, cfPromise])
   }
 
   return (
