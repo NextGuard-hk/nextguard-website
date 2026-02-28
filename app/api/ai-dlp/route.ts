@@ -4,11 +4,12 @@ export const maxDuration = 300
 import { NextRequest, NextResponse } from 'next/server'
 
 const LLM_API_KEY = process.env.PERPLEXITY_API_KEY || process.env.OPENAI_API_KEY || ''
-const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ? 'https://api.perplexity.ai/chat/completions' : 'https://api.openai.com/v1/chat/completions'
+const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ?
+  'https://api.perplexity.ai/chat/completions' : 'https://api.openai.com/v1/chat/completions'
 const LLM_MODEL = process.env.PERPLEXITY_API_KEY ? 'sonar' : 'gpt-4o-mini'
 
 // Traditional DLP patterns with severity
-const DLP_RULES = {
+const DLP_RULES: Record<string, any> = {
   credit_card: {
     name: 'Credit Card Number',
     patterns: [
@@ -62,10 +63,15 @@ const DLP_RULES = {
   }
 }
 
-function traditionalDLPScan(content: string) {
+function traditionalDLPScan(content: string, policy?: any) {
   const findings: Array<{rule: string; type: string; matches: string[]; action: string; severity: string}> = []
   let totalMatches = 0
-  for (const [, rule] of Object.entries(DLP_RULES)) {
+  for (const [key, rule] of Object.entries(DLP_RULES)) {
+    // Check if this rule is disabled by policy
+    if (policy && policy[key] && policy[key].enabled === false) continue
+    // Use policy overrides for action and severity if provided
+    const effectiveAction = (policy && policy[key]?.action) || rule.action
+    const effectiveSeverity = (policy && policy[key]?.severity) || rule.severity
     const matches: string[] = []
     if (rule.type === 'regex' && 'patterns' in rule) {
       for (const pattern of rule.patterns) {
@@ -84,7 +90,13 @@ function traditionalDLPScan(content: string) {
       }
     }
     if (matches.length > 0) {
-      findings.push({ rule: rule.name, type: rule.type, matches, action: rule.action, severity: rule.severity })
+      findings.push({
+        rule: rule.name,
+        type: rule.type,
+        matches,
+        action: effectiveAction,
+        severity: effectiveSeverity
+      })
       totalMatches += matches.length
     }
   }
@@ -99,13 +111,7 @@ function traditionalDLPScan(content: string) {
 
 async function aiDLPScan(content: string) {
   if (!LLM_API_KEY) {
-    return {
-      detected: false,
-      analysis: 'AI API key not configured',
-      findings: [],
-      verdict: 'ERROR',
-      method: 'AI LLM Analysis',
-    }
+    return { detected: false, analysis: 'AI API key not configured', findings: [], verdict: 'ERROR', method: 'AI LLM Analysis' }
   }
   const prompt = `You are an advanced AI-powered DLP (Data Loss Prevention) system. Your job is to analyze text content and detect ANY sensitive/PII data, even if it has been obfuscated, encoded, or disguised to evade traditional pattern-based detection.
 
@@ -118,7 +124,7 @@ Analyze the following content for:
 6. Sensitive keywords and classifications (confidential, secret, classified, internal only, restricted, password, etc.)
 7. Any other PII or sensitive data
 
-IMPORTANT: 
+IMPORTANT:
 - Users may try to bypass DLP by inserting random characters (like &&@, ##, **, etc.) into sensitive data. You MUST detect these evasion attempts.
 - Also detect sensitive classification keywords like "confidential", "secret", "classified", "internal only", "do not distribute", "restricted", "password" etc. These indicate policy violations even without PII.
 
@@ -146,10 +152,7 @@ Respond with ONLY valid JSON.`
   try {
     const res = await fetch(LLM_ENDPOINT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LLM_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Authorization': `Bearer ${LLM_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: LLM_MODEL,
         messages: [
@@ -183,63 +186,31 @@ Respond with ONLY valid JSON.`
 }
 
 // Hybrid DLP: Union of Traditional + AI, takes strictest action
-async function hybridDLPScan(content: string) {
+async function hybridDLPScan(content: string, policy?: any) {
   const [traditional, ai] = await Promise.all([
-    Promise.resolve(traditionalDLPScan(content)),
+    Promise.resolve(traditionalDLPScan(content, policy)),
     aiDLPScan(content),
   ])
-
-  // Merge findings with source tags
   const mergedFindings: Array<any> = []
-
-  // Add pattern-based findings
   for (const f of traditional.findings) {
-    mergedFindings.push({
-      source: 'pattern',
-      rule: f.rule,
-      type: f.type,
-      matches: f.matches,
-      action: f.action,
-      severity: f.severity,
-    })
+    mergedFindings.push({ source: 'pattern', rule: f.rule, type: f.type, matches: f.matches, action: f.action, severity: f.severity })
   }
-
-  // Add AI findings
   if (ai.findings && ai.findings.length > 0) {
     for (const f of ai.findings) {
-      mergedFindings.push({
-        source: 'ai',
-        type: f.type,
-        original_text: f.original_text,
-        decoded_value: f.decoded_value,
-        confidence: f.confidence,
-        evasion_technique: f.evasion_technique,
-        action: f.action,
-      })
+      mergedFindings.push({ source: 'ai', type: f.type, original_text: f.original_text, decoded_value: f.decoded_value, confidence: f.confidence, evasion_technique: f.evasion_technique, action: f.action })
     }
   }
-
-  // Determine strictest action: BLOCK > QUARANTINE > AUDIT
   const actionPriority: Record<string, number> = { BLOCK: 3, QUARANTINE: 2, AUDIT: 1 }
   let maxAction = 'AUDIT'
   for (const f of mergedFindings) {
-    if ((actionPriority[f.action] || 0) > (actionPriority[maxAction] || 0)) {
-      maxAction = f.action
-    }
+    if ((actionPriority[f.action] || 0) > (actionPriority[maxAction] || 0)) maxAction = f.action
   }
-
-  // Determine highest risk level
   const riskPriority: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, none: 0 }
   let maxRisk = ai.risk_level || 'none'
-  // Also consider traditional findings severity
   for (const f of traditional.findings) {
-    if ((riskPriority[f.severity] || 0) > (riskPriority[maxRisk] || 0)) {
-      maxRisk = f.severity
-    }
+    if ((riskPriority[f.severity] || 0) > (riskPriority[maxRisk] || 0)) maxRisk = f.severity
   }
-
   const detected = traditional.detected || ai.detected
-
   return {
     detected,
     verdict: detected ? 'VIOLATION_DETECTED' : 'CLEAN',
@@ -247,40 +218,30 @@ async function hybridDLPScan(content: string) {
     method: 'Hybrid (Pattern-Based + AI LLM)',
     risk_level: maxRisk,
     evasion_detected: ai.evasion_detected || false,
-    pattern_engine: {
-      detected: traditional.detected,
-      totalMatches: traditional.totalMatches,
-      findingCount: traditional.findings.length,
-    },
-    ai_engine: {
-      detected: ai.detected,
-      risk_level: ai.risk_level || 'none',
-      findingCount: ai.findings?.length || 0,
-      summary: ai.summary || '',
-    },
+    pattern_engine: { detected: traditional.detected, totalMatches: traditional.totalMatches, findingCount: traditional.findings.length },
+    ai_engine: { detected: ai.detected, risk_level: ai.risk_level || 'none', findingCount: ai.findings?.length || 0, summary: ai.summary || '' },
     findings: mergedFindings,
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { content, mode } = await req.json()
+    const { content, mode, policy } = await req.json()
     if (!content) return NextResponse.json({ error: 'No content provided' }, { status: 400 })
     if (mode === 'traditional') {
-      const result = traditionalDLPScan(content)
+      const result = traditionalDLPScan(content, policy)
       return NextResponse.json(result)
     } else if (mode === 'ai') {
       const result = await aiDLPScan(content)
       return NextResponse.json(result)
     } else if (mode === 'hybrid') {
-      const result = await hybridDLPScan(content)
+      const result = await hybridDLPScan(content, policy)
       return NextResponse.json(result)
     } else {
-      // All three
       const [traditional, ai, hybrid] = await Promise.all([
-        Promise.resolve(traditionalDLPScan(content)),
+        Promise.resolve(traditionalDLPScan(content, policy)),
         aiDLPScan(content),
-        hybridDLPScan(content),
+        hybridDLPScan(content, policy),
       ])
       return NextResponse.json({ traditional, ai, hybrid })
     }
