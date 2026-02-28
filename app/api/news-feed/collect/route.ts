@@ -34,7 +34,8 @@ const RSS_SOURCES = [
   { name: "SecurityWeek", url: "https://feeds.feedburner.com/securityweek", category: "security-news" },
   { name: "Threatpost", url: "https://threatpost.com/feed/", category: "threat-intel" },
     // Hong Kong & Macau cybersecurity sources
-    { name: "HKCERT", url: "https://www.hkcert.org/blog/rss", category: "hk-security" },
+    { name: "HKCERT", url: "https://www.hkcert.org/getrss/security-bulletin", category: "hk-security" },
+    { name: "HKCERT News", url: "https://www.hkcert.org/getrss/security-news", category: "hk-security" },
     { name: "GovCERT.HK", url: "https://www.govcert.gov.hk/en/rss_security_alerts.xml", category: "hk-security" },
     { name: "InfoSec.gov.hk", url: "https://www.infosec.gov.hk/en/rss/whatsnew.xml", category: "hk-security" },
     { name: "RTHK Local News", url: "https://rthk.hk/rthk/news/rss/e_expressnews_elocal.xml", category: "hk-news" },
@@ -140,7 +141,7 @@ async function fetchRSSFeed(source: { name: string; url: string; category: strin
 function filterRelevantArticles(items: RSSItem[]): RSSItem[] {
   return items.filter(item => {
     const text = `${item.title} ${item.description}`
-    const HK_SOURCES = ["HKCERT","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"]; return HK_SOURCES.includes(item.source) || matchesKeywords(text, AI_KEYWORDS) || matchesKeywords(text, CYBER_KEYWORDS)
+    const HK_SOURCES = ["HKCERT","HKCERT News","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"]; return HK_SOURCES.includes(item.source) || matchesKeywords(text, AI_KEYWORDS) || matchesKeywords(text, CYBER_KEYWORDS)
   })
 }
 
@@ -192,7 +193,7 @@ export async function GET(request: NextRequest) {
         source: item.source,
         publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : now,
         collectedAt: now,
-        tags: (() => { const t = autoTag(item.title, item.description); if (["HKCERT","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"].includes(item.source) && !t.includes("Hong Kong")) t.push("Hong Kong"); return t })(),
+        tags: (() => { const t = autoTag(item.title, item.description); if (["HKCERT","HKCERT News","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"].includes(item.source) && !t.includes("Hong Kong")) t.push("Hong Kong"); return t })(),
         importance: scoreImportance(item.title, item.description),
         status: "published" as const,
         language: "en" as const,
