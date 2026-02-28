@@ -286,7 +286,7 @@ export default function AIDLPDemo() {
           body: JSON.stringify({ content, mode: 'traditional', policy })
         })
         const d1 = await r1.json()
-        tradData = d1
+        tradData = d1           // Immediately show pattern results in Hybrid panel           const patternFindings = d1.findings ? d1.findings.map((f: any) => ({ source: 'pattern', ...f })) : []           setHybridResult({ detected: d1.detected, verdict: d1.detected ? 'VIOLATION_DETECTED' : 'CLEAN', recommended_action: d1.detected ? d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { BLOCK: 3, QUARANTINE: 2, AUDIT: 1 }; return (p[f.action] || 0) > (p[max] || 0) ? f.action : max }, 'AUDIT') : 'NONE', method: 'Hybrid (Pattern-Based + AI LLM)', risk_level: d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }; return (p[f.severity] || 0) > (p[max] || 0) ? f.severity : max }, 'none') || 'none', evasion_detected: false, pattern_engine: { detected: d1.detected, totalMatches: d1.totalMatches || 0, findingCount: d1.findings?.length || 0 }, ai_engine: { detected: false, risk_level: 'none', findingCount: 0, summary: 'AI analysis in progress...' }, findings: patternFindings })           setHybridLoading(false)
         setTradResult(d1)
       } catch (e: any) { setTradError(e.message) }
       finally { setTradLoading(false) }
