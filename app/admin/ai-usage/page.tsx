@@ -3,9 +3,10 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Shield, DollarSign, Cpu, Clock, TrendingUp, RefreshCw, Settings, ArrowLeft, Activity } from "lucide-react"
 import Link from "next/link"
 const ADMIN_SECRET = "nextguard-cron-2024-secure"
-interface UsageRecord { id: string; timestamp: string; model: string; inputTokens: number; outputTokens: number; costUSD: number; endpoint: string }
-interface MonthlySummary { totalCostUSD: number; totalInputTokens: number; totalOutputTokens: number; totalRequests: number }
-interface UsageData { monthlyBudgetUSD: number; usageRecords: UsageRecord[]; monthlySummary: MonthlySummary }
+interface UsageRecord { id: string; timestamp: string; model: string; inputTokens: number; outputTokens: number; costUSD: number; endpoint?: string; analysisId?: string; fileName?: string; eventCount?: number }
+interface MonthlySummaryEntry { totalCostUSD: number; totalInputTokens: number; totalOutputTokens: number; requestCount: number }
+interface UsageData { monthlyBudgetUSD: number; usageRecords: UsageRecord[]; monthlySummary: Record<string, MonthlySummaryEntry>; budgetStatus?: { allowed: boolean; currentSpend: number; budget: number; remaining: number } }
+function getCurrentMonth() { return new Date().toISOString().slice(0, 7) }
 export default function AdminAIUsagePage() {
   const [authed, setAuthed] = useState(false)
   const [pw, setPw] = useState("")
@@ -34,7 +35,7 @@ export default function AdminAIUsagePage() {
   const saveBudget = async () => {
     setSaving(true)
     try {
-      await fetch("/api/syslog-analysis?action=update-budget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: ADMIN_SECRET, monthlyBudgetUSD: parseFloat(newBudget) }) })
+      await fetch(`/api/syslog-analysis?action=update-budget&budget=${parseFloat(newBudget)}&secret=${ADMIN_SECRET}`)
       fetchData()
     } catch {} finally { setSaving(false) }
   }
@@ -47,11 +48,16 @@ export default function AdminAIUsagePage() {
       </div>
     </div>
   )
-  const summary = data?.monthlySummary
+  const month = getCurrentMonth()
+  const summary = data?.monthlySummary?.[month]
   const budget = data?.monthlyBudgetUSD || 0
-  const spent = summary?.totalCostUSD || 0
+  const spent = summary?.totalCostUSD || data?.budgetStatus?.currentSpend || 0
   const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0
   const barColor = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-cyan-500"
+  const totalReqs = summary?.requestCount || 0
+  const totalIn = summary?.totalInputTokens || 0
+  const totalOut = summary?.totalOutputTokens || 0
+  const totalCost = summary?.totalCostUSD || 0
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 pt-24 md:p-8 md:pt-28">
       <div className="max-w-6xl mx-auto">
@@ -78,7 +84,7 @@ export default function AdminAIUsagePage() {
           <>
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2"><DollarSign className="w-5 h-5 text-cyan-400" />Monthly Budget</h2>
+                <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2"><DollarSign className="w-5 h-5 text-cyan-400" />Monthly Budget ({month})</h2>
                 <div className="flex items-center gap-2">
                   <input type="number" value={newBudget} onChange={e => setNewBudget(e.target.value)} className="w-20 sm:w-24 px-2 sm:px-3 py-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" step="0.5" />
                   <button onClick={saveBudget} disabled={saving} className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm disabled:opacity-50"><Settings className="w-4 h-4 inline mr-1" />{saving ? "..." : "Set"}</button>
@@ -89,10 +95,10 @@ export default function AdminAIUsagePage() {
               <div className="text-right text-xs mt-1">{pct > 90 ? <span className="text-red-400">⚠️ Budget almost exhausted!</span> : <span className="text-gray-500">{pct.toFixed(1)}% used</span>}</div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-              {[{icon: Cpu, label: "Total Requests", value: summary?.totalRequests || 0, color: "text-cyan-400"},
-                {icon: TrendingUp, label: "Input Tokens", value: (summary?.totalInputTokens || 0).toLocaleString(), color: "text-blue-400"},
-                {icon: TrendingUp, label: "Output Tokens", value: (summary?.totalOutputTokens || 0).toLocaleString(), color: "text-purple-400"},
-                {icon: DollarSign, label: "Total Cost", value: `$${(summary?.totalCostUSD || 0).toFixed(4)}`, color: "text-green-400"}
+              {[{icon: Cpu, label: "Total Requests", value: totalReqs, color: "text-cyan-400"},
+                {icon: TrendingUp, label: "Input Tokens", value: totalIn.toLocaleString(), color: "text-blue-400"},
+                {icon: TrendingUp, label: "Output Tokens", value: totalOut.toLocaleString(), color: "text-purple-400"},
+                {icon: DollarSign, label: "Total Cost", value: `$${totalCost.toFixed(4)}`, color: "text-green-400"}
               ].map((s, i) => (
                 <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-3 sm:p-4">
                   <div className="flex items-center gap-1 sm:gap-2 mb-1 sm:mb-2"><s.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${s.color}`} /><span className="text-xs sm:text-sm text-gray-400">{s.label}</span></div>
@@ -104,20 +110,21 @@ export default function AdminAIUsagePage() {
               <h2 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-cyan-400" />Recent Requests</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm">
-                  <thead><tr className="text-gray-400 border-b border-gray-800"><th className="text-left py-2 px-2 sm:px-3">Time</th><th className="text-left py-2 px-2 sm:px-3">Model</th><th className="text-right py-2 px-2 sm:px-3">Input</th><th className="text-right py-2 px-2 sm:px-3">Output</th><th className="text-right py-2 px-2 sm:px-3">Cost</th></tr></thead>
+                  <thead><tr className="text-gray-400 border-b border-gray-800"><th className="text-left py-2 px-2 sm:px-3">Time</th><th className="text-left py-2 px-2 sm:px-3">Model</th><th className="text-left py-2 px-2 sm:px-3">File</th><th className="text-right py-2 px-2 sm:px-3">Input</th><th className="text-right py-2 px-2 sm:px-3">Output</th><th className="text-right py-2 px-2 sm:px-3">Cost</th></tr></thead>
                   <tbody>
-                    {data.usageRecords.slice().reverse().slice(0, 50).map((r, i) => (
+                    {(data.usageRecords || []).slice().reverse().slice(0, 50).map((r, i) => (
                       <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                         <td className="py-2 px-2 sm:px-3 text-gray-300 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
                         <td className="py-2 px-2 sm:px-3"><span className="bg-cyan-900/30 text-cyan-400 px-1.5 sm:px-2 py-0.5 rounded text-xs">{r.model}</span></td>
-                        <td className="py-2 px-2 sm:px-3 text-right text-gray-300">{r.inputTokens.toLocaleString()}</td>
-                        <td className="py-2 px-2 sm:px-3 text-right text-gray-300">{r.outputTokens.toLocaleString()}</td>
-                        <td className="py-2 px-2 sm:px-3 text-right text-green-400">${r.costUSD.toFixed(4)}</td>
+                        <td className="py-2 px-2 sm:px-3 text-gray-400 max-w-[120px] truncate">{r.fileName || '-'}</td>
+                        <td className="py-2 px-2 sm:px-3 text-right text-gray-300">{r.inputTokens?.toLocaleString()}</td>
+                        <td className="py-2 px-2 sm:px-3 text-right text-gray-300">{r.outputTokens?.toLocaleString()}</td>
+                        <td className="py-2 px-2 sm:px-3 text-right text-green-400">${r.costUSD?.toFixed(4)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {data.usageRecords.length === 0 && <div className="text-center py-8 text-gray-500">No usage records yet</div>}
+                {(!data.usageRecords || data.usageRecords.length === 0) && <div className="text-center py-8 text-gray-500">No usage records yet. Run an AI Syslog analysis to see data here.</div>}
               </div>
             </div>
           </>
