@@ -43,7 +43,7 @@ export default function DownloadsPage() {
   const [authStep, setAuthStep] = useState<AuthStep>("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")   const [company, setCompany] = useState("")   const [contactName, setContactName] = useState("")
   const [otpCode, setOtpCode] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -80,7 +80,7 @@ export default function DownloadsPage() {
       const res = await fetch("/api/download-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "register", email, password })
+        body: JSON.stringify({ email, password, company, contactName })
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Registration failed."); return }
@@ -190,7 +190,7 @@ export default function DownloadsPage() {
 
           {authStep === "register" && (
             <>
-              <input type="email" placeholder="Company email address" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+              <input type="text" placeholder="Contact name" value={contactName} onChange={e => setContactName(e.target.value)} style={inputStyle} />                 <input type="text" placeholder="Company name" value={company} onChange={e => setCompany(e.target.value)} style={inputStyle} />                 <input type="email" placeholder="Company email address" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
               <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
               <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} />
               <button onClick={handleRegister} disabled={loading} style={btnStyle}>{loading ? "Registering..." : "Register"}</button>
