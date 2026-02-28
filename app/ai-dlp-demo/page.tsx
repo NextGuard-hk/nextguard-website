@@ -215,6 +215,9 @@ export default function AIDLPDemo() {
   const [policy, setPolicy] = useState<typeof DEFAULT_POLICY>(JSON.parse(JSON.stringify(DEFAULT_POLICY)))
   const [uploadedFileName, setUploadedFileName] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+    const [fileRawText, setFileRawText] = useState('')
+  const [fileOcrText, setFileOcrText] = useState('')
+  const [isScannedFile, setIsScannedFile] = useState(false)
 
   function updatePolicy(key: PolicyKey, field: string, value: any) {
     setPolicy(prev => ({
@@ -254,6 +257,9 @@ export default function AIDLPDemo() {
           setContent(`[Error] ${data.error}`)
         } else {
           setContent(data.text)
+                        setFileRawText(data.rawText || '')
+              setFileOcrText(data.ocrText || '')
+              setIsScannedFile(data.isScanned || false)
         }
       } catch (err: any) {
         setContent(`[Error extracting text: ${err.message}]`)
@@ -283,7 +289,7 @@ export default function AIDLPDemo() {
         const r1 = await fetch('/api/ai-dlp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, mode: 'traditional', policy })
+          body: JSON.stringify({ content: isScannedFile ? fileRawText : content, mode: 'traditional', policy })
         })
         const d1 = await r1.json()
         tradData = d1           // Immediately show pattern results in Hybrid panel           const patternFindings = d1.findings ? d1.findings.map((f: any) => ({ source: 'pattern', ...f })) : []           setHybridResult({ detected: d1.detected, verdict: d1.detected ? 'VIOLATION_DETECTED' : 'CLEAN', recommended_action: d1.detected ? d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { BLOCK: 3, QUARANTINE: 2, AUDIT: 1 }; return (p[f.action] || 0) > (p[max] || 0) ? f.action : max }, 'AUDIT') : 'NONE', method: 'Hybrid (Pattern-Based + AI LLM)', risk_level: d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }; return (p[f.severity] || 0) > (p[max] || 0) ? f.severity : max }, 'none') || 'none', evasion_detected: false, pattern_engine: { detected: d1.detected, totalMatches: d1.totalMatches || 0, findingCount: d1.findings?.length || 0 }, ai_engine: { detected: false, risk_level: 'none', findingCount: 0, summary: 'AI analysis in progress...' }, findings: patternFindings })           setHybridLoading(false)
@@ -395,7 +401,7 @@ export default function AIDLPDemo() {
           <p className="text-zinc-500 text-sm mb-3">{SAMPLE_CATEGORIES[activeCategory].description}</p>
           <div className="flex flex-wrap gap-2 mb-4">
             {SAMPLE_CATEGORIES[activeCategory].samples.map((s, si) => (
-              <button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setUploadedFileName(''); setTradResult(null); setAiResult(null); setHybridResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>
+              <button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setUploadedFileName(''); setFileRawText(''); setFileOcrText(''); setIsScannedFile(false); setTradResult(null); setAiResult(null); setHybridResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>
             ))}
           </div>
 
