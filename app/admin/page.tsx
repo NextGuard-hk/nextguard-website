@@ -561,12 +561,12 @@ export default function AdminPage() {
           <button onClick={() => { setTab("news"); fetchNews() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "news" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>News</button>
                           <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Syslog</button>
                         <button onClick={() => { setTab("tokens"); fetchTokens(); fetchTokenRequests() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "tokens" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Tokens</button>
+                        <button onClick={() => { setTab("accounts"); fetchAccounts() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "accounts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Accounts ({accounts.length})</button>
         </div>
 
         {tab === "contacts" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-                      <button onClick={() => { setTab("accounts"); fetchAccounts() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "accounts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Accounts ({accounts.length})</button>
-            <div className="flex justify-end mb-4">
+                      Name="flex justify-end mb-4">
               <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="overflow-x-auto">
