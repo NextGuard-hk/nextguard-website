@@ -23,8 +23,7 @@ const DISCLAIMER_TEXT = `By downloading software, documentation, or any files fr
 
 export default function DownloadsPage() {
   const [isAuth, setIsAuth] = useState(false)
-  const [authMode, setAuthMode] = useState<"password" | "token">("token")
-  const [password, setPassword] = useState("")
+    const [authMode, setAuthMode] = useState<"password" | "token" | "request">("token")const [password, setPassword] = useState("")
   const [token, setToken] = useState("")
   const [error, setError] = useState("")
   const [items, setItems] = useState<FileItem[]>([])
@@ -36,6 +35,9 @@ export default function DownloadsPage() {
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [disclaimerPending, setDisclaimerPending] = useState(false)
   const [company, setCompany] = useState("")
+    const [requestForm, setRequestForm] = useState({ company: "", contact: "", email: "", type: "customer", reason: "" })
+  const [requestSubmitted, setRequestSubmitted] = useState(false)
+  const [requestError, setRequestError] = useState("")
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -51,7 +53,26 @@ export default function DownloadsPage() {
       } else { setError("Invalid password") }
     } catch { setError("Network error") } finally { setLoading(false) }
   }
+  async function handleRequestSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setRequestError(""); setLoading(true)
+    try {
+      const r = await fetch('/api/download-tokens/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestForm)
+      })
+      const d = await r.json()
+      if (r.ok) {
+        setRequestSubmitted(true)
+      } else {
+        setRequestError(d.error || 'Failed to submit request')
+      }
+    } catch { setRequestError('Network error') } finally { setLoading(false) }
+  }
 
+
+  
   async function handleTokenLogin(e: React.FormEvent) {
     e.preventDefault()
     setError(""); setLoading(true)
@@ -171,11 +192,11 @@ export default function DownloadsPage() {
           <button onClick={() => setAuthMode("token")} className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${authMode === 'token' ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:text-white'}`}>Token</button>
           <button onClick={() => setAuthMode("password")} className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${authMode === 'password' ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:text-white'}`}>Password</button>
         </div>
-        {authMode === 'token' ? (
+        {{authMode === 'request' ? (           requestSubmitted ? (             <div className="text-center py-8">               <div className="text-4xl mb-4">✅</div>               <h3 className="text-xl font-bold text-white mb-2">Request Submitted!</h3>               <p className="text-zinc-400 mb-4">We will review your request and send you a download token via email once approved.</p>               <button onClick={() => { setAuthMode('token'); setRequestSubmitted(false) }} className="text-cyan-400 hover:text-cyan-300">Back to Login</button>             </div>           ) : (             <form onSubmit={handleRequestSubmit} className="space-y-4">               {requestError && <p className="text-red-400 bg-red-900/20 border border-red-800 rounded-lg p-3 text-sm">{requestError}</p>}               <div className="grid grid-cols-2 gap-4">                 <div><label className="text-zinc-400 text-sm">Company *</label><input type="text" value={requestForm.company} onChange={(e) => setRequestForm({...requestForm, company: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Your company" required /></div>                 <div><label className="text-zinc-400 text-sm">Contact Name *</label><input type="text" value={requestForm.contact} onChange={(e) => setRequestForm({...requestForm, contact: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Your name" required /></div>               </div>               <div><label className="text-zinc-400 text-sm">Email *</label><input type="email" value={requestForm.email} onChange={(e) => setRequestForm({...requestForm, email: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="work@company.com" required /></div>               <div><label className="text-zinc-400 text-sm">Account Type</label><select value={requestForm.type} onChange={(e) => setRequestForm({...requestForm, type: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white focus:border-cyan-500 focus:outline-none"><option value="customer">Existing Customer</option><option value="partner">Partner</option><option value="poc">POC / Evaluation</option></select></div>               <div><label className="text-zinc-400 text-sm">Reason for Access</label><textarea value={requestForm.reason} onChange={(e) => setRequestForm({...requestForm, reason: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Brief description of why you need access" rows={3} /></div>               <button type="submit" disabled={loading} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50">{loading ? 'Submitting...' : 'Submit Request'}</button>               <p className="text-zinc-500 text-xs text-center">Already have a token? <button type="button" onClick={() => setAuthMode('token')} className="text-cyan-400 hover:text-cyan-300 underline">Sign in here</button></p>             </form>           )         ) : authMode === 'token' ? (
           <form onSubmit={handleTokenLogin}>
             <label className="text-zinc-300 text-sm font-medium">Download Token</label>
             <input type="text" value={token} onChange={e => setToken(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Enter your download token" required />
-            <p className="text-zinc-500 text-xs mt-2 mb-4">Contact your NextGuard sales representative or support team to obtain a token.</p>
+            <p className="text-zinc-500 text-xs mt-2 mb-4">Don&apos;t have a token? <button type="button" onClick={() => setAuthMode('request' as any)} className="text-cyan-400 hover:text-cyan-300 underline">Request Access</button></p>
             <button type="submit" disabled={loading} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50">{loading ? "Verifying..." : "Access Downloads"}</button>
           </form>
         ) : (
