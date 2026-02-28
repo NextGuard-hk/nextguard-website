@@ -217,6 +217,31 @@ export function SocReviewPage() {
         let text = file.name.endsWith('.tgz') || file.name.endsWith('.tar.gz') ? extractTextFromTar(merged) : new TextDecoder('utf-8', { fatal: false }).decode(merged)
         if (!text.trim()) { setUploadError('No readable text found in archive.'); setUploadContent('') } else { setUploadContent(text) }
       } catch (err: any) { setUploadError('Failed to decompress: ' + (err.message || 'Unknown error')); setUploadContent('') }
+        } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      try {
+        setUploadContent('Parsing spreadsheet...')
+        const ab = await file.arrayBuffer()
+        const loadXlsx = async () => {
+          if ((window as any).XLSX) return (window as any).XLSX
+          return new Promise((resolve, reject) => {
+            const s = document.createElement('script')
+            s.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js'
+            s.onload = () => resolve((window as any).XLSX)
+            s.onerror = () => reject(new Error('Failed to load XLSX parser'))
+            document.head.appendChild(s)
+          })
+        }
+        const XLSX = await loadXlsx()
+        const wb = XLSX.read(new Uint8Array(ab), { type: 'array' })
+        const csvParts: string[] = []
+        wb.SheetNames.forEach((name: string) => {
+          const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name])
+          if (csv.trim()) csvParts.push(csv)
+        })
+        const text = csvParts.join('\n')
+        if (!text.trim()) { setUploadError('No data found in spreadsheet.'); setUploadContent('') }
+        else setUploadContent(text)
+      } catch (err: any) { setUploadError('Failed to parse spreadsheet: ' + (err.message || 'Unknown error')); setUploadContent('') }
     } else {
       const reader = new FileReader()
       reader.onload = (ev) => { setUploadContent(ev.target?.result as string || '') }
@@ -291,9 +316,9 @@ export function SocReviewPage() {
               <textarea value={uploadContent} onChange={e => setUploadContent(e.target.value)} placeholder={"Paste syslog lines here..."} rows={10} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono" />
             </div>
             <div className="flex items-center gap-3">
-              <input ref={fileInputRef} type="file" accept=".log,.txt,.csv,.syslog,.gz,.tgz" onChange={handleFileSelect} className="hidden" />
+              <input ref={fileInputRef} type="file" accept=".log,.txt,.csv,.syslog,.gz,.tgz,.xlsx,.xls" onChange={handleFileSelect} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm flex items-center gap-2 border border-zinc-700"><FileText className="w-4 h-4" /> Choose File</button>
-              <span className="text-xs text-zinc-500">Supports .log, .txt, .csv, .syslog, .gz, .tgz</span>
+              <span className="text-xs text-zinc-500">Supports .log, .txt, .csv, .syslog, .gz, .tgz, .xlsx, .xls</span>
             </div>
             {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
             <div className="flex justify-end gap-3 pt-2">
