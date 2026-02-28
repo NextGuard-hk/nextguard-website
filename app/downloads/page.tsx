@@ -23,7 +23,8 @@ const DISCLAIMER_TEXT = `By downloading software, documentation, or any files fr
 
 export default function DownloadsPage() {
   const [isAuth, setIsAuth] = useState(false)
-    const [authMode, setAuthMode] = useState<"password" | "token" | "request">("token")const [password, setPassword] = useState("")
+    const [authMode, setAuthMode] = useState<"password" | "token" | "request">("token")
+    const [password, setPassword] = useState("")
   const [token, setToken] = useState("")
   const [error, setError] = useState("")
   const [items, setItems] = useState<FileItem[]>([])
