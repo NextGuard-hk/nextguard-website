@@ -209,4 +209,63 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
   }
+
+  // GET - Admin list all users
+export async function GET(req: NextRequest) {
+  const secret = req.nextUrl.searchParams.get('secret')
+  const action = req.nextUrl.searchParams.get('action')
+  if (secret !== 'nextguard-cron-2024-secure') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  try {
+    const users = await getUsers()
+    const safeUsers = users.map(u => ({
+      id: u.id,
+      email: u.email,
+      company: u.company,
+      contactName: u.contactName,
+      createdAt: u.createdAt,
+      active: u.active,
+      emailVerified: u.emailVerified,
+      lastLogin: u.lastLogin || null,
+      loginCount: u.loginCount || 0,
+    }))
+    return NextResponse.json({ users: safeUsers })
+  } catch {
+    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+  }
+}
+
+  // PUT - Admin manage user (toggle active, delete)
+export async function PUT(req: NextRequest) {
+  const secret = req.nextUrl.searchParams.get('secret')
+  const action = req.nextUrl.searchParams.get('action')
+  const userId = req.nextUrl.searchParams.get('id')
+  if (secret !== 'nextguard-cron-2024-secure') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!userId) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+  try {
+    let users = await getUsers()
+    if (action === 'toggle-active') {
+      const user = users.find(u => u.id === userId)
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      user.active = !user.active
+      await saveUsers(users)
+      await writeLog({ type: 'download-user', action: user.active ? 'admin-activate' : 'admin-deactivate', email: user.email })
+      return NextResponse.json({ success: true, active: user.active })
+    }
+    if (action === 'delete') {
+      const user = users.find(u => u.id === userId)
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      users = users.filter(u => u.id !== userId)
+      await saveUsers(users)
+      await writeLog({ type: 'download-user', action: 'admin-delete', email: user.email })
+      return NextResponse.json({ success: true })
+    }
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  } catch {
+    return NextResponse.json({ error: 'Operation failed' }, { status: 500 })
+  }
+}
 }
