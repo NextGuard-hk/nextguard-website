@@ -122,22 +122,30 @@ export default function AIDLPDemo() {
     setTradResult(null); setAiResult(null); setHybridResult(null)
     setTradError(''); setAiError(''); setHybridError('')
     setTradLoading(true); setAiLoading(true); setHybridLoading(true)
-    try {
-      const r1 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'traditional' }) })
-      const d1 = await r1.json()
-      setTradResult(d1)
-    } catch (e: any) { setTradError(e.message) } finally { setTradLoading(false) }
-    try {
-      const r2 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'ai' }) })
-      const d2 = await r2.json()
-      setAiResult(d2)
-    } catch (e: any) { setAiError(e.message) } finally { setAiLoading(false) }
-    try {
-      const r3 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'hybrid' }) })
-      const d3 = await r3.json()
-      setHybridResult(d3)
-    } catch (e: any) { setHybridError(e.message) } finally { setHybridLoading(false) }
+    // Fire all three scans in parallel - Traditional shows instantly, AI/Hybrid appear when ready
+    ;(async () => {
+      try {
+        const r1 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'traditional' }) })
+        const d1 = await r1.json()
+        setTradResult(d1)
+      } catch (e: any) { setTradError(e.message) } finally { setTradLoading(false) }
+    })()
+    ;(async () => {
+      try {
+        const r2 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'ai' }) })
+        const d2 = await r2.json()
+        setAiResult(d2)
+      } catch (e: any) { setAiError(e.message) } finally { setAiLoading(false) }
+    })()
+    ;(async () => {
+      try {
+        const r3 = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: 'hybrid' }) })
+        const d3 = await r3.json()
+        setHybridResult(d3)
+      } catch (e: any) { setHybridError(e.message) } finally { setHybridLoading(false) }
+    })()
   }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="max-w-[1600px] mx-auto px-4 py-8">
