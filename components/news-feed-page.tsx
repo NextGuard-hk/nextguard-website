@@ -2,7 +2,7 @@
 import { useLanguage } from "@/lib/language-context"
 import { PageHeader } from "./page-header"
 import { AnimateIn } from "./animate-in"
-import { ArrowUpRight, Rss, Shield, Filter, Loader2, Newspaper } from "lucide-react"
+import { ArrowUpRight, Rss, Shield, Filter, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
 interface NewsArticle { id: string; title: string; summary: string; url: string; source: string; publishedAt: string; tags: string[]; importance: "high"|"medium"|"low" }
 const tagColors: Record<string,string> = { AI:"bg-purple-500/10 text-purple-400 border-purple-500/20", Ransomware:"bg-red-500/10 text-red-400 border-red-500/20", Phishing:"bg-orange-500/10 text-orange-400 border-orange-500/20", "Data Breach":"bg-yellow-500/10 text-yellow-400 border-yellow-500/20", Vulnerability:"bg-rose-500/10 text-rose-400 border-rose-500/20", Malware:"bg-red-600/10 text-red-500 border-red-600/20", DLP:"bg-primary/10 text-primary border-primary/20", "Cloud Security":"bg-sky-500/10 text-sky-400 border-sky-500/20", Cybersecurity:"bg-accent/10 text-accent border-accent/20", "Hong Kong":"bg-emerald-500/10 text-emerald-400 border-emerald-500/20" }
@@ -40,7 +40,6 @@ export function NewsFeedPage() {
       setArticles(d.items||[]); setTotal(d.total||0)
     } catch { setArticles([]) } finally { setLoading(false) }
   }
-
   const tags=["AI","Ransomware","Phishing","Data Breach","Vulnerability","Malware","DLP","Cloud Security","Hong Kong"]
   const tp=Math.ceil(total/ps)
   const hdr:Record<string,{title:string;subtitle:string}>={en:{title:"AI Cybersecurity News Feed",subtitle:"Real-time AI-curated cybersecurity intelligence from trusted sources"},"zh-TW":{title:"AI \u7db2\u7d61\u5b89\u5168\u65b0\u805e",subtitle:"\u5373\u6642 AI \u7be9\u9078\u5168\u7403\u53ef\u4fe1\u4f86\u6e90\u7684\u7db2\u7d61\u5b89\u5168\u60c5\u5831"},"zh-CN":{title:"AI \u7f51\u7edc\u5b89\u5168\u65b0\u95fb",subtitle:"\u5b9e\u65f6 AI \u7b5b\u9009\u5168\u7403\u53ef\u4fe1\u6765\u6e90\u7684\u7f51\u7edc\u5b89\u5168\u60c5\u62a5"}}
@@ -56,7 +55,7 @@ export function NewsFeedPage() {
       </div>
       {/* Source Filters - HK News */}
       <div className="flex items-center gap-2 flex-wrap mb-6">
-        <Newspaper className="w-4 h-4 text-muted-foreground" />
+        <Rss className="w-4 h-4 text-muted-foreground" />
         <span className="text-xs text-muted-foreground mr-1">{language==="zh-TW"?"\u4f86\u6e90":language==="zh-CN"?"\u6765\u6e90":"Source"}:</span>
         {sourceFilters.map(s=>(<button key={s.value} onClick={()=>{setActiveSource(activeSource===s.value?null:s.value);setActiveTag(null);setPage(1)}} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${activeSource===s.value?s.color:"bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"}`}>{s.label}</button>))}
       </div>
