@@ -19,258 +19,262 @@ function formatSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
 }
 
-const DISCLAIMER_TEXT = `By downloading software, documentation, or any files from NextGuard Technology, you acknowledge and agree to the following:\n\n1. These files are provided exclusively for authorized customers, partners, and approved POC participants.\n2. Redistribution, reverse engineering, or sharing with unauthorized third parties is strictly prohibited.\n3. All downloads are logged and monitored. Excessive or suspicious download behavior may result in token revocation.\n4. NextGuard Technology reserves the right to revoke access at any time without prior notice.\n5. The downloaded materials are provided "AS IS" without warranty of any kind.`
+const DISCLAIMER_TEXT = `By downloading software, documentation, or any files from this page, you acknowledge and agree to the following:\n\n1. All materials provided are the proprietary property of NextGuard Technology and are protected by applicable intellectual property laws.\n2. You are granted a limited, non-exclusive, non-transferable license to use the downloaded materials solely for evaluation or authorized business purposes.\n3. Redistribution, reverse engineering, or unauthorized sharing of any downloaded content is strictly prohibited.\n4. All software is provided "AS IS" without warranty of any kind.\n5. NextGuard Technology reserves the right to revoke access at any time without prior notice.`
+
+const FREE_EMAIL_DOMAINS = [
+  "gmail.com", "yahoo.com", "yahoo.co.jp", "yahoo.co.uk", "yahoo.com.hk",
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "163.com", "126.com", "yeah.net", "qq.com", "foxmail.com",
+  "icloud.com", "me.com", "mac.com",
+  "aol.com", "mail.com", "zoho.com", "protonmail.com", "proton.me",
+  "yandex.com", "gmx.com", "gmx.net", "web.de",
+  "naver.com", "hanmail.net", "daum.net"
+]
+
+function isCompanyEmail(email: string): boolean {
+  const domain = email.split("@")[1]?.toLowerCase()
+  if (!domain) return false
+  return !FREE_EMAIL_DOMAINS.includes(domain)
+}
+
+type AuthStep = "register" | "login" | "otp" | "authenticated"
 
 export default function DownloadsPage() {
-  const [isAuth, setIsAuth] = useState(false)
-    const [authMode, setAuthMode] = useState<"password" | "token" | "request">("token")
-    const [password, setPassword] = useState("")
-  const [token, setToken] = useState("")
+  const [authStep, setAuthStep] = useState<AuthStep>("login")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [otpCode, setOtpCode] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [sessionToken, setSessionToken] = useState("")
+
   const [items, setItems] = useState<FileItem[]>([])
   const [currentPath, setCurrentPath] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [downloading, setDownloading] = useState<string | null>(null)
-  const [budgetError, setBudgetError] = useState("")
-  const [rateLimitMsg, setRateLimitMsg] = useState("")
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [agreed, setAgreed] = useState(false)
   const [showDisclaimer, setShowDisclaimer] = useState(false)
-  const [disclaimerPending, setDisclaimerPending] = useState(false)
-  const [company, setCompany] = useState("")
-    const [requestForm, setRequestForm] = useState({ company: "", contact: "", email: "", type: "customer", reason: "" })
-  const [requestSubmitted, setRequestSubmitted] = useState(false)
-  const [requestError, setRequestError] = useState("")
+  const [pendingDownload, setPendingDownload] = useState<string | null>(null)
 
-  async function handlePasswordLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setError(""); setLoading(true)
+  // Register
+  async function handleRegister() {
+    setError("")
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields.")
+      return
+    }
+    if (!isCompanyEmail(email)) {
+      setError("Please use a company email address. Free email services (Gmail, Yahoo, QQ, Hotmail, etc.) are not accepted.")
+      return
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.")
+      return
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.")
+      return
+    }
+    setLoading(true)
     try {
-      const r = await fetch('/api/downloads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
-      if (r.ok) {
-        const listR = await fetch(`/api/downloads?prefix=${encodeURIComponent(PUBLIC_PREFIX)}`)
-        if (listR.ok) {
-          const d = await listR.json()
-          setItems(d.items || []); setIsAuth(true); setCurrentPath(PUBLIC_PREFIX)
-        }
-      } else { setError("Invalid password") }
-    } catch { setError("Network error") } finally { setLoading(false) }
-  }
-  async function handleRequestSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setRequestError(""); setLoading(true)
-    try {
-      const r = await fetch('/api/download-tokens/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestForm)
+      const res = await fetch("/api/download-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "register", email, password })
       })
-      const d = await r.json()
-      if (r.ok) {
-        setRequestSubmitted(true)
-      } else {
-        setRequestError(d.error || 'Failed to submit request')
-      }
-    } catch { setRequestError('Network error') } finally { setLoading(false) }
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || "Registration failed."); return }
+      setAuthStep("login")
+      setError("")
+      alert("Registration successful! Please log in.")
+    } catch { setError("Network error.") }
+    finally { setLoading(false) }
   }
 
-
-  
-  async function handleTokenLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setError(""); setLoading(true)
+  // Login
+  async function handleLogin() {
+    setError("")
+    if (!email || !password) {
+      setError("Please enter email and password.")
+      return
+    }
+    setLoading(true)
     try {
-      // First validate the token
-      const r = await fetch('/api/downloads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
-      if (r.ok) {
-        const data = await r.json()
-        setCompany(data.company || "")
-        // Show disclaimer if not yet accepted
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || "Login failed."); return }
+      setAuthStep("otp")
+      setError("")
+    } catch { setError("Network error.") }
+    finally { setLoading(false) }
+  }
+
+  // Verify OTP
+  async function handleVerifyOtp() {
+    setError("")
+    if (!otpCode) { setError("Please enter the verification code."); return }
+    setLoading(true)
+    try {
+      const res = await fetch("/api/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: otpCode })
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || "Verification failed."); return }
+      setSessionToken(data.sessionToken || "verified")
+      setAuthStep("authenticated")
+      setError("")
+      loadFiles("")
+    } catch { setError("Network error.") }
+    finally { setLoading(false) }
+  }
+
+  async function loadFiles(path: string) {
+    setLoadingFiles(true)
+    try {
+      const res = await fetch(`/api/files?path=${encodeURIComponent(PUBLIC_PREFIX + path)}`)
+      const data = await res.json()
+      setItems(data.items || [])
+      setCurrentPath(path)
+    } catch { setItems([]) }
+    finally { setLoadingFiles(false) }
+  }
+
+  function handleItemClick(item: FileItem) {
+    if (item.type === "folder") {
+      const newPath = currentPath ? currentPath + "/" + item.name : item.name
+      loadFiles(newPath)
+    } else {
+      if (!agreed) {
+        setPendingDownload(item.path)
         setShowDisclaimer(true)
-        setDisclaimerPending(true)
       } else {
-        const data = await r.json()
-        setError(data.error || "Invalid token")
+        window.open(`/api/download?file=${encodeURIComponent(item.path)}`, "_blank")
       }
-    } catch { setError("Network error") } finally { setLoading(false) }
+    }
   }
 
-  async function acceptDisclaimer() {
-    setLoading(true)
-    try {
-      // Accept disclaimer via API
-      await fetch('/api/downloads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, acceptDisclaimer: true }) })
-      // Load file list
-      const listR = await fetch(`/api/downloads?prefix=${encodeURIComponent(PUBLIC_PREFIX)}&token=${encodeURIComponent(token)}`)
-      if (listR.ok) {
-        const d = await listR.json()
-        setItems(d.items || []); setIsAuth(true); setCurrentPath(PUBLIC_PREFIX)
-      }
-      setShowDisclaimer(false); setDisclaimerPending(false)
-    } catch { setError("Network error") } finally { setLoading(false) }
-  }
-
-  async function navigateFolder(path: string) {
-    setLoading(true)
-    try {
-      const safePath = path.startsWith(PUBLIC_PREFIX) ? path : PUBLIC_PREFIX + path
-      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
-      const r = await fetch(`/api/downloads?prefix=${encodeURIComponent(safePath)}${tokenParam}`)
-      if (r.ok) { const d = await r.json(); setItems(d.items || []); setCurrentPath(safePath) }
-    } catch {} finally { setLoading(false) }
-  }
-
-  async function handleDownload(key: string, name: string, size?: number) {
-    setDownloading(key)
-    try {
-      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
-      const sizeParam = size ? `&size=${size}` : ''
-      const r = await fetch(`/api/downloads?action=download&key=${encodeURIComponent(key)}${tokenParam}${sizeParam}`)
-      if (r.ok) {
-        const d = await r.json()
-        const a = document.createElement("a")
-        a.href = d.url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      } else {
-        const d = await r.json()
-        if (d.rateLimited) { setRateLimitMsg(d.error || "Rate limit exceeded") }
-        else if (d.budgetExceeded) { setBudgetError(d.error || "Bandwidth budget exceeded") }
-        else if (d.disclaimerRequired) { setShowDisclaimer(true) }
-      }
-    } catch {} finally { setDownloading(null) }
+  function handleAgreeAndDownload() {
+    setAgreed(true)
+    setShowDisclaimer(false)
+    if (pendingDownload) {
+      window.open(`/api/download?file=${encodeURIComponent(pendingDownload)}`, "_blank")
+      setPendingDownload(null)
+    }
   }
 
   function goUp() {
-    const parts = currentPath.replace(/\/$/, "").split("/").filter(Boolean)
+    const parts = currentPath.split("/")
     parts.pop()
-    const newPath = parts.length > 0 ? parts.join("/") + "/" : PUBLIC_PREFIX
-    if (!newPath.startsWith(PUBLIC_PREFIX)) navigateFolder(PUBLIC_PREFIX)
-    else navigateFolder(newPath)
+    loadFiles(parts.join("/"))
   }
 
-  const displayPath = currentPath.replace(/^public\//, "")
-  const breadcrumbs = displayPath.split("/").filter(Boolean)
+  // Auth forms
+  if (authStep !== "authenticated") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#111", border: "1px solid #333", borderRadius: 12, padding: 40, maxWidth: 420, width: "100%" }}>
+          <h1 style={{ color: "#fff", fontSize: 24, marginBottom: 8, textAlign: "center" }}>NextGuard Downloads</h1>
+          <p style={{ color: "#888", fontSize: 14, textAlign: "center", marginBottom: 24 }}>
+            {authStep === "register" && "Create an account with your company email"}
+            {authStep === "login" && "Sign in to access downloads"}
+            {authStep === "otp" && `A verification code has been sent to ${email}`}
+          </p>
 
-  // ── Disclaimer Modal ──
-  if (showDisclaimer) return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-2xl w-full">
-        <h2 className="text-2xl font-bold text-white mb-2">Download Disclaimer</h2>
-        {company && <p className="text-cyan-400 mb-4">Company: {company}</p>}
-        <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 mb-6 max-h-64 overflow-y-auto">
-          <pre className="text-zinc-300 text-sm whitespace-pre-wrap">{DISCLAIMER_TEXT}</pre>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={acceptDisclaimer} disabled={loading} className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50">
-            {loading ? "Processing..." : "I Accept & Continue"}
-          </button>
-          <button onClick={() => { setShowDisclaimer(false); setDisclaimerPending(false) }} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white py-3 rounded-lg transition-colors">
-            Decline
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+          {error && <div style={{ background: "#3a1111", border: "1px solid #e74c3c", color: "#e74c3c", padding: "8px 12px", borderRadius: 6, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-  // ── Rate Limit Popup ──
-  const rateLimitPopup = rateLimitMsg ? (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 border border-yellow-600 rounded-2xl p-8 max-w-md w-full text-center">
-        <div className="text-4xl mb-4">⚠️</div>
-        <h3 className="text-xl font-bold text-yellow-400 mb-3">Download Limit Reached</h3>
-        <p className="text-zinc-300 mb-6">{rateLimitMsg}</p>
-        <button onClick={() => setRateLimitMsg("")} className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg">OK</button>
-      </div>
-    </div>
-  ) : null
+          {authStep === "register" && (
+            <>
+              <input type="email" placeholder="Company email address" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+              <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
+              <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} />
+              <button onClick={handleRegister} disabled={loading} style={btnStyle}>{loading ? "Registering..." : "Register"}</button>
+              <p style={{ color: "#888", fontSize: 13, textAlign: "center", marginTop: 16 }}>
+                Already have an account? <span onClick={() => { setAuthStep("login"); setError("") }} style={{ color: "#4ea1f5", cursor: "pointer" }}>Sign in</span>
+              </p>
+            </>
+          )}
 
-  // ── Login Page ──
-  if (!isAuth) return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      {rateLimitPopup}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-white mb-2">Downloads</h1>
-        <p className="text-zinc-400 mb-6">Access NextGuard software, manuals, and official documents</p>
-        {error && <p className="text-red-400 bg-red-900/20 border border-red-800 rounded-lg p-3 mb-4 text-sm">{error}</p>}
-        <div className="flex mb-6 bg-zinc-800 rounded-lg p-1">
-          <button onClick={() => setAuthMode("token")} className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${authMode === 'token' ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:text-white'}`}>Token</button>
-          <button onClick={() => setAuthMode("password")} className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${authMode === 'password' ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:text-white'}`}>Password</button>
-        </div>
-        {authMode === 'request' ? (           requestSubmitted ? (             <div className="text-center py-8">               <div className="text-4xl mb-4">✅</div>               <h3 className="text-xl font-bold text-white mb-2">Request Submitted!</h3>               <p className="text-zinc-400 mb-4">We will review your request and send you a download token via email once approved.</p>               <button onClick={() => { setAuthMode('token'); setRequestSubmitted(false) }} className="text-cyan-400 hover:text-cyan-300">Back to Login</button>             </div>           ) : (             <form onSubmit={handleRequestSubmit} className="space-y-4">               {requestError && <p className="text-red-400 bg-red-900/20 border border-red-800 rounded-lg p-3 text-sm">{requestError}</p>}               <div className="grid grid-cols-2 gap-4">                 <div><label className="text-zinc-400 text-sm">Company *</label><input type="text" value={requestForm.company} onChange={(e) => setRequestForm({...requestForm, company: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Your company" required /></div>                 <div><label className="text-zinc-400 text-sm">Contact Name *</label><input type="text" value={requestForm.contact} onChange={(e) => setRequestForm({...requestForm, contact: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Your name" required /></div>               </div>               <div><label className="text-zinc-400 text-sm">Email *</label><input type="email" value={requestForm.email} onChange={(e) => setRequestForm({...requestForm, email: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="work@company.com" required /></div>               <div><label className="text-zinc-400 text-sm">Account Type</label><select value={requestForm.type} onChange={(e) => setRequestForm({...requestForm, type: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white focus:border-cyan-500 focus:outline-none"><option value="customer">Existing Customer</option><option value="partner">Partner</option><option value="poc">POC / Evaluation</option></select></div>               <div><label className="text-zinc-400 text-sm">Reason for Access</label><textarea value={requestForm.reason} onChange={(e) => setRequestForm({...requestForm, reason: e.target.value})} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Brief description of why you need access" rows={3} /></div>               <button type="submit" disabled={loading} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50">{loading ? 'Submitting...' : 'Submit Request'}</button>               <p className="text-zinc-500 text-xs text-center">Already have a token? <button type="button" onClick={() => setAuthMode('token')} className="text-cyan-400 hover:text-cyan-300 underline">Sign in here</button></p>             </form>           )         ) : authMode === 'token' ? (
-          <form onSubmit={handleTokenLogin}>
-            <label className="text-zinc-300 text-sm font-medium">Download Token</label>
-            <input type="text" value={token} onChange={e => setToken(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Enter your download token" required />
-            <p className="text-zinc-500 text-xs mt-2 mb-4">Don&apos;t have a token? <button type="button" onClick={() => setAuthMode('request')} className="text-cyan-400 hover:text-cyan-300 underline">Request Access</button></p>
-            <button type="submit" disabled={loading} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50">{loading ? "Verifying..." : "Access Downloads"}</button>
-          </form>
-        ) : (
-          <form onSubmit={handlePasswordLogin}>
-            <label className="text-zinc-300 text-sm font-medium">Access Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none" placeholder="Enter download password" required />
-            <button type="submit" disabled={loading} className="w-full mt-4 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50">{loading ? "Verifying..." : "Access Downloads"}</button>
-          </form>
-        )}
-      </div>
-    </div>
-  )
+          {authStep === "login" && (
+            <>
+              <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+              <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+              <button onClick={handleLogin} disabled={loading} style={btnStyle}>{loading ? "Signing in..." : "Sign In"}</button>
+              <p style={{ color: "#888", fontSize: 13, textAlign: "center", marginTop: 16 }}>
+                No account? <span onClick={() => { setAuthStep("register"); setError("") }} style={{ color: "#4ea1f5", cursor: "pointer" }}>Register</span>
+              </p>
+            </>
+          )}
 
-  // ── File Browser ──
-  return (
-    <div className="min-h-screen bg-black text-white">
-      {rateLimitPopup}
-      <div className="max-w-5xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">NextGuard Downloads</h1>
-            <p className="text-zinc-400 mt-1">Software ISO, HotFix, Manuals & Installation Guides</p>
-            {company && <p className="text-cyan-400 text-sm mt-1">Authenticated: {company}</p>}
-          </div>
-          <button onClick={() => { setIsAuth(false); setPassword(""); setToken(""); setItems([]); setCompany("") }} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm">Logout</button>
-        </div>
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-1 text-sm mb-4 flex-wrap">
-          <button onClick={() => navigateFolder(PUBLIC_PREFIX)} className="text-cyan-400 hover:text-cyan-300">Root</button>
-          {breadcrumbs.map((crumb, i) => (
-            <span key={i}>
-              <span className="text-zinc-600 mx-1">/</span>
-              <button onClick={() => navigateFolder(PUBLIC_PREFIX + breadcrumbs.slice(0, i + 1).join("/") + "/")} className="text-cyan-400 hover:text-cyan-300">{crumb}</button>
-            </span>
-          ))}
-        </div>
-        {budgetError && <p className="text-red-400 bg-red-900/20 border border-red-800 rounded-lg p-3 mb-4 text-sm">{budgetError}</p>}
-        {/* File List */}
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
-          {loading ? (
-            <p className="text-zinc-500 text-center py-12">Loading...</p>
-          ) : items.length === 0 ? (
-            <p className="text-zinc-500 text-center py-12">No files in this directory</p>
-          ) : (
-            <table className="w-full">
-              <thead><tr className="border-b border-zinc-800 text-zinc-400 text-sm"><th className="text-left px-4 py-3">Name</th><th className="text-left px-4 py-3 w-24">Size</th><th className="text-left px-4 py-3 w-32">Modified</th><th className="text-left px-4 py-3 w-28">Action</th></tr></thead>
-              <tbody>
-                {currentPath !== PUBLIC_PREFIX && <tr className="border-b border-zinc-800/50 hover:bg-zinc-800/30"><td colSpan={4} className="px-4 py-2"><button onClick={goUp} className="text-zinc-400 hover:text-white">← Back</button></td></tr>}
-                {items.filter(item => item.name !== ".keep").map(item => (
-                  <tr key={item.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="px-4 py-2.5">
-                      {item.type === "folder" ? (
-                        <button onClick={() => navigateFolder(item.path)} className="flex items-center gap-2 text-white hover:text-cyan-400">
-                          📁 {item.name}
-                        </button>
-                      ) : <span className="flex items-center gap-2">📄 {item.name}</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-zinc-400 text-sm">{item.type === "file" && item.size ? formatSize(item.size) : "-"}</td>
-                    <td className="px-4 py-2.5 text-zinc-400 text-sm">{item.lastModified ? new Date(item.lastModified).toLocaleDateString() : "-"}</td>
-                    <td className="px-4 py-2.5">
-                      {item.type === "file" && (
-                        <button onClick={() => handleDownload(item.path, item.name, item.size)} disabled={downloading === item.path} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-3 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50">
-                          {downloading === item.path ? "Downloading..." : "Download"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {authStep === "otp" && (
+            <>
+              <input type="text" placeholder="Enter 6-digit code" value={otpCode} onChange={e => setOtpCode(e.target.value)} style={{ ...inputStyle, textAlign: "center", fontSize: 20, letterSpacing: 8 }} maxLength={6} onKeyDown={e => e.key === "Enter" && handleVerifyOtp()} />
+              <button onClick={handleVerifyOtp} disabled={loading} style={btnStyle}>{loading ? "Verifying..." : "Verify"}</button>
+              <p style={{ color: "#888", fontSize: 13, textAlign: "center", marginTop: 16 }}>
+                <span onClick={() => { setAuthStep("login"); setError("") }} style={{ color: "#4ea1f5", cursor: "pointer" }}>Back to login</span>
+              </p>
+            </>
           )}
         </div>
       </div>
+    )
+  }
+
+  // File browser (authenticated)
+  return (
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", padding: "40px 20px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <h1 style={{ color: "#fff", fontSize: 24, marginBottom: 24 }}>Downloads</h1>
+
+        {currentPath && (
+          <button onClick={goUp} style={{ background: "none", border: "1px solid #333", color: "#4ea1f5", padding: "6px 16px", borderRadius: 6, cursor: "pointer", marginBottom: 16 }}>
+            ← Back
+          </button>
+        )}
+
+        {loadingFiles ? (
+          <p style={{ color: "#888" }}>Loading...</p>
+        ) : items.length === 0 ? (
+          <p style={{ color: "#888" }}>No files available.</p>
+        ) : (
+          <div style={{ border: "1px solid #333", borderRadius: 8, overflow: "hidden" }}>
+            {items.map((item, i) => (
+              <div key={i} onClick={() => handleItemClick(item)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: i < items.length - 1 ? "1px solid #222" : "none", cursor: "pointer", color: "#fff" }}>
+                <span>{item.type === "folder" ? "📁" : "📄"} {item.name}</span>
+                <span style={{ color: "#888", fontSize: 13 }}>{item.size ? formatSize(item.size) : ""}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showDisclaimer && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+          <div style={{ background: "#111", border: "1px solid #333", borderRadius: 12, padding: 32, maxWidth: 560, width: "100%", maxHeight: "80vh", overflow: "auto" }}>
+            <h2 style={{ color: "#fff", marginBottom: 16 }}>Download Disclaimer</h2>
+            <pre style={{ color: "#ccc", fontSize: 13, whiteSpace: "pre-wrap", marginBottom: 24 }}>{DISCLAIMER_TEXT}</pre>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={() => { setShowDisclaimer(false); setPendingDownload(null) }} style={{ ...btnStyle, background: "#333" }}>Cancel</button>
+              <button onClick={handleAgreeAndDownload} style={btnStyle}>I Agree & Download</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", padding: "10px 14px", marginBottom: 12, borderRadius: 6,
+  border: "1px solid #333", background: "#1a1a1a", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box"
+}
+
+const btnStyle: React.CSSProperties = {
+  width: "100%", padding: "10px 14px", borderRadius: 6, border: "none",
+  background: "#4ea1f5", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 4
 }
