@@ -39,6 +39,7 @@ export interface DownloadUser {
   otpExpires?: string
   lastLogin?: string
   loginCount: number
+    mustResetPassword?: boolean
 }
 
 async function writeLog(entry: Record<string, string>) {
@@ -229,6 +230,7 @@ export async function GET(req: NextRequest) {
       emailVerified: u.emailVerified,
       lastLogin: u.lastLogin || null,
       loginCount: u.loginCount || 0,
+              mustResetPassword: u.mustResetPassword || false,
     }))
     return NextResponse.json({ users: safeUsers })
   } catch {
@@ -263,6 +265,30 @@ export async function PUT(req: NextRequest) {
       await writeLog({ type: 'download-user', action: 'admin-delete', email: user.email })
       return NextResponse.json({ success: true })
     }
+        if (action === 'reset-password') {
+      const user = users.find(u => u.id === userId)
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      const tempPassword = Math.random().toString(36).slice(-10) + Math.floor(Math.random() * 90 + 10)
+      const encoder = new TextEncoder()
+      const data = encoder.encode(tempPassword + (process.env.DOWNLOAD_USER_SESSION_SECRET || 'salt'))
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      user.passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      user.mustResetPassword = true
+      await saveUsers(users)
+      await sendEmail(user.email, 'NextGuard Downloads - Password Reset by Admin', `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:20px">
+        <h2 style="color:#06b6d4">NextGuard Downloads</h2>
+        <p>Hello ${user.contactName},</p>
+        <p>Your password has been reset by an administrator.</p>
+        <p>Your temporary password is:</p>
+        <p style="font-size:24px;font-weight:bold;letter-spacing:4px;text-align:center;background:#18181b;padding:16px;border-radius:8px;color:#06b6d4">${tempPassword}</p>
+        <p><strong>You must change your password on your next login.</strong></p>
+        <p>If you did not expect this, please contact support.</p>
+      </div>`)
+      await writeLog({ type: 'download-user', action: 'admin-reset-password', email: user.email })
+      return NextResponse.json({ success: true, message: 'Password reset. Temporary password sent to ' + user.email })
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch {
     return NextResponse.json({ error: 'Operation failed' }, { status: 500 })
