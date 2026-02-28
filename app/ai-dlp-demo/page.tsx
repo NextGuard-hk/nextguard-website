@@ -256,7 +256,7 @@ export default function AIDLPDemo() {
         if (data.error) {
           setContent(`[Error] ${data.error}`)
         } else {
-          setContent(data.text)
+          setContent((data.isScanned) ? `[📄 Scanned file: ${file.name} — OCR text extracted for AI analysis]` : data.text)
                         setFileRawText(data.rawText || '')
               setFileOcrText(data.ocrText || '')
               setIsScannedFile(data.isScanned || false)
@@ -302,7 +302,7 @@ export default function AIDLPDemo() {
         const r2 = await fetch('/api/ai-dlp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, mode: 'ai', policy })
+          body: JSON.stringify({ content: isScannedFile ? (fileOcrText || content) : content, mode: 'ai', policy })
         })
         const d2 = await r2.json()
         setAiResult(d2)
