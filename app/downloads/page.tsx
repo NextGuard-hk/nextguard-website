@@ -102,7 +102,7 @@ export default function DownloadsPage() {
     }
     setLoading(true)
     try {
-      const res = await fetch("/api/login", {
+      const res = await fetch("/api/download-users/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -121,7 +121,7 @@ export default function DownloadsPage() {
     if (!otpCode) { setError("Please enter the verification code."); return }
     setLoading(true)
     try {
-      const res = await fetch("/api/verify-otp", {
+      const res = await fetch("/api/download-users/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: otpCode })
