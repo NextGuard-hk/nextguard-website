@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
     delete user.otpExpires
     user.lastLogin = new Date().toISOString()
     user.loginCount = (user.loginCount || 0) + 1
+        user.emailVerified = true // set on first successful OTP verification
     await saveUsers(users)
     // Generate session token
     const sessionToken = await generateSessionToken(email)
