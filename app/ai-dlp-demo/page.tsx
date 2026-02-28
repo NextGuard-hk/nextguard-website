@@ -66,7 +66,7 @@ const SAMPLE_CATEGORIES = [
   },
   {
     category: 'Contract & Legal',
-    icon: '\ud83d\udcc4',
+    icon: '📄',
     description: 'Simulate DLP scanning contract text, NDA clauses, M&A terms extracted from real business documents',
     samples: [
       { name: 'NDA Agreement Excerpt', content: 'NON-DISCLOSURE AGREEMENT\n\nThis Agreement is entered into as of 15 February 2026 between NextGuard Technology Limited ("Disclosing Party") and Skyguard Holdings Co. Ltd. ("Receiving Party").\n\n1. CONFIDENTIAL INFORMATION\nThe Receiving Party agrees to keep strictly confidential all proprietary information including but not limited to: source code, customer lists, financial projections, product roadmaps, and pricing structures disclosed by the Disclosing Party.\n\n2. RESTRICTED PERSONNEL\nAccess shall be limited to: James Wong (CEO, HKID: K234567(8), james.wong@nextguard.com), Sarah Lam (CTO, HKID: L345678(9), sarah.lam@nextguard.com).\n\n3. PENALTY\nBreach of this agreement shall result in liquidated damages of HKD 5,000,000.' },
@@ -149,7 +149,7 @@ function ResultPanel({ title, result, loading, error, color }: { title: string; 
     <div>
       <h3 className="text-lg font-bold mb-3" style={{color}}>{title}</h3>
       <div className={`text-lg font-bold mb-2 ${result.detected ? 'text-red-400' : 'text-green-400'}`}>
-        {result.detected ? '\u26A0\uFE0F' : '\u2705'}&nbsp;&nbsp;{result.verdict || (result.detected ? 'DETECTED' : 'CLEAN')}
+        {result.detected ? '⚠️' : '✅'}&nbsp;&nbsp;{result.verdict || (result.detected ? 'DETECTED' : 'CLEAN')}
       </div>
       {result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
       {result.recommended_action && result.detected && (
@@ -310,12 +310,12 @@ export default function AIDLPDemo() {
         {/* Policy Settings Toggle */}
         <div className="mb-6">
           <button onClick={() => setShowPolicy(!showPolicy)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-            \u2699\uFE0F DLP Policy Settings {showPolicy ? '\u25B2' : '\u25BC'}
+            ⚙️ DLP Policy Settings {showPolicy ? '▲' : '▼'}
           </button>
           {showPolicy && (
             <div className="mt-3 bg-zinc-900 border border-zinc-700 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-cyan-400">\u2699\uFE0F DLP Policy Configuration</h3>
+                <h3 className="text-lg font-bold text-cyan-400">⚙️ DLP Policy Configuration</h3>
                 <button onClick={resetPolicy} className="text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-3 py-1 rounded">Reset to Default</button>
               </div>
               <p className="text-xs text-zinc-500 mb-4">Configure which detection rules are enabled, their action on match, and severity level. These settings apply to Traditional and Hybrid DLP engines.</p>
@@ -373,9 +373,9 @@ export default function AIDLPDemo() {
           <div className="flex items-center gap-3 mb-4">
             <input ref={fileInputRef} type="file" accept=".txt,.csv,.json,.xml,.log,.md,.html,.js,.ts,.py,.sql,.yml,.yaml,.env,.cfg,.conf,.ini" onChange={handleFileUpload} className="hidden" />
             <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-              \ud83d\udcc2 Upload File
+              📂 Upload File
             </button>
-            {uploadedFileName && <span className="text-sm text-cyan-400">\ud83d\udcc4 {uploadedFileName}</span>}
+            {uploadedFileName && <span className="text-sm text-cyan-400">📄 {uploadedFileName}</span>}
             <span className="text-xs text-zinc-600">Supports: .txt, .csv, .json, .xml, .log, .md, .html, .js, .ts, .py, .sql, .yml, .env</span>
           </div>
 
