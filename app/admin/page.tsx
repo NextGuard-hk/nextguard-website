@@ -566,7 +566,7 @@ export default function AdminPage() {
 
         {tab === "contacts" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-                      Name="flex justify-end mb-4">
+                      <div className="flex justify-end mb-4">
               <button onClick={() => window.open("/api/contact?format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="overflow-x-auto">
