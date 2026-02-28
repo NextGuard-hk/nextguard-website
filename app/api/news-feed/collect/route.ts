@@ -25,7 +25,6 @@ interface NewsArticle {
   status: "pending" | "published"
   language: "en"
 }
-
 const RSS_SOURCES = [
   { name: "The Hacker News", url: "https://feeds.feedburner.com/TheHackersNews", category: "threat-intel" },
   { name: "BleepingComputer", url: "https://www.bleepingcomputer.com/feed/", category: "security-news" },
@@ -33,12 +32,40 @@ const RSS_SOURCES = [
   { name: "Dark Reading", url: "https://www.darkreading.com/rss.xml", category: "security-news" },
   { name: "SecurityWeek", url: "https://feeds.feedburner.com/securityweek", category: "security-news" },
   { name: "Threatpost", url: "https://threatpost.com/feed/", category: "threat-intel" },
-    // Hong Kong & Macau cybersecurity sources
-    { name: "HKCERT", url: "https://www.hkcert.org/getrss/security-bulletin", category: "hk-security" },
-    { name: "HKCERT News", url: "https://www.hkcert.org/getrss/security-news", category: "hk-security" },
-    { name: "GovCERT.HK", url: "https://www.govcert.gov.hk/en/rss_security_alerts.xml", category: "hk-security" },
-    { name: "InfoSec.gov.hk", url: "https://www.infosec.gov.hk/en/rss/whatsnew.xml", category: "hk-security" },
-    { name: "RTHK Local News", url: "https://rthk.hk/rthk/news/rss/e_expressnews_elocal.xml", category: "hk-news" },
+  // Hong Kong & Macau cybersecurity sources
+  { name: "HKCERT", url: "https://www.hkcert.org/getrss/security-bulletin", category: "hk-security" },
+  { name: "HKCERT News", url: "https://www.hkcert.org/getrss/security-news", category: "hk-security" },
+  { name: "GovCERT.HK", url: "https://www.govcert.gov.hk/en/rss_security_alerts.xml", category: "hk-security" },
+  { name: "InfoSec.gov.hk", url: "https://www.infosec.gov.hk/en/rss/whatsnew.xml", category: "hk-security" },
+  { name: "RTHK Local News", url: "https://rthk.hk/rthk/news/rss/e_expressnews_elocal.xml", category: "hk-news" },
+  // Hong Kong IT & Tech news sources
+  { name: "Wepro180", url: "https://www.wepro180.com/feed", category: "hk-tech" },
+  { name: "HK01 Tech", url: "https://rsshub.app/hk01/zone/11", category: "hk-tech" },
+  { name: "ezone.hk", url: "https://rsshub.app/ezone/srae001", category: "hk-tech" },
+  { name: "ezone IT Times", url: "https://rsshub.app/ezone/srae021", category: "hk-tech" },
+  { name: "Cyberport News", url: "https://www.cyberport.hk/en/news/press_releases/rss.xml", category: "hk-tech" },
+  { name: "HKPC Tech", url: "https://www.hkpc.org/en/rss/news.xml", category: "hk-tech" },
+]
+// HK news sites to scrape (no RSS available)
+const HK_SCRAPE_SOURCES = [
+  {
+    name: "TVB News Tech",
+    url: "https://news.tvb.com/tc/technology",
+    baseUrl: "https://news.tvb.com",
+    articleSelector: "article",
+    titleAttr: "h2,h3",
+    linkAttr: "a",
+    category: "hk-tech",
+  },
+  {
+    name: "HK01 IT",
+    url: "https://www.hk01.com/%E6%95%B8%E7%A2%BC%E7%94%9F%E6%B4%BB",
+    baseUrl: "https://www.hk01.com",
+    articleSelector: "article,div[data-type]",
+    titleAttr: "h2,h3",
+    linkAttr: "a",
+    category: "hk-tech",
+  },
 ]
 
 const AI_KEYWORDS = [
@@ -47,13 +74,21 @@ const AI_KEYWORDS = [
   "chatbot", "nlp", "natural language processing", "computer vision",
   "ai-powered", "ai-driven", "automated threat", "ai security",
   "deepfake", "ai attack", "ai defense", "ml model",
+  "人工智能", "機器學習", "深度學習",
 ]
 
 const CYBER_KEYWORDS = [
   "cybersecurity", "data breach", "ransomware", "malware", "phishing",
   "vulnerability", "zero-day", "exploit", "threat", "hack",
-  "data loss", "dlp", "data protection", "encryption", "firewall",
-  "endpoint security", "soc", "siem", "incident response",
+  "data loss", "dlp", "data protection", "encryption",
+  "firewall", "endpoint security", "soc", "siem", "incident response",
+  "網絡安全", "資料外洩", "勒索", "惡意軟件", "釣魚", "漏洞",
+]
+
+const HK_TECH_KEYWORDS = [
+  "hong kong", "hk", "香港", "科技", "tech", "it", "digital",
+  "innovation", "startup", "fintech", "cyberport", "hkstp",
+  "智慧城市", "數碼", "電腦", "網絡", "軟件", "硬件",
 ]
 
 function matchesKeywords(text: string, keywords: string[]): boolean {
@@ -64,19 +99,17 @@ function matchesKeywords(text: string, keywords: string[]): boolean {
 function autoTag(title: string, description: string): string[] {
   const text = `${title} ${description}`.toLowerCase()
   const tags: string[] = []
-  
-  if (matchesKeywords(text, ["ai", "artificial intelligence", "machine learning", "llm", "gpt", "generative ai"])) tags.push("AI")
-  if (matchesKeywords(text, ["ransomware"])) tags.push("Ransomware")
-  if (matchesKeywords(text, ["phishing"])) tags.push("Phishing")
-  if (matchesKeywords(text, ["data breach", "data leak", "data loss"])) tags.push("Data Breach")
-  if (matchesKeywords(text, ["vulnerability", "cve", "zero-day", "exploit"])) tags.push("Vulnerability")
-  if (matchesKeywords(text, ["malware", "trojan", "virus", "worm"])) tags.push("Malware")
+  if (matchesKeywords(text, ["ai", "artificial intelligence", "machine learning", "llm", "gpt", "generative ai", "人工智能"])) tags.push("AI")
+  if (matchesKeywords(text, ["ransomware", "勒索"])) tags.push("Ransomware")
+  if (matchesKeywords(text, ["phishing", "釣魚"])) tags.push("Phishing")
+  if (matchesKeywords(text, ["data breach", "data leak", "data loss", "資料外洩"])) tags.push("Data Breach")
+  if (matchesKeywords(text, ["vulnerability", "cve", "zero-day", "exploit", "漏洞"])) tags.push("Vulnerability")
+  if (matchesKeywords(text, ["malware", "trojan", "virus", "worm", "惡意軟件"])) tags.push("Malware")
   if (matchesKeywords(text, ["dlp", "data loss prevention", "data protection"])) tags.push("DLP")
   if (matchesKeywords(text, ["cloud", "aws", "azure", "saas"])) tags.push("Cloud Security")
   if (matchesKeywords(text, ["regulation", "compliance", "gdpr", "privacy"])) tags.push("Compliance")
   if (matchesKeywords(text, ["endpoint", "edr", "xdr"])) tags.push("Endpoint Security")
-    if (matchesKeywords(text, ["hong kong", "macau", "macao", "hkcert", "hksar", "ogcio", "cyberport"])) tags.push("Hong Kong")
-  
+  if (matchesKeywords(text, ["hong kong", "macau", "macao", "hkcert", "hksar", "ogcio", "cyberport", "香港", "澳門"])) tags.push("Hong Kong")
   return tags.length > 0 ? tags : ["Cybersecurity"]
 }
 
@@ -84,7 +117,6 @@ function scoreImportance(title: string, description: string): "high" | "medium" 
   const text = `${title} ${description}`.toLowerCase()
   const hasAI = matchesKeywords(text, AI_KEYWORDS)
   const hasCyber = matchesKeywords(text, CYBER_KEYWORDS)
-  
   if (hasAI && hasCyber) return "high"
   if (hasAI || hasCyber) return "medium"
   return "low"
@@ -107,33 +139,97 @@ async function fetchRSSFeed(source: { name: string; url: string; category: strin
       signal: AbortSignal.timeout(10000),
     })
     if (!response.ok) return []
-    
     const xml = await response.text()
     const items: RSSItem[] = []
     const itemRegex = /<item>(.*?)<\/item>/gs
     let match
-    
     while ((match = itemRegex.exec(xml)) !== null) {
       const itemXml = match[1]
-      const title = itemXml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/s)?.[1] || ""
-      const link = itemXml.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/s)?.[1] || ""
-      const desc = itemXml.match(/<description>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/description>/s)?.[1] || ""
-      const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/s)?.[1] || ""
-      
+      const title = itemXml.match(/<title>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?<\/title>/s)?.[1] || ""
+      const link = itemXml.match(/<link>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?<\/link>/s)?.[1] ||
+                   itemXml.match(/<link[^>]+href=["']([^"']+)["']/)?.[1] || ""
+      const desc = itemXml.match(/<description>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?<\/description>/s)?.[1] || ""
+      const pubDate = itemXml.match(/<pubDate>(.+?)<\/pubDate>/s)?.[1] ||
+                      itemXml.match(/<dc:date>(.+?)<\/dc:date>/s)?.[1] ||
+                      itemXml.match(/<published>(.+?)<\/published>/s)?.[1] || ""
       if (title && link) {
         items.push({
           title: stripHtml(title),
-          link: stripHtml(link),
+          link: stripHtml(link).trim(),
           description: stripHtml(desc).slice(0, 500),
           pubDate,
           source: source.name,
         })
       }
     }
-    
-    return items.slice(0, 10)
+    // Also handle Atom feeds
+    if (items.length === 0) {
+      const entryRegex = /<entry>(.*?)<\/entry>/gs
+      while ((match = entryRegex.exec(xml)) !== null) {
+        const entryXml = match[1]
+        const title = entryXml.match(/<title[^>]*>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?<\/title>/s)?.[1] || ""
+        const link = entryXml.match(/<link[^>]+href=["']([^"']+)["']/)?.[1] || ""
+        const desc = entryXml.match(/<summary[^>]*>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?<\/summary>/s)?.[1] ||
+                     entryXml.match(/<content[^>]*>(?:<!\[CDATA\[)?(.+?)(?:\]\]>)?<\/content>/s)?.[1] || ""
+        const pubDate = entryXml.match(/<published>(.+?)<\/published>/s)?.[1] ||
+                        entryXml.match(/<updated>(.+?)<\/updated>/s)?.[1] || ""
+        if (title && link) {
+          items.push({
+            title: stripHtml(title),
+            link: stripHtml(link).trim(),
+            description: stripHtml(desc).slice(0, 500),
+            pubDate,
+            source: source.name,
+          })
+        }
+      }
+    }
+    return items.slice(0, 15)
   } catch {
     console.error(`Failed to fetch RSS from ${source.name}`)
+    return []
+  }
+}
+
+async function scrapeHKNewsSite(source: typeof HK_SCRAPE_SOURCES[0]): Promise<RSSItem[]> {
+  try {
+    const response = await fetch(source.url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NextGuard-NewsBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "zh-HK,zh;q=0.9,en;q=0.8",
+      },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) return []
+    const html = await response.text()
+    const items: RSSItem[] = []
+    // Extract article links and titles using regex patterns
+    // Pattern 1: anchor tags with article paths
+    const linkRegex = /<a[^>]+href=["']([^"']*(?:article|story|news|tech|technology)[^"']*)["'][^>]*>([^<]{10,200})<\/a>/gi
+    let match
+    const seen = new Set<string>()
+    while ((match = linkRegex.exec(html)) !== null) {
+      let href = match[1]
+      const text = stripHtml(match[2]).trim()
+      if (!text || text.length < 10) continue
+      if (!href.startsWith('http')) {
+        href = href.startsWith('/') ? `${source.baseUrl}${href}` : `${source.baseUrl}/${href}`
+      }
+      if (seen.has(href)) continue
+      seen.add(href)
+      items.push({
+        title: text,
+        link: href,
+        description: "",
+        pubDate: new Date().toISOString(),
+        source: source.name,
+      })
+      if (items.length >= 10) break
+    }
+    return items
+  } catch {
+    console.error(`Failed to scrape ${source.name}`)
     return []
   }
 }
@@ -141,48 +237,73 @@ async function fetchRSSFeed(source: { name: string; url: string; category: strin
 function filterRelevantArticles(items: RSSItem[]): RSSItem[] {
   return items.filter(item => {
     const text = `${item.title} ${item.description}`
-    const HK_SOURCES = ["HKCERT","HKCERT News","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"]; return HK_SOURCES.includes(item.source) || matchesKeywords(text, AI_KEYWORDS) || matchesKeywords(text, CYBER_KEYWORDS)
+    const HK_SOURCES = [
+      "HKCERT", "HKCERT News", "GovCERT.HK", "InfoSec.gov.hk",
+      "RTHK Local News", "Wepro180", "HK01 Tech", "HK01 IT",
+      "ezone.hk", "ezone IT Times", "TVB News Tech",
+      "Cyberport News", "HKPC Tech",
+    ]
+    return HK_SOURCES.includes(item.source) ||
+           matchesKeywords(text, AI_KEYWORDS) ||
+           matchesKeywords(text, CYBER_KEYWORDS) ||
+           matchesKeywords(text, HK_TECH_KEYWORDS)
   })
 }
+
+const HK_SOURCES_LIST = [
+  "HKCERT", "HKCERT News", "GovCERT.HK", "InfoSec.gov.hk",
+  "RTHK Local News", "Wepro180", "HK01 Tech", "HK01 IT",
+  "ezone.hk", "ezone IT Times", "TVB News Tech",
+  "Cyberport News", "HKPC Tech",
+]
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization")
   const url = new URL(request.url)
   const secret = url.searchParams.get("secret")
-  
   if (authHeader !== `Bearer ${COLLECT_SECRET}` && secret !== COLLECT_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  
+
   try {
     const allItems: RSSItem[] = []
+
+    // Fetch all RSS feeds in parallel
     const feedPromises = RSS_SOURCES.map(source => fetchRSSFeed(source))
-    const results = await Promise.allSettled(feedPromises)
-    
-    results.forEach(result => {
+    const rssResults = await Promise.allSettled(feedPromises)
+    rssResults.forEach(result => {
       if (result.status === "fulfilled") {
         allItems.push(...result.value)
       }
     })
-    
+
+    // Scrape HK news sites without RSS
+    const scrapePromises = HK_SCRAPE_SOURCES.map(source => scrapeHKNewsSite(source))
+    const scrapeResults = await Promise.allSettled(scrapePromises)
+    scrapeResults.forEach(result => {
+      if (result.status === "fulfilled") {
+        allItems.push(...result.value)
+      }
+    })
+
     const relevantItems = filterRelevantArticles(allItems)
-    
+
     // Safely read existing data from npoint, handle both formats
     let existingArticles: NewsArticle[] = []
     try {
       const existingRes = await fetch(NPOINT_API)
       if (existingRes.ok) {
         const raw = await existingRes.json()
-        // Support both { articles: [...] } and { news: [...] } formats
-        existingArticles = Array.isArray(raw.articles) ? raw.articles : Array.isArray(raw.news) ? raw.news : []
+        existingArticles = Array.isArray(raw.articles) ? raw.articles :
+                           Array.isArray(raw.news) ? raw.news : []
       }
     } catch {
       existingArticles = []
     }
-    
+
     const existingUrls = new Set(existingArticles.map(a => a.url))
     const now = new Date().toISOString()
-    
+
     const newArticles: NewsArticle[] = relevantItems
       .filter(item => !existingUrls.has(item.link))
       .map(item => ({
@@ -193,20 +314,25 @@ export async function GET(request: NextRequest) {
         source: item.source,
         publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : now,
         collectedAt: now,
-        tags: (() => { const t = autoTag(item.title, item.description); if (["HKCERT","HKCERT News","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"].includes(item.source) && !t.includes("Hong Kong")) t.push("Hong Kong"); return t })(),
+        tags: (() => {
+          const t = autoTag(item.title, item.description)
+          if (HK_SOURCES_LIST.includes(item.source) && !t.includes("Hong Kong"))
+            t.push("Hong Kong")
+          return t
+        })(),
         importance: scoreImportance(item.title, item.description),
         status: "published" as const,
         language: "en" as const,
       }))
-    
-            // Always write back in the correct { articles: [...] } format
+
+    // Always write back in the correct { articles: [...] } format
     const updatedArticles = [...newArticles, ...existingArticles].slice(0, 200)
     await fetch(NPOINT_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ articles: updatedArticles }),
     })
-    
+
     return NextResponse.json({
       success: true,
       totalFetched: allItems.length,
@@ -218,3 +344,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+export const POST = GET
