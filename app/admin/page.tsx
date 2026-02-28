@@ -341,7 +341,7 @@ export default function AdminPage() {
   async function triggerCollect() {
     setNewsLoading(true)
     try {
-      const r = await fetch('/api/news-feed/collect', { method: 'POST' })
+      const r = await fetch('/api/news-feed/collect?secret=nextguard-collect-2024', { method: 'POST' })
       if (r.ok) { await fetchNews() }
     } catch {} finally { setNewsLoading(false) }
   }
