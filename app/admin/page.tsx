@@ -464,6 +464,20 @@ export default function AdminPage() {
     fetchDownloads(parts.length > 0 ? parts.join("/") + "/" : "")
   }
 
+    async function resetAccountPassword(id: string) {
+    if (!confirm('Reset this account password? A temporary password will be emailed to the user.')) return
+    try {
+      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=reset-password&id=' + id, { method: 'PUT' })
+      const data = await r.json()
+      if (r.ok) {
+        alert(data.message || 'Password reset successfully')
+        fetchAccounts()
+      } else {
+        alert(data.error || 'Failed to reset password')
+      }
+    } catch {}
+  }
+
     async function handleRename() {
     if (!renameItem || !renameValue.trim()) return
     setRenameLoading(true)
@@ -903,6 +917,7 @@ export default function AdminPage() {
                       <td className="py-3">
                         <button onClick={() => toggleAccountActive(a.id)} className={(a.active ? "bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400" : "bg-green-600/20 hover:bg-green-600/30 text-green-400") + " px-2 py-1 rounded text-xs mr-1"}>{a.active ? "Disable" : "Enable"}</button>
                         <button onClick={() => deleteAccount(a.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-2 py-1 rounded text-xs">Delete</button>
+                                              <button onClick={() => resetAccountPassword(a.id)} className="bg-yellow-600 hover:bg-yellow-500 text-white text-xs px-2 py-1 rounded">Reset PW</button>
                       </td>
                     </tr>
                   ))}</tbody>
