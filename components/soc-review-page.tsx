@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { PageHeader } from "./page-header"
 import { AnimateIn } from "./animate-in"
-import { Shield, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Search, ChevronDown, ChevronRight, RefreshCw, Upload, X, Loader2, Play, Trash2 } from "lucide-react"
+import { Shield, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Search, ChevronDown, ChevronRight, RefreshCw, Upload, X, Loader2, Play, Trash2 , Download} from "lucide-react"
 
 interface AnalysisResult {
   id: string
@@ -265,6 +265,36 @@ export function SocReviewPage() {
       }
     } catch {}
   }
+    function exportToCSV() {
+    if (!selectedAnalysis) return
+    const headers = ['Event ID', 'Timestamp', 'Host', 'Severity', 'Facility', 'AI Verdict', 'SOC Override', 'Confidence', 'Reasoning', 'Recommendation', 'SOC Notes', 'Raw Event']
+    const rows = selectedAnalysis.results.map(r => {
+      const evt = selectedAnalysis.events.find(e => e.id === r.eventId)
+      const verdict = r.socOverride || r.verdict
+      return [
+        r.eventId,
+        evt?.timestamp || '',
+        evt?.host || '',
+        evt?.severity || '',
+        evt?.facility || '',
+        verdict,
+        r.socOverride || '',
+        r.confidence.toString(),
+        `"${r.reasoning.replace(/"/g, '""')}"`,
+        `"${r.recommendation.replace(/"/g, '""')}"`,
+        `"${(r.socNotes || '').replace(/"/g, '""')}"`,
+        `"${(evt?.raw || '').replace(/"/g, '""')}"`,
+      ].join(',')
+    })
+    const csv = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `soc-analysis-${selectedAnalysis.fileName.replace(/[^a-z0-9]/gi, '-')}-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   function toggleEvent(id: string) {
 
@@ -353,7 +383,7 @@ export function SocReviewPage() {
           <select value={selectedAnalysis?.id || ''} onChange={e => setSelectedAnalysis(analyses.find(a => a.id === e.target.value) || null)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-white text-sm focus:border-cyan-500 focus:outline-none">
             {analyses.map(a => (<option key={a.id} value={a.id}>{a.fileName} - {new Date(a.analyzedAt).toLocaleDateString()}</option>))}
           </select>
-          <button onClick={() => { setShowUpload(true); setUploadError(''); setUploadContent(''); setUploadFileName('') }} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2"><Upload className="w-4 h-4" /> Upload Syslog</button>         {selectedAnalysis && <button onClick={() => handleDeleteAnalysis(selectedAnalysis.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 border border-red-500/30"><Trash2 className="w-4 h-4" /> Delete</button>}
+          <button onClick={() => { setShowUpload(true); setUploadError(''); setUploadContent(''); setUploadFileName('') }} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2"><Upload className="w-4 h-4" /> Upload Syslog</button>         {selectedAnalysis && <button onClick={() => handleDeleteAnalysis(selectedAnalysis.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 border border-red-500/30"><Trash2 className="w-4 h-4" /> Delete</button>} {selectedAnalysis && <button onClick={exportToCSV} className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 border border-cyan-500/30"><Download className="w-4 h-4" /> Export CSV</button>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(['all', 'false_positive', 'true_positive', 'needs_review'] as const).map(f => (
