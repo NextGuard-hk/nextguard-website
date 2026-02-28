@@ -39,9 +39,9 @@ export default function AdminAIUsagePage() {
     } catch {} finally { setSaving(false) }
   }
   if (!authed) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-md">
-        <div className="flex items-center gap-3 mb-6"><Shield className="w-8 h-8 text-cyan-400" /><h1 className="text-2xl font-bold text-white">AI Usage Admin</h1></div>
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 pt-24">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 sm:p-8 w-full max-w-md">
+        <div className="flex items-center gap-3 mb-6"><Shield className="w-8 h-8 text-cyan-400" /><h1 className="text-xl sm:text-2xl font-bold text-white">AI Usage Admin</h1></div>
         <input type="password" placeholder="Enter admin password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && pw === ADMIN_SECRET) setAuthed(true) }} className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white mb-4" />
         <button onClick={() => { if (pw === ADMIN_SECRET) setAuthed(true) }} className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-semibold">Login</button>
       </div>
@@ -53,66 +53,66 @@ export default function AdminAIUsagePage() {
   const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0
   const barColor = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-cyan-500"
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 md:p-8">
+    <div className="min-h-screen bg-gray-950 text-white p-4 pt-24 md:p-8 md:pt-28">
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <Link href="/admin" className="text-gray-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
-            <Shield className="w-8 h-8 text-cyan-400" />
-            <h1 className="text-2xl font-bold">AI Usage Dashboard</h1>
+            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
+            <h1 className="text-lg sm:text-2xl font-bold">AI Usage Dashboard</h1>
             {autoRefresh && <span className="flex items-center gap-1 text-xs bg-green-900/50 text-green-400 px-2 py-1 rounded-full"><Activity className="w-3 h-3 animate-pulse" />LIVE</span>}
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
-              <span className="text-xs text-gray-400">Refresh:</span>
-              {[5,10,30,60].map(s => (<button key={s} onClick={() => setRefreshInterval(s)} className={`text-xs px-2 py-1 rounded ${refreshInterval === s ? "bg-cyan-600 text-white" : "text-gray-400 hover:text-white"}`}>{s}s</button>))}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex items-center gap-1 sm:gap-2 bg-gray-900 border border-gray-800 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2">
+              <span className="text-xs text-gray-400 hidden sm:inline">Refresh:</span>
+              {[5,10,30,60].map(s => (<button key={s} onClick={() => setRefreshInterval(s)} className={`text-xs px-1.5 sm:px-2 py-1 rounded ${refreshInterval === s ? "bg-cyan-600 text-white" : "text-gray-400 hover:text-white"}`}>{s}s</button>))}
             </div>
-            <button onClick={() => setAutoRefresh(!autoRefresh)} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm ${autoRefresh ? "bg-green-900/50 text-green-400 border border-green-800" : "bg-gray-900 text-gray-400 border border-gray-800"}`}>
-              <RefreshCw className={`w-4 h-4 ${autoRefresh ? "animate-spin" : ""}`} style={autoRefresh ? {animationDuration:"3s"} : {}} />{autoRefresh ? "Auto-Refresh ON" : "Auto-Refresh OFF"}
+            <button onClick={() => setAutoRefresh(!autoRefresh)} className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm ${autoRefresh ? "bg-green-900/50 text-green-400 border border-green-800" : "bg-gray-900 text-gray-400 border border-gray-800"}`}>
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${autoRefresh ? "animate-spin" : ""}`} style={autoRefresh ? {animationDuration:"3s"} : {}} />{autoRefresh ? "Auto ON" : "Auto OFF"}
             </button>
-            <button onClick={() => fetchData()} className="flex items-center gap-1 px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-400 hover:text-white"><RefreshCw className="w-4 h-4" />Refresh</button>
+            <button onClick={() => fetchData()} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-900 border border-gray-800 rounded-lg text-xs sm:text-sm text-gray-400 hover:text-white"><RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />Refresh</button>
             {lastUpdate && <span className="text-xs text-gray-500">Updated: {lastUpdate.toLocaleTimeString()}</span>}
           </div>
         </div>
         {loading && !data ? <div className="text-center py-20 text-gray-400">Loading...</div> : data && (
           <>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2"><DollarSign className="w-5 h-5 text-cyan-400" />Monthly Budget</h2>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2"><DollarSign className="w-5 h-5 text-cyan-400" />Monthly Budget</h2>
                 <div className="flex items-center gap-2">
-                  <input type="number" value={newBudget} onChange={e => setNewBudget(e.target.value)} className="w-24 px-3 py-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" step="0.5" />
+                  <input type="number" value={newBudget} onChange={e => setNewBudget(e.target.value)} className="w-20 sm:w-24 px-2 sm:px-3 py-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" step="0.5" />
                   <button onClick={saveBudget} disabled={saving} className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm disabled:opacity-50"><Settings className="w-4 h-4 inline mr-1" />{saving ? "..." : "Set"}</button>
                 </div>
               </div>
-              <div className="w-full bg-gray-800 rounded-full h-4 mb-2"><div className={`h-4 rounded-full ${barColor} transition-all duration-500`} style={{width:`${pct}%`}} /></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-400">${spent.toFixed(4)} used</span><span className="text-gray-400">${budget.toFixed(2)} budget</span></div>
+              <div className="w-full bg-gray-800 rounded-full h-3 sm:h-4 mb-2"><div className={`h-3 sm:h-4 rounded-full ${barColor} transition-all duration-500`} style={{width:`${pct}%`}} /></div>
+              <div className="flex justify-between text-xs sm:text-sm"><span className="text-gray-400">${spent.toFixed(4)} used</span><span className="text-gray-400">${budget.toFixed(2)} budget</span></div>
               <div className="text-right text-xs mt-1">{pct > 90 ? <span className="text-red-400">⚠️ Budget almost exhausted!</span> : <span className="text-gray-500">{pct.toFixed(1)}% used</span>}</div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
               {[{icon: Cpu, label: "Total Requests", value: summary?.totalRequests || 0, color: "text-cyan-400"},
                 {icon: TrendingUp, label: "Input Tokens", value: (summary?.totalInputTokens || 0).toLocaleString(), color: "text-blue-400"},
                 {icon: TrendingUp, label: "Output Tokens", value: (summary?.totalOutputTokens || 0).toLocaleString(), color: "text-purple-400"},
                 {icon: DollarSign, label: "Total Cost", value: `$${(summary?.totalCostUSD || 0).toFixed(4)}`, color: "text-green-400"}
               ].map((s, i) => (
-                <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2"><s.icon className={`w-5 h-5 ${s.color}`} /><span className="text-sm text-gray-400">{s.label}</span></div>
-                  <div className="text-2xl font-bold">{s.value}</div>
+                <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-1 sm:gap-2 mb-1 sm:mb-2"><s.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${s.color}`} /><span className="text-xs sm:text-sm text-gray-400">{s.label}</span></div>
+                  <div className="text-lg sm:text-2xl font-bold">{s.value}</div>
                 </div>
               ))}
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-cyan-400" />Recent Requests</h2>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-cyan-400" />Recent Requests</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead><tr className="text-gray-400 border-b border-gray-800"><th className="text-left py-2 px-3">Time</th><th className="text-left py-2 px-3">Model</th><th className="text-right py-2 px-3">Input</th><th className="text-right py-2 px-3">Output</th><th className="text-right py-2 px-3">Cost</th></tr></thead>
+                <table className="w-full text-xs sm:text-sm">
+                  <thead><tr className="text-gray-400 border-b border-gray-800"><th className="text-left py-2 px-2 sm:px-3">Time</th><th className="text-left py-2 px-2 sm:px-3">Model</th><th className="text-right py-2 px-2 sm:px-3">Input</th><th className="text-right py-2 px-2 sm:px-3">Output</th><th className="text-right py-2 px-2 sm:px-3">Cost</th></tr></thead>
                   <tbody>
                     {data.usageRecords.slice().reverse().slice(0, 50).map((r, i) => (
                       <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                        <td className="py-2 px-3 text-gray-300">{new Date(r.timestamp).toLocaleString()}</td>
-                        <td className="py-2 px-3"><span className="bg-cyan-900/30 text-cyan-400 px-2 py-0.5 rounded text-xs">{r.model}</span></td>
-                        <td className="py-2 px-3 text-right text-gray-300">{r.inputTokens.toLocaleString()}</td>
-                        <td className="py-2 px-3 text-right text-gray-300">{r.outputTokens.toLocaleString()}</td>
-                        <td className="py-2 px-3 text-right text-green-400">${r.costUSD.toFixed(4)}</td>
+                        <td className="py-2 px-2 sm:px-3 text-gray-300 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
+                        <td className="py-2 px-2 sm:px-3"><span className="bg-cyan-900/30 text-cyan-400 px-1.5 sm:px-2 py-0.5 rounded text-xs">{r.model}</span></td>
+                        <td className="py-2 px-2 sm:px-3 text-right text-gray-300">{r.inputTokens.toLocaleString()}</td>
+                        <td className="py-2 px-2 sm:px-3 text-right text-gray-300">{r.outputTokens.toLocaleString()}</td>
+                        <td className="py-2 px-2 sm:px-3 text-right text-green-400">${r.costUSD.toFixed(4)}</td>
                       </tr>
                     ))}
                   </tbody>
