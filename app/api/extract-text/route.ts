@@ -27,11 +27,11 @@ async function ocrFromImage(buffer: Buffer, filename: string): Promise<string> {
     const data = await res.json()
     if (data.ParsedResults && data.ParsedResults.length > 0) {
       const text = data.ParsedResults.map((r: any) => r.ParsedText).join('\n').trim()
-      if (text) return `[OCR Extracted Text from: ${filename}]\n${text}`
+      if (text) return text
     }
-    return `[No text detected in image]\nFilename: ${filename}`
+    return ''
   } catch (e: any) {
-    return `[OCR processing failed]\nFilename: ${filename}\nError: ${e.message}`
+    return ''
   }
 }
 
@@ -56,20 +56,18 @@ async function ocrFromPdf(buffer: Buffer, filename: string): Promise<string> {
     const data = await res.json()
     if (data.ParsedResults && data.ParsedResults.length > 0) {
       const text = data.ParsedResults.map((r: any) => r.ParsedText).join('\n').trim()
-      if (text) return `[OCR Extracted Text from PDF: ${filename}]\n${text}`
+      if (text) return text
     }
-    return `[No text detected in scanned PDF]\nFilename: ${filename}`
+    return ''
   } catch (e: any) {
-    return `[PDF OCR processing failed]\nFilename: ${filename}\nError: ${e.message}`
+    return ''
   }
 }
 
 // Check if extracted PDF text is meaningful (not just metadata)
 function isPdfTextMeaningful(text: string): boolean {
   if (!text) return false
-  // Remove common PDF metadata artifacts
   const cleaned = text.replace(/font\s*size[:\s]*\d+/gi, '').replace(/\s+/g, ' ').trim()
-  // If less than 20 chars of real content, likely a scanned/image PDF
   return cleaned.length >= 20
 }
 
@@ -82,22 +80,25 @@ export async function POST(req: NextRequest) {
 
     const name = file.name.toLowerCase()
     const buffer = Buffer.from(await file.arrayBuffer())
-    let text = ''
+    let rawText = ''
+    let ocrText = ''
+    let isScanned = false
 
     if (name.endsWith('.pdf')) {
-      // First try text extraction via pdf-parse
       const pdfParse = (await import('pdf-parse')).default
       const data = await pdfParse(buffer)
-      text = data.text
-      // If pdf-parse returned no meaningful text, this is likely a scanned/image PDF
-      // Fall back to OCR
-      if (!isPdfTextMeaningful(text)) {
-        text = await ocrFromPdf(buffer, file.name)
+      rawText = data.text || ''
+      if (!isPdfTextMeaningful(rawText)) {
+        isScanned = true
+        ocrText = await ocrFromPdf(buffer, file.name)
       }
+    } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
+      isScanned = true
+      ocrText = await ocrFromImage(buffer, file.name)
     } else if (name.endsWith('.docx')) {
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
-      text = result.value
+      rawText = result.value
     } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
       const XLSX = await import('xlsx')
       const workbook = XLSX.read(buffer, { type: 'buffer' })
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
         const sheet = workbook.Sheets[sheetName]
         sheets.push(`[Sheet: ${sheetName}]\n${XLSX.utils.sheet_to_csv(sheet)}`)
       }
-      text = sheets.join('\n\n')
+      rawText = sheets.join('\n\n')
     } else if (name.endsWith('.pptx')) {
       const JSZip = (await import('jszip')).default
       const zip = await JSZip.loadAsync(buffer)
@@ -120,17 +121,15 @@ export async function POST(req: NextRequest) {
           slideTexts.push(slideText)
         }
       }
-      text = slideTexts.join('\n\n')
-    } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
-      text = await ocrFromImage(buffer, file.name)
+      rawText = slideTexts.join('\n\n')
     } else if (name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json') || name.endsWith('.xml') || name.endsWith('.log') || name.endsWith('.md') || name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sql') || name.endsWith('.yml') || name.endsWith('.yaml') || name.endsWith('.env') || name.endsWith('.cfg') || name.endsWith('.conf') || name.endsWith('.ini')) {
-      text = buffer.toString('utf-8')
+      rawText = buffer.toString('utf-8')
     } else {
       return NextResponse.json({ error: `Unsupported file type: ${file.name}` }, { status: 400 })
     }
 
-    if (!text.trim()) text = '[No text content extracted from file]'
-    return NextResponse.json({ text, filename: file.name, size: file.size })
+    const displayText = ocrText || rawText || '[No text content extracted from file]'
+    return NextResponse.json({ text: displayText, rawText, ocrText, isScanned, filename: file.name, size: file.size })
   } catch (e: any) {
     return NextResponse.json({ error: `Extraction failed: ${e.message}` }, { status: 500 })
   }
