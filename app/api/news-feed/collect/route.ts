@@ -33,6 +33,11 @@ const RSS_SOURCES = [
   { name: "Dark Reading", url: "https://www.darkreading.com/rss.xml", category: "security-news" },
   { name: "SecurityWeek", url: "https://feeds.feedburner.com/securityweek", category: "security-news" },
   { name: "Threatpost", url: "https://threatpost.com/feed/", category: "threat-intel" },
+    // Hong Kong & Macau cybersecurity sources
+    { name: "HKCERT", url: "https://www.hkcert.org/blog/rss", category: "hk-security" },
+    { name: "GovCERT.HK", url: "https://www.govcert.gov.hk/en/rss_security_alerts.xml", category: "hk-security" },
+    { name: "InfoSec.gov.hk", url: "https://www.infosec.gov.hk/en/rss/whatsnew.xml", category: "hk-security" },
+    { name: "RTHK Local News", url: "https://rthk.hk/rthk/news/rss/e_expressnews_elocal.xml", category: "hk-news" },
 ]
 
 const AI_KEYWORDS = [
@@ -69,6 +74,7 @@ function autoTag(title: string, description: string): string[] {
   if (matchesKeywords(text, ["cloud", "aws", "azure", "saas"])) tags.push("Cloud Security")
   if (matchesKeywords(text, ["regulation", "compliance", "gdpr", "privacy"])) tags.push("Compliance")
   if (matchesKeywords(text, ["endpoint", "edr", "xdr"])) tags.push("Endpoint Security")
+    if (matchesKeywords(text, ["hong kong", "macau", "macao", "hkcert", "hksar", "ogcio", "cyberport"])) tags.push("Hong Kong")
   
   return tags.length > 0 ? tags : ["Cybersecurity"]
 }
@@ -134,7 +140,7 @@ async function fetchRSSFeed(source: { name: string; url: string; category: strin
 function filterRelevantArticles(items: RSSItem[]): RSSItem[] {
   return items.filter(item => {
     const text = `${item.title} ${item.description}`
-    return matchesKeywords(text, AI_KEYWORDS) || matchesKeywords(text, CYBER_KEYWORDS)
+    const HK_SOURCES = ["HKCERT","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"]; return HK_SOURCES.includes(item.source) || matchesKeywords(text, AI_KEYWORDS) || matchesKeywords(text, CYBER_KEYWORDS)
   })
 }
 
@@ -186,7 +192,7 @@ export async function GET(request: NextRequest) {
         source: item.source,
         publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : now,
         collectedAt: now,
-        tags: autoTag(item.title, item.description),
+        tags: (() => { const t = autoTag(item.title, item.description); if (["HKCERT","GovCERT.HK","InfoSec.gov.hk","RTHK Local News"].includes(item.source) && !t.includes("Hong Kong")) t.push("Hong Kong"); return t })(),
         importance: scoreImportance(item.title, item.description),
         status: "published" as const,
         language: "en" as const,
