@@ -37,7 +37,7 @@ function isCompanyEmail(email: string): boolean {
   return !FREE_EMAIL_DOMAINS.includes(domain)
 }
 
-type AuthStep = "register" | "login" | "otp" | "authenticated" | "forgot-password" | "reset-password"
+type AuthStep = "register" | "login" | "otp" | "authenticated" | "forgot-password" | "reset-password" | "force-reset-password"
 
 export default function DownloadsPage() {
   const [authStep, setAuthStep] = useState<AuthStep>("login")
@@ -103,7 +103,7 @@ export default function DownloadsPage() {
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Verification failed."); return }
       setSessionToken(data.sessionToken || "verified")
-      setAuthStep("authenticated")
+      setAuthStep(data.mustResetPassword ? "force-reset-password" : "authenticated")
       setError("")
       loadFiles("")
     } catch { setError("Network error.") } finally { setLoading(false) }
@@ -140,6 +140,22 @@ export default function DownloadsPage() {
       setError("")
       setPassword("")
       alert("Password reset successful! Please log in with your new password.")
+    } catch { setError("Network error.") } finally { setLoading(false) }
+  }
+    // Force Reset Password (admin-triggered)
+  async function handleForceResetPassword() {
+    setError("")
+    if (!newPassword || !newPasswordConfirm) { setError("Please fill in all fields."); return }
+    if (newPassword.length < 8) { setError("Password must be at least 8 characters."); return }
+    if (newPassword !== newPasswordConfirm) { setError("Passwords do not match."); return }
+    setLoading(true)
+    try {
+      const res = await fetch("/api/download-users/reset-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, newPassword, forceReset: true }) })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || "Password reset failed."); return }
+      setAuthStep("authenticated")
+      setError("")
+      loadFiles("")
     } catch { setError("Network error.") } finally { setLoading(false) }
   }
 
@@ -252,6 +268,12 @@ export default function DownloadsPage() {
             <p style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#888" }}><span onClick={() => { setAuthStep("login"); setError(""); setSuccessMsg("") }} style={{ color: "#4ea1f5", cursor: "pointer" }}>Back to login</span></p>
           </>)}
         </div>
+              {authStep === "force-reset-password" && (<>
+        <p style={{ color: "#f87171", background: "#2a1a1a", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13 }}>Your account requires a password change before you can continue.</p>
+        <input type="password" placeholder="New password (min 8 characters)" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} />
+        <input type="password" placeholder="Confirm new password" value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} style={inputStyle} />
+        <button onClick={handleForceResetPassword} disabled={loading} style={btnStyle}>{loading ? "Saving..." : "Set New Password"}</button>
+      </>)}
       </div>
     )
   }
