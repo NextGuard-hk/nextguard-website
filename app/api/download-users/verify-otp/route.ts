@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-
 const USERS_NPOINT_URL = process.env.NPOINT_DOWNLOAD_USERS_URL || ''
 const DOWNLOAD_PASSWORD = process.env.DOWNLOAD_PASSWORD || ''
 const SESSION_SECRET = process.env.DOWNLOAD_USER_SESSION_SECRET || ''
 const LOG_NPOINT_URL = process.env.NPOINT_LOGS_URL || ''
-
 interface DownloadUser {
   id: string
   email: string
@@ -17,8 +15,8 @@ interface DownloadUser {
   otpExpires?: string
   lastLogin?: string
   loginCount: number
+  mustResetPassword?: boolean
 }
-
 async function writeLog(entry: Record<string, string>) {
   try {
     const logEntry = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...entry }
@@ -33,7 +31,6 @@ async function writeLog(entry: Record<string, string>) {
     })
   } catch (e) { console.error('Log write error:', e) }
 }
-
 async function getUsers(): Promise<DownloadUser[]> {
   if (!USERS_NPOINT_URL) return []
   try {
@@ -42,7 +39,6 @@ async function getUsers(): Promise<DownloadUser[]> {
     return data.users || []
   } catch { return [] }
 }
-
 async function saveUsers(users: DownloadUser[]) {
   if (!USERS_NPOINT_URL) return
   await fetch(USERS_NPOINT_URL, {
@@ -51,7 +47,6 @@ async function saveUsers(users: DownloadUser[]) {
     body: JSON.stringify({ users }),
   })
 }
-
 // Generate session token from email + secret
 async function generateSessionToken(email: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -60,7 +55,6 @@ async function generateSessionToken(email: string): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
-
 // POST - Verify OTP and create session
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || 'unknown'
@@ -97,6 +91,7 @@ export async function POST(req: NextRequest) {
       message: 'Login successful',
       company: user.company,
       contactName: user.contactName,
+      mustResetPassword: user.mustResetPassword || false,
     })
     // Set download user session cookie (24 hours)
     res.cookies.set('download_user_session', sessionToken, {
