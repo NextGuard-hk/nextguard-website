@@ -6,22 +6,32 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
-// OCR via Tesseract.js (Vercel serverless compatible)
-async function ocrWithTesseract(buffer: Buffer, filename: string): Promise<string> {
+// OCR via OCR.space free API (Vercel serverless compatible - no binary deps)
+async function ocrFromImage(buffer: Buffer, filename: string): Promise<string> {
   try {
-    const Tesseract = await import('tesseract.js')
-    const worker = await Tesseract.createWorker('eng', 1, {
-      cachePath: '/tmp',
-      gzip: false,
+    const base64 = buffer.toString('base64')
+    const ext = filename.toLowerCase().split('.').pop() || 'png'
+    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png'
+    const body = new URLSearchParams({
+      apikey: process.env.OCR_SPACE_API_KEY || 'helloworld',
+      base64Image: `data:${mimeType};base64,${base64}`,
+      language: 'eng',
+      isOverlayRequired: 'false',
+      OCREngine: '2',
     })
-    const { data: { text } } = await worker.recognize(buffer)
-    await worker.terminate()
-    const trimmed = text?.trim()
-    if (!trimmed) return `[No text detected in image]\nFilename: ${filename}`
-    return `[OCR Extracted Text from: ${filename}]\n${trimmed}`
+    const res = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+    const data = await res.json()
+    if (data.ParsedResults && data.ParsedResults.length > 0) {
+      const text = data.ParsedResults.map((r: any) => r.ParsedText).join('\n').trim()
+      if (text) return `[OCR Extracted Text from: ${filename}]\n${text}`
+    }
+    return `[No text detected in image]\nFilename: ${filename}`
   } catch (e: any) {
-    // Fallback: return image metadata if OCR engine fails
-    return `[OCR engine unavailable - image received]\nFilename: ${filename}\nSize: ${buffer.length} bytes\nNote: Image uploaded successfully but OCR processing failed: ${e.message}`
+    return `[OCR processing failed]\nFilename: ${filename}\nError: ${e.message}`
   }
 }
 
@@ -68,8 +78,7 @@ export async function POST(req: NextRequest) {
       }
       text = slideTexts.join('\n\n')
     } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
-      // OCR: Extract text from image using Tesseract.js
-      text = await ocrWithTesseract(buffer, file.name)
+      text = await ocrFromImage(buffer, file.name)
     } else if (name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json') || name.endsWith('.xml') || name.endsWith('.log') || name.endsWith('.md') || name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sql') || name.endsWith('.yml') || name.endsWith('.yaml') || name.endsWith('.env') || name.endsWith('.cfg') || name.endsWith('.conf') || name.endsWith('.ini')) {
       text = buffer.toString('utf-8')
     } else {
