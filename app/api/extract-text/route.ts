@@ -6,31 +6,35 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
-// OCR via OpenAI Vision API
-async function ocrWithVision(base64Image: string, mimeType: string, filename: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.PERPLEXITY_API_KEY || ''
-  if (!apiKey) return `[OCR unavailable: no API key configured]\nFilename: ${filename}`
-
-  const isOpenAI = !!process.env.OPENAI_API_KEY
-  const endpoint = isOpenAI
-    ? 'https://api.openai.com/v1/chat/completions'
-    : 'https://api.perplexity.ai/chat/completions'
-  const model = isOpenAI ? 'gpt-4o-mini' : 'sonar'
-
-  // Only OpenAI supports vision - if only Perplexity key, fall back
-  if (!isOpenAI) {
-    return `[OCR requires OpenAI API key. Perplexity API does not support image analysis.]\nFilename: ${filename}`
+// OCR via Tesseract.js (local, no API key needed, works in all regions)
+async function ocrWithTesseract(buffer: Buffer, filename: string): Promise<string> {
+  try {
+    const Tesseract = await import('tesseract.js')
+    const { data: { text } } = await Tesseract.recognize(buffer, 'eng+chi_tra+chi_sim', {
+      logger: () => {},
+    })
+    const trimmed = text?.trim()
+    if (!trimmed) return `[No text detected in image]\nFilename: ${filename}`
+    return `[OCR Extracted Text from: ${filename}]\n${trimmed}`
+  } catch (e: any) {
+    return `[OCR failed: ${e.message}]\nFilename: ${filename}`
   }
+}
+
+// Optional: OCR via OpenAI Vision API (requires OPENAI_API_KEY env var)
+async function ocrWithVision(base64Image: string, mimeType: string, filename: string): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY || ''
+  if (!apiKey) return '' // Signal to fall back to Tesseract
 
   try {
-    const res = await fetch(endpoint, {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model,
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -58,16 +62,14 @@ async function ocrWithVision(base64Image: string, mimeType: string, filename: st
       }),
     })
 
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}))
-      return `[OCR error: ${res.status}]\nFilename: ${filename}`
-    }
+    if (!res.ok) return '' // Fall back to Tesseract
 
     const data = await res.json()
-    const extractedText = data.choices?.[0]?.message?.content?.trim() || '[No text detected]'
+    const extractedText = data.choices?.[0]?.message?.content?.trim() || ''
+    if (!extractedText) return ''
     return `[OCR Extracted Text from: ${filename}]\n${extractedText}`
   } catch (e: any) {
-    return `[OCR failed: ${e.message}]\nFilename: ${filename}`
+    return '' // Fall back to Tesseract
   }
 }
 
@@ -114,10 +116,14 @@ export async function POST(req: NextRequest) {
       }
       text = slideTexts.join('\n\n')
     } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
-      // OCR: Extract text from image using OpenAI Vision API
+      // OCR: Try OpenAI Vision first (if key available), fall back to Tesseract.js
       const mimeType = name.endsWith('.png') ? 'image/png' : 'image/jpeg'
       const base64 = buffer.toString('base64')
       text = await ocrWithVision(base64, mimeType, file.name)
+      if (!text) {
+        // Fall back to Tesseract.js (local OCR, no API key needed)
+        text = await ocrWithTesseract(buffer, file.name)
+      }
     } else if (name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json') || name.endsWith('.xml') || name.endsWith('.log') || name.endsWith('.md') || name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sql') || name.endsWith('.yml') || name.endsWith('.yaml') || name.endsWith('.env') || name.endsWith('.cfg') || name.endsWith('.conf') || name.endsWith('.ini')) {
       text = buffer.toString('utf-8')
     } else {
