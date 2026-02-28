@@ -124,7 +124,7 @@ export default function DownloadsPage() {
       const res = await fetch("/api/download-users/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: otpCode })
+        body: JSON.stringify({ email, otp: otpCode })
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Verification failed."); return }
