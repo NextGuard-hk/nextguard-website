@@ -231,6 +231,8 @@ export default function AIDLPDemo() {
   }
 
   const [extracting, setExtracting] = useState(false)
+  const [virusScanning, setVirusScanning] = useState(false)
+  const [virusScanResult, setVirusScanResult] = useState<{safe: boolean; message: string; skipped?: boolean} | null>(null)
 
   const BINARY_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.pptx', '.jpg', '.jpeg', '.png']
   const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -244,6 +246,26 @@ export default function AIDLPDemo() {
       return
     }
     setUploadedFileName(file.name)
+    setVirusScanResult(null)
+    // Step 1: Virus scan
+    setVirusScanning(true)
+    try {
+      const vsForm = new FormData()
+      vsForm.append('file', file)
+      const vsRes = await fetch('/api/virus-scan', { method: 'POST', body: vsForm })
+      const vsData = await vsRes.json()
+      setVirusScanResult(vsData)
+      if (!vsData.safe) {
+        setVirusScanning(false)
+        setContent(`\u26a0\ufe0f THREAT DETECTED: ${vsData.message}\n\nThis file has been blocked for security reasons.`)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
+    } catch (vsErr: unknown) {
+      setVirusScanResult({ safe: true, skipped: true, message: 'Virus scan unavailable' })
+    } finally {
+      setVirusScanning(false)
+    }
     setTradResult(null); setAiResult(null); setHybridResult(null)
     const isBinary = BINARY_EXTS.some(ext => file.name.toLowerCase().endsWith(ext))
     if (isBinary) {
@@ -401,7 +423,7 @@ export default function AIDLPDemo() {
           <p className="text-zinc-500 text-sm mb-3">{SAMPLE_CATEGORIES[activeCategory].description}</p>
           <div className="flex flex-wrap gap-2 mb-4">
             {SAMPLE_CATEGORIES[activeCategory].samples.map((s, si) => (
-              <button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setUploadedFileName(''); setFileRawText(''); setFileOcrText(''); setIsScannedFile(false); setTradResult(null); setAiResult(null); setHybridResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>
+              <button key={si} onClick={() => { setContent(s.content); setSelectedSample(s.name); setUploadedFileName(''); setFileRawText(''); setFileOcrText(''); setIsScannedFile(false); setVirusScanResult(null); setTradResult(null); setAiResult(null); setHybridResult(null) }} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSample === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>
             ))}
           </div>
 
@@ -411,12 +433,14 @@ export default function AIDLPDemo() {
             <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
               📂 Upload File
             </button>
-            {uploadedFileName && <span className="text-sm text-cyan-400">📄 {uploadedFileName}</span>}         {extracting && <span className="text-sm text-yellow-400 animate-pulse">Extracting text from file...</span>}
+            {uploadedFileName && <span className="text-sm text-cyan-400">📄 {uploadedFileName}</span>}         {virusScanning && <span className="text-sm text-orange-400 animate-pulse">\ud83d\udd12 Scanning for viruses...</span>}
+          {extracting && <span className="text-sm text-yellow-400 animate-pulse">Extracting text from file...</span>}
+          {virusScanResult && !virusScanning && <span className={`text-sm ${virusScanResult.safe ? 'text-green-400' : 'text-red-400'}`}>{virusScanResult.safe ? '\u2705' : '\u26a0\ufe0f'} {virusScanResult.message}</span>}
             <span className="text-xs text-zinc-600">Supports: .pdf, .docx, .xlsx, .pptx, .jpg, .txt, .csv, .json, .xml and more (max 5MB per file)</span>
           </div>
 
           <textarea value={content} onChange={e => setContent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-none font-mono text-sm min-h-[120px] mb-4" placeholder="Select a sample above, upload a file, or paste your own content to scan..." />
-          <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading || hybridLoading || extracting} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{extracting ? 'Extracting text...' : tradLoading || aiLoading || hybridLoading ? 'Scanning...' : 'Scan Content'}</button>
+          <button onClick={runScan} disabled={!content.trim() || tradLoading || aiLoading || hybridLoading || extracting || virusScanning} className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-bold transition-colors">{virusScanning ? 'Virus Scanning...' : extracting ? 'Extracting text...' : tradLoading || aiLoading || hybridLoading ? 'Scanning...' : 'Scan Content'}</button>
         </div>
 
         {/* Results Grid */}
