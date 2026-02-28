@@ -43,7 +43,7 @@ export default function DownloadsPage() {
   const [authStep, setAuthStep] = useState<AuthStep>("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-    const [confirmPassword, setConfirmPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [company, setCompany] = useState("")
   const [contactName, setContactName] = useState("")
   const [otpCode, setOtpCode] = useState("")
