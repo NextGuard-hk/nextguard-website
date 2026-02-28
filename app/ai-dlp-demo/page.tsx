@@ -362,7 +362,7 @@ export default function AIDLPDemo() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent">AI DLP Demo</h1>
           <h2 className="text-xl text-zinc-300 mt-2">Traditional DLP vs AI DLP vs Hybrid DLP</h2>
-          <p className="text-zinc-500 mt-2 max-w-3xl mx-auto">Compare pattern-based DLP against AI LLM detection and NextGuard Hybrid mode. Traditional DLP uses Regex & Dictionary. AI DLP understands context and detects evasion. Hybrid combines both for maximum coverage.</p>
+          <p className="text-zinc-500 mt-2 max-w-3xl mx-auto">Compare pattern-based DLP against AI Detection and NextGuard Hybrid mode. Traditional DLP uses Regex & Dictionary. AI DLP understands context and detects evasion. Hybrid combines both for maximum coverage.</p>
         </div>
 
         {/* Policy Settings Toggle */}
@@ -449,10 +449,10 @@ export default function AIDLPDemo() {
             <ResultPanel title="Traditional DLP (Pattern-Based)" result={tradResult} loading={tradLoading} error={tradError} color="#fb923c" />
           </div>
           <div className="bg-zinc-900 border border-cyan-800 rounded-xl p-6">
-            <ResultPanel title="AI LLM Detection" result={aiResult} loading={aiLoading} error={aiError} color="#22d3ee" />
+            <ResultPanel title="AI Detection" result={aiResult} loading={aiLoading} error={aiError} color="#22d3ee" />
           </div>
           <div className="bg-zinc-900 border border-green-700 rounded-xl p-6 ring-2 ring-green-600/30">
-            <ResultPanel title="Hybrid DLP (NextGuard)" result={hybridResult} loading={hybridLoading} error={hybridError} color="#4ade80" />
+            <ResultPanel title="Hybrid DLP" result={hybridResult} loading={hybridLoading} error={hybridError} color="#4ade80" />
           </div>
         </div>
 
@@ -483,7 +483,7 @@ export default function AIDLPDemo() {
               </ul>
             </div>
             <div>
-              <h4 className="text-green-400 font-bold mb-2">Hybrid DLP (NextGuard)</h4>
+              <h4 className="text-green-400 font-bold mb-2">Hybrid DLP</h4>
               <ul className="text-sm text-zinc-400 space-y-1">
                 <li>- Pattern engine runs first (instant, zero-cost)</li>
                 <li>- AI engine runs in parallel for context analysis</li>
