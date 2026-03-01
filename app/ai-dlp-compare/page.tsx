@@ -429,11 +429,11 @@ export default function ComparePage() {
               <div>
                 <div className="text-2xl font-mono font-bold text-purple-400">{(cfLatency / 1000).toFixed(2)}s</div>
                 <div className="text-sm text-zinc-400">Cloudflare Workers AI</div>
-                <div className="text-xs text-purple-400 mt-1">Edge AI - faster inference</div>
+                <div className="text-xs text-purple-400 mt-1">Edge AI - data stays local</div>
               </div>
             </div>
             <div className="mt-4 text-xs text-zinc-500 text-center">
-              Traditional DLP is fastest but cannot detect obfuscated, encoded, or context-based violations. AI DLP catches what regex misses.
+              Traditional DLP is fastest but cannot detect obfuscated, encoded, or context-based violations. AI DLP catches what regex misses. Edge AI keeps sensitive data within region for compliance.
             </div>
           </div>
         )}
