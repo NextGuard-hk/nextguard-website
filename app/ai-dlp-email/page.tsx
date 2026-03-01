@@ -144,6 +144,25 @@ export default function EmailDLPPage() {
   const [scanScope, setScanScope] = useState({ subject: true, body: true, attachment: true })
   const enabledPolicySummary = DLP_POLICIES.filter(p => policyEnabled[p.id]).map(p => p.label)
 
+    // Proofpoint / FortiMail / CheckPoint Harmony states
+  const [protectionMode, setProtectionMode] = useState('prevent-inline')
+  const [misdirectedEmailDetection, setMisdirectedEmailDetection] = useState(true)
+  const [smartIdentifiers, setSmartIdentifiers] = useState(true)
+  const [policyScope, setPolicyScope] = useState('company-wide')
+  const [scopeUsers, setScopeUsers] = useState('')
+  const [encryptionMode, setEncryptionMode] = useState('none')
+  const [conditionMatch, setConditionMatch] = useState('any')
+  const [dlpExceptions, setDlpExceptions] = useState('')
+  const [documentFingerprinting, setDocumentFingerprinting] = useState(false)
+  const [fingerprintMatchPercent, setFingerprintMatchPercent] = useState(80)
+  const [fingerprintSensitivity, setFingerprintSensitivity] = useState('Critical')
+  const [contentActionOnMatch, setContentActionOnMatch] = useState('default')
+  const [sensitivityLevel, setSensitivityLevel] = useState('high')
+  const [sensitivityLabels, setSensitivityLabels] = useState(false)
+  const [subjectRegex, setSubjectRegex] = useState('')
+  const [subjectRegexEnabled, setSubjectRegexEnabled] = useState(false)
+  const [notifyRecipient, setNotifyRecipient] = useState(false)
+  const [customSensitivityHitCount, setCustomSensitivityHitCount] = useState(3)
   useEffect(() => {
     fetch('/api/warmup-cloudflare').catch(() => {})
   }, [])
@@ -437,6 +456,24 @@ export default function EmailDLPPage() {
             logLevel={logLevel} setLogLevel={setLogLevel}
             severity={severity}
             action={action}
+                        protectionMode={protectionMode} setProtectionMode={setProtectionMode}
+            misdirectedEmailDetection={misdirectedEmailDetection} setMisdirectedEmailDetection={setMisdirectedEmailDetection}
+            smartIdentifiers={smartIdentifiers} setSmartIdentifiers={setSmartIdentifiers}
+            policyScope={policyScope} setPolicyScope={setPolicyScope}
+            scopeUsers={scopeUsers} setScopeUsers={setScopeUsers}
+            encryptionMode={encryptionMode} setEncryptionMode={setEncryptionMode}
+            conditionMatch={conditionMatch} setConditionMatch={setConditionMatch}
+            dlpExceptions={dlpExceptions} setDlpExceptions={setDlpExceptions}
+            documentFingerprinting={documentFingerprinting} setDocumentFingerprinting={setDocumentFingerprinting}
+            fingerprintMatchPercent={fingerprintMatchPercent} setFingerprintMatchPercent={setFingerprintMatchPercent}
+            fingerprintSensitivity={fingerprintSensitivity} setFingerprintSensitivity={setFingerprintSensitivity}
+            contentActionOnMatch={contentActionOnMatch} setContentActionOnMatch={setContentActionOnMatch}
+            sensitivityLevel={sensitivityLevel} setSensitivityLevel={setSensitivityLevel}
+            sensitivityLabels={sensitivityLabels} setSensitivityLabels={setSensitivityLabels}
+            subjectRegex={subjectRegex} setSubjectRegex={setSubjectRegex}
+            subjectRegexEnabled={subjectRegexEnabled} setSubjectRegexEnabled={setSubjectRegexEnabled}
+            notifyRecipient={notifyRecipient} setNotifyRecipient={setNotifyRecipient}
+            customSensitivityHitCount={customSensitivityHitCount} setCustomSensitivityHitCount={setCustomSensitivityHitCount}
           />
           </div>
         )}
