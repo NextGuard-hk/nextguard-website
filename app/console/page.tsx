@@ -35,6 +35,18 @@ interface Incident {
   details: Record<string, unknown>
 }
 
+interface Policy {
+  id: string
+  name: string
+  description: string
+  framework: string
+  severity: string
+  action: string
+  channels: string[]
+  enabled: boolean
+  version: number
+}
+
 const API_BASE = '/api/v1'
 
 export default function ConsoleDashboard() {
@@ -42,13 +54,17 @@ export default function ConsoleDashboard() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [stats, setStats] = useState<IncidentStats | null>(null)
+  const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
+  const [incidentFilter, setIncidentFilter] = useState<string>('all')
+  const [severityFilter, setSeverityFilter] = useState<string>('all')
 
   const fetchData = useCallback(async () => {
     try {
-      const [agentsRes, incidentsRes] = await Promise.all([
+      const [agentsRes, incidentsRes, policiesRes] = await Promise.all([
         fetch(`${API_BASE}/agents/heartbeat`),
         fetch(`${API_BASE}/incidents`),
+        fetch(`${API_BASE}/policies/bundle`),
       ])
       if (agentsRes.ok) {
         const ad = await agentsRes.json()
@@ -58,6 +74,10 @@ export default function ConsoleDashboard() {
         const id = await incidentsRes.json()
         setIncidents(id.incidents || [])
         setStats(id.stats || null)
+      }
+      if (policiesRes.ok) {
+        const pd = await policiesRes.json()
+        setPolicies(pd.policies || [])
       }
     } catch (e) { console.error('Fetch error:', e) }
     finally { setLoading(false) }
@@ -72,6 +92,12 @@ export default function ConsoleDashboard() {
   const onlineAgents = agents.filter(a => a.status === 'online').length
   const offlineAgents = agents.filter(a => a.status === 'offline').length
 
+  const filteredIncidents = incidents.filter(inc => {
+    if (incidentFilter !== 'all' && inc.status !== incidentFilter) return false
+    if (severityFilter !== 'all' && inc.severity !== severityFilter) return false
+    return true
+  })
+
   const severityColor = (s: string) => {
     switch(s) {
       case 'critical': return 'bg-red-600'
@@ -81,7 +107,6 @@ export default function ConsoleDashboard() {
       default: return 'bg-gray-500'
     }
   }
-
   const statusColor = (s: string) => {
     switch(s) {
       case 'online': return 'text-green-400'
@@ -147,7 +172,6 @@ export default function ConsoleDashboard() {
                 <p className="text-green-400 text-xs mt-2">All time</p>
               </div>
             </div>
-
             {/* Channel Breakdown */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
               <h3 className="text-lg font-semibold mb-4">Incidents by Channel</h3>
@@ -160,7 +184,6 @@ export default function ConsoleDashboard() {
                 ))}
               </div>
             </div>
-
             {/* Recent Incidents Table */}
             <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-800">
@@ -240,17 +263,137 @@ export default function ConsoleDashboard() {
             </div>
           </div>
         ) : activeTab === 'policies' ? (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-            <h3 className="text-lg font-semibold mb-4">Policy Management</h3>
-            <p className="text-gray-400 mb-6">Configure DLP policies that are pushed to all connected agents.</p>
-            <a href="/console/policies" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors">
-              Open Policy Editor
-            </a>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Policy Management</h3>
+              <a href="/console/policies" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors">
+                Open Full Policy Editor
+              </a>
+            </div>
+            <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+                <span className="text-sm text-gray-400">{policies.length} policies configured</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Status</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Name</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Framework</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Severity</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Action</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Channels</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {policies.map(p => (
+                      <tr key={p.id} className="hover:bg-gray-800/30">
+                        <td className="px-4 py-3">{p.enabled ? <span className="text-green-400">●</span> : <span className="text-gray-500">●</span>}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium">{p.name}</div>
+                          <div className="text-xs text-gray-500">{p.description}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs">{p.framework}</td>
+                        <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-medium text-white ${severityColor(p.severity)}`}>{p.severity}</span></td>
+                        <td className="px-4 py-3 capitalize">{p.action}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400">{p.channels?.join(', ')}</td>
+                      </tr>
+                    ))}
+                    {policies.length === 0 && (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No policies configured. Use the Policy Editor to create DLP policies.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-            <h3 className="text-lg font-semibold mb-4">Incident Management</h3>
-            <p className="text-gray-400">Full incident management view coming soon. Use the Dashboard tab to see recent incidents.</p>
+          /* Incidents Tab - Full View */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h3 className="text-lg font-semibold">Incident Management</h3>
+              <div className="flex gap-3">
+                <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+                  <option value="all">All Severities</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <select value={incidentFilter} onChange={e => setIncidentFilter(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+                  <option value="all">All Statuses</option>
+                  <option value="open">Open</option>
+                  <option value="investigating">Investigating</option>
+                  <option value="escalated">Escalated</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
+            </div>
+            {/* Incident Stats Cards */}
+            {stats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <p className="text-xs text-gray-400">Critical</p>
+                  <p className="text-2xl font-bold text-red-400">{stats.bySeverity.critical}</p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <p className="text-xs text-gray-400">High</p>
+                  <p className="text-2xl font-bold text-orange-400">{stats.bySeverity.high}</p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <p className="text-xs text-gray-400">Medium</p>
+                  <p className="text-2xl font-bold text-yellow-400">{stats.bySeverity.medium}</p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <p className="text-xs text-gray-400">Low</p>
+                  <p className="text-2xl font-bold text-blue-400">{stats.bySeverity.low}</p>
+                </div>
+              </div>
+            )}
+            {/* Full Incidents Table */}
+            <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+                <span className="text-sm text-gray-400">{filteredIncidents.length} incident(s)</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">ID</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Severity</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Policy</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Channel</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Host</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">User</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Action</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Status</th>
+                      <th className="text-left px-4 py-3 text-gray-400 font-medium">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {filteredIncidents.map(inc => (
+                      <tr key={inc.id} className="hover:bg-gray-800/30">
+                        <td className="px-4 py-3 font-mono text-xs">{inc.id}</td>
+                        <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-medium text-white ${severityColor(inc.severity)}`}>{inc.severity}</span></td>
+                        <td className="px-4 py-3">{inc.policyName}</td>
+                        <td className="px-4 py-3 capitalize">{inc.channel}</td>
+                        <td className="px-4 py-3">{inc.hostname}</td>
+                        <td className="px-4 py-3">{inc.username}</td>
+                        <td className="px-4 py-3 capitalize">{inc.action}</td>
+                        <td className="px-4 py-3 capitalize">{inc.status}</td>
+                        <td className="px-4 py-3 text-gray-400">{new Date(inc.timestamp).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                    {filteredIncidents.length === 0 && (
+                      <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">{incidents.length === 0 ? 'No incidents reported yet. Agents will report incidents when DLP violations are detected.' : 'No incidents match the current filters.'}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </main>
