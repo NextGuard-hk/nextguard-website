@@ -83,7 +83,7 @@ interface SyslogEntry {
 const API_BASE = '/api/v1'
 
 export default function ConsoleDashboard() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agents' | 'policies' | 'incidents' | 'reports' | 'configuration' | 'syslog' | 'config'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agents' | 'policies' | 'incidents' | 'reports' | 'configuration' | 'syslog' | 'appMonitoring'>('dashboard')
   const [agents, setAgents] = useState<Agent[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
     const [policies, setPolicies] = useState<Policy[]>([])
@@ -211,7 +211,7 @@ export default function ConsoleDashboard() {
             {tabBtn('agents', `Agents (${agents.length})`)}
             {tabBtn('policies', `Policies (${policies.length})`)}
             {tabBtn('incidents', `Incidents (${incidents.length})`)}
-            {tabBtn('reports', 'Reports')}             {tabBtn('syslog', 'Syslog')}             {tabBtn('config', 'Config')}
+            {tabBtn('reports', 'Reports')}             {tabBtn('syslog', 'Syslog')}             {tabBtn('appMonitoring', 'App Monitor')}
             {tabBtn('configuration', `Configuration (${configSummary?.totalFeatures || 0})`)}
           </div>
         </div>
@@ -503,6 +503,63 @@ export default function ConsoleDashboard() {
                 </tbody>
               </table>
               {syslogEntries.length === 0 && <p className="text-gray-500 text-sm text-center py-8">No syslog entries. Configure agents to forward syslog data.</p>}
+            </div>
+          </div>
+        )}
+
+                {activeTab === 'appMonitoring' && (
+          <div className="space-y-4">
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h3 className="text-lg font-bold text-white mb-4">App DLP Monitor</h3>
+              <p className="text-gray-400 text-sm mb-4">Real-time monitoring of application-level DLP events across file, clipboard, email, browser, USB, and network channels.</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {['FILE_SEND','FILE_UPLOAD','FILE_DOWNLOAD','FILE_PRINT','CLIPBOARD_COPY','EMAIL_SEND','BROWSER_UPLOAD','USB_WRITE'].map(e => (
+                  <div key={e} className="bg-gray-900 rounded-lg px-3 py-2 text-center">
+                    <span className="text-xs text-cyan-400 font-mono">{e}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h3 className="text-lg font-bold text-white mb-3">Monitored Applications</h3>
+              <div className="space-y-3">
+                {policies.filter(p => p.enabled).slice(0, 10).map(p => (
+                  <div key={p.id} className="flex items-center justify-between bg-gray-900 rounded-lg px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 font-mono">{p.id}</span>
+                      <span className="text-sm text-white">{p.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded ${severityColor(p.severity)}`}>{p.severity}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${modeColor(p.detectionMode)}`}>{p.detectionMode}</span>
+                      <span className="text-xs text-green-400">● Active</span>
+                    </div>
+                  </div>
+                ))}
+                {policies.filter(p => p.enabled).length === 0 && <p className="text-gray-500 text-sm">No active policies</p>}
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h3 className="text-lg font-bold text-white mb-3">Recent DLP Events</h3>
+              {incidents.length > 0 ? (
+                <div className="space-y-2">
+                  {incidents.slice(0, 10).map(inc => (
+                    <div key={inc.id} className="flex items-center justify-between bg-gray-900 rounded-lg px-4 py-2">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs px-2 py-0.5 rounded ${severityColor(inc.severity)}`}>{inc.severity}</span>
+                        <span className="text-sm text-white">{inc.policyName}</span>
+                        <span className="text-xs text-gray-500">{inc.channel}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400">{inc.hostname}</span>
+                        <span className="text-xs text-gray-500">{new Date(inc.timestamp).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">No DLP events recorded yet. Events will appear here when agents detect policy violations.</p>
+              )}
             </div>
           </div>
         )}
