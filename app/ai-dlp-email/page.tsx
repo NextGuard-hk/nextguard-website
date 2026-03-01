@@ -7,15 +7,15 @@ const EMAIL_SCENARIOS = [
     from: 'hr@nextguard.com',
     to: 'external-recruiter@headhunt.com',
     subject: 'RE: Candidate Reference Check',
-    body: 'Hi Karen,\n\nAs requested, here are the details for the candidate reference:\n\nCandidate: Wong Mei Ling\nHKID: F234567(8)\nDate of Birth: 15 March 1992\nCurrent Salary: HKD 52,000/month\nBank Account: BOC 012-987654-321\nEmergency Contact: Wong Tai Wai, +852 9123 4567\nMedical: Declared mild asthma\n\nPlease keep this strictly confidential.\n\nBest regards,\nSarah Lam\nHR Manager',
+    body: 'Hi Karen,\n\nAs requested, here are the details for the candidate reference check:\n\nFull Name: John Michael Smith\nDate of Birth: 1985-03-15\nHKID: A123456(7)\nPassport: K98765432\nPhone: +852 9876 5432\nEmail: john.smith@personal.com\nAddress: Flat 12B, Tower 3, City Garden, North Point, HK\nSalary: HKD 85,000/month\nBank Account: HSBC 123-456789-001\n\nPlease keep this confidential.\n\nBest regards,\nSarah Wong\nHR Manager',
     attachmentHint: 'Upload .xlsx/.csv with employee data to test attachment scanning',
   },
   {
     name: 'CFO M&A Confidential',
     from: 'cfo@nextguard.com',
     to: 'legal@external-law-firm.com',
-    subject: 'CONFIDENTIAL - Project Phoenix M&A Term Sheet - USD 12.5M Valuation - DO NOT FORWARD',
-    body: 'Dear Counsel,\n\nPlease review the attached term sheet at your earliest convenience. We aim to sign by end of March.\n\nRegards,\nRaymond Cheung\nCFO, NextGuard Technology Limited',
+    subject: 'CONFIDENTIAL - Project Phoenix M&A Term Sheet - USD 12.5M Valuation',
+    body: 'Dear Counsel,\n\nPlease review the attached term sheet at your earliest convenience.\n\nKey terms:\n- Acquisition price: USD 12.5M\n- Structure: 60% cash, 40% stock swap\n- Due diligence period: 45 days\n- Break fee: 3% (USD 375K)\n- Target: TechVault Security Ltd\n- Expected close: Q2 2026\n\nThis is HIGHLY CONFIDENTIAL. Do not share outside your immediate deal team.\n\nRegards,\nDavid Chen\nCFO, NextGuard',
     attachmentHint: 'Upload term sheet PDF to test attachment scanning',
   },
   {
@@ -23,61 +23,75 @@ const EMAIL_SCENARIOS = [
     from: 'accounting@nextguard.com',
     to: 'vendor-billing@cloudservice.com',
     subject: 'Payment for Invoice #INV-2026-0342',
-    body: 'Hi,\n\nPlease process the following payment:\n\nCompany: NextGuard Technology Limited\nAmount: USD 8,500\nCard Number: 4532 8901 2345 6789\nExpiry: 09/28\nCVV: 456\nCardholder: Raymond Cheung\n\nPlease confirm once processed.\n\nThanks,\nAccounting Team',
+    body: 'Hi,\n\nPlease process the following payment:\n\nCompany: NextGuard Technology Ltd\nInvoice: #INV-2026-0342\nAmount: USD 15,750.00\n\nPayment Details:\nCard Type: Visa\nCard Number: 4532-1234-5678-9012\nExpiry: 09/2027\nCVV: 847\nCardholder: David Chen\n\nAlternative wire transfer:\nBank: HSBC Hong Kong\nSWIFT: HSBCHKHH\nAccount: 123-456789-001\n\nPlease confirm once processed.\n\nRegards,\nAccounting Team',
     attachmentHint: 'Upload invoice PDF to test attachment scanning',
   },
   {
-    name: 'Obfuscated Data Exfiltration',
-    from: 'suspicious.user@nextguard.com',
-    to: 'personal@gmail.com',
-    subject: 'Notes from today',
-    body: 'Hey,\n\nJust saving some info:\n\nThe W0ng acc0unt - her !D is F-two-three-four-five-six-seven-(eight)\nSalary: fifty-two-k per month\nBank deets: B-O-C zero-one-two dash nine-eight-seven-six-five-four dash three-two-one\n\nDon\'t forget to delete this after.',
-    attachmentHint: 'Upload any file with PII to test evasion detection',
+    name: 'Engineering - Source Code Leak',
+    from: 'dev@nextguard.com',
+    to: 'friend@competitor-security.com',
+    subject: 'Check out this cool algo',
+    body: 'Hey!\n\nCheck out this encryption module I wrote for our DLP engine:\n\n```typescript\n// NextGuard Proprietary - Classification: TOP SECRET\n// DLP Core Engine v3.2.1 - Patent Pending\nclass DLPScanEngine {\n  private apiKey = "ng-prod-sk_live_a1b2c3d4e5f6";\n  private dbConn = "mongodb://admin:Str0ngP@ss@prod-db.nextguard.internal:27017";\n  \n  async scanContent(content: string): Promise<ScanResult> {\n    const patterns = this.loadPatterns();\n    return this.classifyRisk(content, patterns);\n  }\n}\n```\n\nPretty neat right? Let me know what you think!',
+    attachmentHint: 'Upload .py/.ts/.js source code file to test code leak detection',
   },
   {
-    name: 'Clean Business Update',
-    from: 'james.wong@nextguard.com',
-    to: 'all-staff@nextguard.com',
-    subject: 'Q1 2026 Company Update',
-    body: 'Dear Team,\n\nQ1 2026 highlights:\n- Revenue grew 18% YoY\n- 15 new enterprise clients across APAC\n- Customer satisfaction: 4.7/5.0\n- 3 major product releases shipped\n\nThank you for your hard work!\n\nBest regards,\nJames Wong\nCEO',
-    attachmentHint: 'Upload a clean report to verify no false positives',
+    name: 'Legal - GDPR Data Export',
+    from: 'legal@nextguard.com',
+    to: 'consultant@external-advisory.com',
+    subject: 'Customer Data Export - GDPR Request #GR-2026-089',
+    body: 'Hi,\n\nAttached is the customer data export for GDPR compliance request #GR-2026-089.\n\nData includes:\n- Customer: Maria Garcia (EU citizen, Spain)\n- EU Tax ID: ES12345678A\n- Records: 847 data points spanning 2019-2026\n- Categories: Purchase history, support tickets, usage analytics, IP logs\n- Includes health-related app usage data (GDPR Art. 9 special category)\n\nNote: This export includes data from our EU-West-1 cluster.\nDatabase credentials for verification: eu-prod-read:R3adOnly2026!@eu-db.nextguard.com\n\nPlease review for compliance before we send to the data subject.\n\nRegards,\nLegal Team',
+    attachmentHint: 'Upload customer data CSV/JSON to test GDPR data detection',
   },
   {
-    name: 'Board Pack with Financial Data',
-    from: 'cfo@nextguard.com',
-    to: 'board@nextguard.com',
-    subject: 'Board Pack - Q4 2025 Financial Results - STRICTLY CONFIDENTIAL',
-    body: 'Dear Board Members,\n\nPlease find attached the Q4 2025 board pack.\nKey highlights: Revenue HKD 12.3M, EBITDA margin 23.4%.\n\nPlease do not forward this email or the attachment.\n\nRegards,\nRaymond Cheung\nCFO',
-    attachmentHint: 'Upload financial report (.xlsx/.pdf) to test attachment DLP',
+    name: 'Sales - Customer List to Personal Email',
+    from: 'sales@nextguard.com',
+    to: 'mike.personal@gmail.com',
+    subject: 'FW: Q1 Enterprise Pipeline',
+    body: 'Sending this to my personal email for the weekend...\n\n--- CONFIDENTIAL - INTERNAL ONLY ---\n\nQ1 2026 Enterprise Pipeline:\n\n1. HSBC Hong Kong - $2.1M - DLP Suite - 85% probability\n   Contact: James.Wong@hsbc.com.hk | +852 2822 1111\n2. Cathay Pacific - $890K - Email Security - 60%\n   Contact: Lisa.Chan@cathaypacific.com | +852 2747 5000\n3. HK Government - $3.5M - Full Stack - 40%\n   Contact: William.Lau@gov.hk | Tender ref: GOV-SEC-2026-112\n4. Bank of China (HK) - $1.8M - Endpoint DLP - 70%\n   Contact: Peter.Zhao@bochk.com | +852 2826 6888\n\nTotal Pipeline: $8.29M\nQuota: $5M | Current: $1.2M closed\n\n--- END CONFIDENTIAL ---',
+    attachmentHint: 'Upload sales report Excel to test business data detection',
+  },
+  {
+    name: 'IT Admin - Credentials Sharing',
+    from: 'it-admin@nextguard.com',
+    to: 'new-contractor@freelance-dev.com',
+    subject: 'Access Credentials for Onboarding',
+    body: 'Welcome aboard!\n\nHere are your access credentials:\n\nVPN:\n- Server: vpn.nextguard.internal\n- Username: contractor_2026_04\n- Password: Temp!Pass#2026\n- 2FA Secret: JBSWY3DPEHPK3PXP\n\nAWS Console:\n- URL: https://nextguard.signin.aws.amazon.com/console\n- Access Key: AKIAIOSFODNN7EXAMPLE\n- Secret Key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n\nGitHub Enterprise:\n- Token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\nProduction DB (read-only):\n- Host: prod-mysql.nextguard.internal:3306\n- User: readonly_user\n- Pass: Pr0dR3ad!2026\n\nPlease change all passwords on first login.\n\nBest,\nIT Team',
+    attachmentHint: 'Upload config/env file to test credential detection',
   },
 ]
 
-const BINARY_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.pptx', '.jpg', '.jpeg', '.png']
+const DLP_POLICIES = [
+  { id: 'pii_names', label: 'Personal Names', category: 'PII', defaultOn: true },
+  { id: 'pii_id_numbers', label: 'ID Numbers (HKID/Passport/SSN)', category: 'PII', defaultOn: true },
+  { id: 'pii_contact', label: 'Phone/Email/Address', category: 'PII', defaultOn: true },
+  { id: 'financial_cc', label: 'Credit Card Numbers', category: 'Financial', defaultOn: true },
+  { id: 'financial_bank', label: 'Bank Account/SWIFT', category: 'Financial', defaultOn: true },
+  { id: 'financial_salary', label: 'Salary/Compensation Data', category: 'Financial', defaultOn: true },
+  { id: 'confidential_ma', label: 'M&A / Deal Information', category: 'Confidential', defaultOn: true },
+  { id: 'confidential_legal', label: 'Legal Privileged Content', category: 'Confidential', defaultOn: true },
+  { id: 'confidential_internal', label: 'Internal Only / Restricted', category: 'Confidential', defaultOn: true },
+  { id: 'credentials_passwords', label: 'Passwords & Secrets', category: 'Credentials', defaultOn: true },
+  { id: 'credentials_api', label: 'API Keys & Tokens', category: 'Credentials', defaultOn: true },
+  { id: 'credentials_db', label: 'Database Connection Strings', category: 'Credentials', defaultOn: true },
+  { id: 'code_source', label: 'Source Code / Algorithms', category: 'IP & Code', defaultOn: true },
+  { id: 'code_proprietary', label: 'Proprietary / Patent Content', category: 'IP & Code', defaultOn: true },
+  { id: 'code_config', label: 'Config / Environment Files', category: 'IP & Code', defaultOn: true },
+  { id: 'compliance_gdpr', label: 'GDPR Personal Data', category: 'Compliance', defaultOn: true },
+  { id: 'compliance_hipaa', label: 'Health / Medical Data', category: 'Compliance', defaultOn: true },
+  { id: 'compliance_pci', label: 'PCI-DSS Cardholder Data', category: 'Compliance', defaultOn: true },
+  { id: 'business_pipeline', label: 'Sales Pipeline / Revenue', category: 'Business', defaultOn: true },
+]
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ScanResultBadge({ label, result }: { label: string; result: any }) {
-  if (!result) return <span className="text-xs text-zinc-600">{label}: -</span>
-  return (
-    <div className="mb-2">
-      <div className={`text-xs font-bold ${result.detected ? 'text-red-400' : 'text-green-400'}`}>
-        {label}: {result.detected ? '⚠️ VIOLATION' : '✅ CLEAN'}
-      </div>
-      {result.detected && result.findings && result.findings.length > 0 && (
-        <div className="ml-2 mt-1">
-          {result.findings.slice(0, 5).map((f: any, i: number) => (
-            <div key={i} className="text-xs text-zinc-400">
-              • <span className="text-orange-400">{f.rule || f.type}</span>
-              {f.matches && <span className="text-zinc-500"> ({f.matches.slice(0, 3).join(', ')})</span>}
-              {f.confidence && <span className="text-zinc-500"> {f.confidence}%</span>}
-            </div>
-          ))}
-        </div>
-      )}
-      {result.detected && result.summary && (
-        <div className="text-xs text-zinc-500 mt-1 ml-2">{result.summary}</div>
-      )}
-    </div>
-  )
+const POLICY_CATEGORIES = ['PII', 'Financial', 'Confidential', 'Credentials', 'IP & Code', 'Compliance', 'Business']
+
+async function scanPart(content: string, engine: string, policyContext?: string) {
+  const res = await fetch(`/api/ai-dlp-${engine === 'traditional' ? 'traditional' : engine === 'pplx' ? 'cloudflare' : 'cloudflare'}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, policyContext }),
+  })
+  if (!res.ok) throw new Error('Scan failed')
+  return res.json()
 }
 
 export default function EmailDLPPage() {
@@ -91,66 +105,76 @@ export default function EmailDLPPage() {
   const [scanning, setScanning] = useState(false)
   const [selectedScenario, setSelectedScenario] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // Results: each engine has { subject, body, attachment } sub-results
   const [results, setResults] = useState<any>(null)
   const [latencies, setLatencies] = useState<any>(null)
+  // Policy settings
+  const [policyEnabled, setPolicyEnabled] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(DLP_POLICIES.map(p => [p.id, p.defaultOn]))
+  )
+  const [severity, setSeverity] = useState<string>('High')
+  const [action, setAction] = useState<string>('Block')
+  const [showPolicyPanel, setShowPolicyPanel] = useState(false)
+  const [scanScope, setScanScope] = useState({ subject: true, body: true, attachment: true })
+
+  const enabledPolicySummary = DLP_POLICIES.filter(p => policyEnabled[p.id]).map(p => p.label)
 
   useEffect(() => {
     fetch('/api/warmup-cloudflare').catch(() => {})
   }, [])
 
-  const loadScenario = (s: typeof EMAIL_SCENARIOS[0]) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAttachmentName(file.name)
+    setExtracting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/ai-dlp/extract', { method: 'POST', body: formData })
+      const data = await res.json()
+      setAttachmentText(data.text || '')
+    } catch {
+      setAttachmentText('[Extraction failed]')
+    }
+    setExtracting(false)
+  }
+
+  const loadScenario = (idx: number) => {
+    const s = EMAIL_SCENARIOS[idx]
+    if (!s) return
+    setSelectedScenario(String(idx))
     setEmailFrom(s.from)
     setEmailTo(s.to)
     setEmailSubject(s.subject)
     setEmailBody(s.body)
-    setSelectedScenario(s.name)
     setAttachmentName('')
     setAttachmentText('')
     setResults(null)
     setLatencies(null)
   }
 
-  const handleAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) { alert('File too large (max 5MB)'); return }
-    setAttachmentName(file.name)
-    setAttachmentText('')
-    setExtracting(true)
-    const isBinary = BINARY_EXTS.some(ext => file.name.toLowerCase().endsWith(ext))
-    if (isBinary) {
-      try {
-        const fd = new FormData()
-        fd.append('file', file)
-        const res = await fetch('/api/extract-text', { method: 'POST', body: fd })
-        const data = await res.json()
-        setAttachmentText(data.ocrText || data.text || data.rawText || '')
-      } catch { setAttachmentText('[Error extracting text]') }
-    } else {
-      try { setAttachmentText(await file.text()) } catch { setAttachmentText('[Error reading file]') }
-    }
-    setExtracting(false)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  const toggleCategory = (cat: string) => {
+    const ids = DLP_POLICIES.filter(p => p.category === cat).map(p => p.id)
+    const allOn = ids.every(id => policyEnabled[id])
+    setPolicyEnabled(prev => {
+      const next = { ...prev }
+      ids.forEach(id => { next[id] = !allOn })
+      return next
+    })
   }
 
-  const scanPart = async (content: string, engine: string) => {
-    if (!content.trim()) return { detected: false, findings: [], summary: 'No content to scan' }
-    const url = engine === 'traditional' ? '/api/ai-dlp-traditional' : engine === 'pplx' ? '/api/ai-dlp' : '/api/ai-dlp-cloudflare'
-    const body = engine === 'pplx' ? { content, mode: 'ai' } : { content }
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    return res.json()
-  }
+  const hasContent = emailSubject.trim() || emailBody.trim() || attachmentText.trim()
 
-  const runEmailScan = async () => {
+  const handleScan = async () => {
     setScanning(true)
     setResults(null)
     setLatencies(null)
+    const policyContext = `Enabled DLP Policies: ${enabledPolicySummary.join(', ')}\nSeverity: ${severity}\nAction: ${action}`
     const engines = ['traditional', 'pplx', 'cloudflare'] as const
     const parts = [
-      { key: 'subject', content: emailSubject },
-      { key: 'body', content: emailBody },
-      { key: 'attachment', content: attachmentText },
+      ...(scanScope.subject ? [{ key: 'subject', content: emailSubject }] : []),
+      ...(scanScope.body ? [{ key: 'body', content: emailBody }] : []),
+      ...(scanScope.attachment ? [{ key: 'attachment', content: attachmentText }] : []),
     ]
     const res: any = {}
     const lat: any = {}
@@ -159,7 +183,7 @@ export default function EmailDLPPage() {
       const t0 = performance.now()
       await Promise.all(parts.map(async (p) => {
         try {
-          res[eng][p.key] = await scanPart(p.content, eng)
+          res[eng][p.key] = await scanPart(p.content, eng, policyContext)
         } catch {
           res[eng][p.key] = { detected: false, error: true, summary: 'Scan failed' }
         }
@@ -171,125 +195,163 @@ export default function EmailDLPPage() {
     setScanning(false)
   }
 
-  const hasContent = emailSubject.trim() || emailBody.trim() || attachmentText.trim()
-
   return (
-    <div className="min-h-screen bg-black text-white pt-24 px-4 pb-12">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-cyan-400 mb-2 text-center">📧 Email DLP Simulation</h1>
-        <p className="text-zinc-400 mb-6 text-center">Simulate sending an email with Subject, Body & Attachment — DLP scans each part separately</p>
+    <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold mb-1">Email DLP Scanning Demo</h1>
+        <p className="text-zinc-400 text-sm mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Perplexity Sonar), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
 
         {/* Scenario Selector */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-4">
-          <div className="text-xs text-zinc-500 mb-2">Load a pre-built email scenario:</div>
-          <div className="flex flex-wrap gap-2">
-            {EMAIL_SCENARIOS.map((s, i) => (
-              <button key={i} onClick={() => loadScenario(s)} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedScenario === s.name ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}>{s.name}</button>
-            ))}
-          </div>
+        <div className="mb-4">
+          <label className="text-xs text-zinc-400 block mb-1">Load Test Scenario</label>
+          <select value={selectedScenario} onChange={e => loadScenario(Number(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm">
+            <option value="">-- Select a scenario --</option>
+            {EMAIL_SCENARIOS.map((s, i) => <option key={i} value={i}>{s.name}</option>)}
+          </select>
         </div>
 
-        {/* Email Compose Form */}
-        <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 mb-4">
-          <div className="text-lg font-bold text-white mb-4">✉️ Compose Email</div>
+        {/* Policy Settings Toggle */}
+        <div className="mb-4">
+          <button onClick={() => setShowPolicyPanel(!showPolicyPanel)} className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300">
+            <span>{showPolicyPanel ? '\u25BC' : '\u25B6'}</span>
+            <span>DLP Policy Settings</span>
+            <span className="text-xs text-zinc-500">({enabledPolicySummary.length}/{DLP_POLICIES.length} policies active)</span>
+          </button>
+        </div>
+
+        {/* Policy Panel */}
+        {showPolicyPanel && (
+          <div className="mb-6 bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+            <div className="flex flex-wrap gap-4 mb-4">
+              <div>
+                <span className="text-xs text-zinc-400 block mb-1">Severity Level</span>
+                <div className="flex gap-1">
+                  {['Low','Medium','High','Critical'].map(s => (
+                    <button key={s} onClick={() => setSeverity(s)} className={`px-2 py-1 text-xs rounded ${severity === s ? 'bg-cyan-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-zinc-400 block mb-1">Action</span>
+                <div className="flex gap-1">
+                  {['Monitor','Warn','Block','Quarantine'].map(a => (
+                    <button key={a} onClick={() => setAction(a)} className={`px-2 py-1 text-xs rounded ${action === a ? 'bg-cyan-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>{a}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-zinc-400 block mb-1">Scan Scope</span>
+                <div className="flex gap-2">
+                  {(['subject','body','attachment'] as const).map(s => (
+                    <label key={s} className="flex items-center gap-1 text-xs cursor-pointer">
+                      <input type="checkbox" checked={scanScope[s]} onChange={() => setScanScope(prev => ({ ...prev, [s]: !prev[s] }))} />
+                      <span className="text-zinc-300 capitalize">{s}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Policy Categories */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {POLICY_CATEGORIES.map(cat => {
+                const policies = DLP_POLICIES.filter(p => p.category === cat)
+                const enabledCount = policies.filter(p => policyEnabled[p.id]).length
+                return (
+                  <div key={cat} className="bg-zinc-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-zinc-300">{cat}</span>
+                      <button onClick={() => toggleCategory(cat)} className="text-xs text-cyan-400 hover:text-cyan-300">
+                        {enabledCount === policies.length ? 'Disable All' : 'Enable All'}
+                      </button>
+                    </div>
+                    {policies.map(p => (
+                      <label key={p.id} className="flex items-center gap-2 py-0.5 cursor-pointer">
+                        <input type="checkbox" checked={policyEnabled[p.id]} onChange={() => setPolicyEnabled(prev => ({ ...prev, [p.id]: !prev[p.id] }))} />
+                        <span className={`text-xs ${policyEnabled[p.id] ? 'text-zinc-200' : 'text-zinc-600'}`}>{p.label}</span>
+                      </label>
+                    ))}
+                    <div className="text-xs text-zinc-600 mt-1">{enabledCount}/{policies.length} active</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Email Form */}
+        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="text-xs text-zinc-500">From:</label>
-              <input value={emailFrom} onChange={e => setEmailFrom(e.target.value)} placeholder="sender@company.com" className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-sm text-white mt-1" />
+              <label className="text-xs text-zinc-400 block mb-1">From</label>
+              <input value={emailFrom} onChange={e => setEmailFrom(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm" placeholder="sender@company.com" />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">To:</label>
-              <input value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recipient@external.com" className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-sm text-white mt-1" />
+              <label className="text-xs text-zinc-400 block mb-1">To</label>
+              <input value={emailTo} onChange={e => setEmailTo(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm" placeholder="recipient@external.com" />
             </div>
           </div>
           <div className="mb-3">
-            <label className="text-xs text-zinc-500">Subject: <span className="text-yellow-500">(DLP scans this)</span></label>
-            <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Email subject line..." className="w-full bg-zinc-800 border border-yellow-700 rounded px-3 py-2 text-sm text-white mt-1" />
+            <label className="text-xs text-zinc-400 block mb-1">Subject</label>
+            <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm" placeholder="Email subject" />
           </div>
           <div className="mb-3">
-            <label className="text-xs text-zinc-500">Body: <span className="text-yellow-500">(DLP scans this)</span></label>
-            <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Email body content..." className="w-full h-32 bg-zinc-800 border border-yellow-700 rounded px-3 py-2 text-sm text-white mt-1 font-mono" />
+            <label className="text-xs text-zinc-400 block mb-1">Body</label>
+            <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={8} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm font-mono" placeholder="Email body content..." />
           </div>
           <div className="mb-3">
-            <label className="text-xs text-zinc-500">📎 Attachment: <span className="text-yellow-500">(DLP extracts & scans file content)</span></label>
-            <div className="flex items-center gap-3 mt-1">
-              <input ref={fileInputRef} type="file" accept=".txt,.csv,.json,.xml,.pdf,.docx,.xlsx,.xls,.pptx,.jpg,.jpeg,.png" onChange={handleAttachment} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">📂 Attach File</button>
-              {attachmentName && <span className="text-xs text-cyan-400">📄 {attachmentName}</span>}
-              {extracting && <span className="text-xs text-yellow-400 animate-pulse">Extracting text...</span>}
-              {attachmentText && !extracting && <span className="text-xs text-green-400">✅ {attachmentText.length} chars extracted</span>}
+            <label className="text-xs text-zinc-400 block mb-1">Attachment</label>
+            <div className="flex items-center gap-2">
+              <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm hover:bg-zinc-700">
+                {extracting ? 'Extracting...' : 'Upload File'}
+              </button>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.py,.ts,.js,.env" />
+              {attachmentName && <span className="text-xs text-zinc-400">{attachmentName}</span>}
             </div>
-            {selectedScenario && !attachmentName && (
-              <div className="text-xs text-zinc-600 mt-1">💡 {EMAIL_SCENARIOS.find(s => s.name === selectedScenario)?.attachmentHint}</div>
+            {attachmentText && (
+              <textarea value={attachmentText} onChange={e => setAttachmentText(e.target.value)} rows={4} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm font-mono mt-2" />
             )}
           </div>
-          <button onClick={runEmailScan} disabled={!hasContent || scanning || extracting} className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 text-white font-bold py-3 px-8 rounded-xl transition">
-            {scanning ? '🔍 Scanning Email...' : '🔍 Scan Email Before Sending'}
+          <button onClick={handleScan} disabled={scanning || !hasContent} className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded text-sm font-bold">
+            {scanning ? 'Scanning with 3 AI Engines...' : 'Scan Email for DLP Violations'}
           </button>
         </div>
 
         {/* Results */}
-        {scanning && <div className="text-cyan-400 animate-pulse text-center py-8 text-lg">🔍 Scanning Subject, Body & Attachment across all 3 engines...</div>}
         {results && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Traditional DLP */}
-            <div className="bg-zinc-900 border border-orange-600 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-white mb-1">Traditional DLP</h3>
-              <div className="text-xs text-zinc-500 mb-1">Regex + Dictionary</div>
-              {latencies?.traditional && <div className="text-xl font-mono font-bold text-green-400 mb-3">{latencies.traditional}ms</div>}
-              <ScanResultBadge label="📌 Subject" result={results.traditional?.subject} />
-              <ScanResultBadge label="📝 Body" result={results.traditional?.body} />
-              <ScanResultBadge label="📎 Attachment" result={results.traditional?.attachment} />
-            </div>
-            {/* Perplexity Sonar */}
-            <div className="bg-zinc-900 border border-cyan-600 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-white mb-1">Perplexity Sonar</h3>
-              <div className="text-xs text-zinc-500 mb-1">Cloud AI - high accuracy</div>
-              {latencies?.pplx && <div className="text-xl font-mono font-bold text-cyan-400 mb-3">{(latencies.pplx / 1000).toFixed(2)}s</div>}
-              <ScanResultBadge label="📌 Subject" result={results.pplx?.subject} />
-              <ScanResultBadge label="📝 Body" result={results.pplx?.body} />
-              <ScanResultBadge label="📎 Attachment" result={results.pplx?.attachment} />
-            </div>
-            {/* Cloudflare Workers AI */}
-            <div className="bg-zinc-900 border border-purple-600 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-white mb-1">Cloudflare Workers AI</h3>
-              <div className="text-xs text-zinc-500 mb-1">Edge AI - data stays local</div>
-              {latencies?.cloudflare && <div className="text-xl font-mono font-bold text-purple-400 mb-3">{(latencies.cloudflare / 1000).toFixed(2)}s</div>}
-              <ScanResultBadge label="📌 Subject" result={results.cloudflare?.subject} />
-              <ScanResultBadge label="📝 Body" result={results.cloudflare?.body} />
-              <ScanResultBadge label="📎 Attachment" result={results.cloudflare?.attachment} />
-            </div>
-          </div>
-        )}
-
-        {/* Summary */}
-        {results && latencies && (
-          <div className="mt-8 bg-zinc-900 border border-zinc-700 rounded-xl p-6">
-            <h3 className="text-lg font-bold mb-4">📊 Email DLP Performance Summary</h3>
-            <div className="grid grid-cols-3 gap-4 text-center mb-4">
-              <div>
-                <div className="text-2xl font-mono font-bold text-green-400">{latencies.traditional}ms</div>
-                <div className="text-sm text-zinc-400">Traditional DLP</div>
-              </div>
-              <div>
-                <div className="text-2xl font-mono font-bold text-cyan-400">{(latencies.pplx / 1000).toFixed(2)}s</div>
-                <div className="text-sm text-zinc-400">Perplexity Sonar</div>
-              </div>
-              <div>
-                <div className="text-2xl font-mono font-bold text-purple-400">{(latencies.cloudflare / 1000).toFixed(2)}s</div>
-                <div className="text-sm text-zinc-400">Cloudflare Workers AI</div>
-              </div>
-            </div>
-            <div className="text-xs text-zinc-500 text-center">
-              Each engine scanned Subject, Body & Attachment independently. Traditional DLP uses regex only. AI engines detect obfuscated and context-based violations.
+          <div>
+            <h2 className="text-lg font-bold mb-3">Scan Results</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(['traditional', 'pplx', 'cloudflare'] as const).map(eng => (
+                <div key={eng} className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-sm capitalize">{eng === 'pplx' ? 'Perplexity Sonar Pro' : eng === 'traditional' ? 'Perplexity Sonar' : 'Cloudflare Workers AI'}</h3>
+                    {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
+                  </div>
+                  {['subject', 'body', 'attachment'].map(part => {
+                    const result = results[eng]?.[part]
+                    if (!result) return null
+                    return (
+                      <div key={part} className="mb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-zinc-400 uppercase">{part}</span>
+                          {result.detected ? (
+                            <span className="text-xs px-1.5 py-0.5 bg-red-900/50 text-red-400 rounded">VIOLATION</span>
+                          ) : (
+                            <span className="text-xs px-1.5 py-0.5 bg-green-900/50 text-green-400 rounded">CLEAN</span>
+                          )}
+                        </div>
+                        {result.detected && result.summary && (
+                          <div className="text-xs text-zinc-500 mt-1 ml-2">{result.summary}</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         )}
-
-        {/* Back Link */}
-        <div className="mt-6 text-center">
-          <a href="/ai-dlp-compare" className="text-cyan-400 hover:text-cyan-300 text-sm">← Back to DLP Engine Comparison (Text Mode)</a>
-        </div>
       </div>
     </div>
   )
