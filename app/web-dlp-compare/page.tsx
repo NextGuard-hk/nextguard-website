@@ -186,16 +186,16 @@ const WEB_SCENARIOS = [
   },
 ]
 const DEFAULT_WEB_POLICY = {
-  credit_card: { enabled: true, action: 'BLOCK', severity: 'critical' },
+  credit_card: { enabled: true, action: 'BLOCK', severity: 'critical', matchCount: 1, confidence: 'high', proximity: 300, direction: 'outbound', notifyAdmin: true, logContent: false, customPattern: '', schedule: 'always' },
   phone_hk: { enabled: true, action: 'AUDIT', severity: 'medium' },
   hkid: { enabled: true, action: 'BLOCK', severity: 'critical' },
   email_addr: { enabled: true, action: 'AUDIT', severity: 'low' },
   iban: { enabled: true, action: 'BLOCK', severity: 'high' },
-  passport: { enabled: true, action: 'BLOCK', severity: 'high' },
-  sensitive_keywords: { enabled: true, action: 'QUARANTINE', severity: 'high' },
-  api_keys: { enabled: true, action: 'BLOCK', severity: 'critical' },
-  url_exfil: { enabled: true, action: 'BLOCK', severity: 'critical' },
-  file_type: { enabled: true, action: 'AUDIT', severity: 'medium' },
+  passport: { enabled: true, action: 'BLOCK', severity: 'high', matchCount: 1, confidence: 'high', proximity: 300, direction: 'outbound', notifyAdmin: true, logContent: false, customPattern: '', schedule: 'always' },
+  sensitive_keywords: { enabled: true, action: 'QUARANTINE', severity: 'high', matchCount: 2, confidence: 'medium', proximity: 500, direction: 'both', notifyAdmin: true, logContent: true, customPattern: '', schedule: 'business_hours' },
+  api_keys: { enabled: true, action: 'BLOCK', severity: 'critical', matchCount: 1, confidence: 'high', proximity: 0, direction: 'outbound', notifyAdmin: true, logContent: false, customPattern: '', schedule: 'always' },
+  url_exfil: { enabled: true, action: 'BLOCK', severity: 'critical', matchCount: 1, confidence: 'high', proximity: 0, direction: 'outbound', notifyAdmin: true, logContent: true, customPattern: '', schedule: 'always' },
+  file_type: { enabled: true, action: 'AUDIT', severity: 'medium', matchCount: 1, confidence: 'medium', proximity: 0, direction: 'outbound', notifyAdmin: false, logContent: true, customPattern: '', schedule: 'always' },
 }
 
 type PolicyKey = keyof typeof DEFAULT_WEB_POLICY
@@ -214,7 +214,7 @@ const POLICY_LABELS: Record<PolicyKey, string> = {
 }
 
 const ACTIONS = ['BLOCK', 'QUARANTINE', 'AUDIT']
-const SEVERITIES = ['critical', 'high', 'medium', 'low']
+const SEVERITIES = ['critical', 'high', 'medium', 'low']; const CONFIDENCES = ['high', 'medium', 'low']; const DIRECTIONS = ['outbound', 'inbound', 'both']; const SCHEDULES = ['always', 'business_hours', 'off_hours', 'custom']
 
 const CHANNEL_COLORS: Record<string, string> = {
   'web-form': 'bg-blue-900/50 text-blue-300',
@@ -415,19 +415,19 @@ export default function WebDLPComparePage() {
               <h3 className="font-bold">Web DLP Policy Configuration</h3>
               <button onClick={resetPolicy} className="text-xs text-cyan-400 hover:text-cyan-300">Reset to Default</button>
             </div>
-            <table className="w-full text-sm">
-              <thead><tr className="text-zinc-500 text-xs"><th className="text-left py-1">Enabled</th><th className="text-left">Rule</th><th className="text-left">Action</th><th className="text-left">Severity</th></tr></thead>
+            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[900px]">
+              <thead><tr className="text-zinc-500 text-xs"><th className="text-left py-1">Enabled</th><th className="text-left">Rule</th><th className="text-left">Action</th><th className="text-left">Severity</th><th className="text-left text-xs text-zinc-400 pb-2">Count</th><th className="text-left text-xs text-zinc-400 pb-2">Confidence</th><th className="text-left text-xs text-zinc-400 pb-2">Proximity</th><th className="text-left text-xs text-zinc-400 pb-2">Direction</th><th className="text-left text-xs text-zinc-400 pb-2">Schedule</th><th className="text-left text-xs text-zinc-400 pb-2">Notify</th><th className="text-left text-xs text-zinc-400 pb-2">Log</th></tr></thead>
               <tbody>
                 {(Object.keys(policy) as PolicyKey[]).map(key => (
                   <tr key={key} className="border-t border-zinc-800">
                     <td className="py-1"><input type="checkbox" checked={policy[key].enabled} onChange={e => updatePolicy(key, 'enabled', e.target.checked)} className="accent-cyan-500" /></td>
                     <td className="text-zinc-300">{POLICY_LABELS[key]}</td>
                     <td><select value={policy[key].action} onChange={e => updatePolicy(key, 'action', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-xs text-white">{ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></td>
-                    <td><select value={policy[key].severity} onChange={e => updatePolicy(key, 'severity', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-xs text-white">{SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                    <td><select value={policy[key].severity} onChange={e => updatePolicy(key, 'severity', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-xs text-white">{SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}</select></td><td className="py-1 pr-2"><input type="number" min={1} max={100} value={policy[key].matchCount} onChange={e => updatePolicy(key, 'matchCount', parseInt(e.target.value) || 1)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white w-12" /></td><td className="py-1 pr-2"><select value={policy[key].confidence} onChange={e => updatePolicy(key, 'confidence', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white">{CONFIDENCES.map(c => <option key={c} value={c}>{c}</option>)}</select></td><td className="py-1 pr-2"><input type="number" min={0} max={1000} step={50} value={policy[key].proximity} onChange={e => updatePolicy(key, 'proximity', parseInt(e.target.value) || 0)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white w-14" /></td><td className="py-1 pr-2"><select value={policy[key].direction} onChange={e => updatePolicy(key, 'direction', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white">{DIRECTIONS.map(d => <option key={d} value={d}>{d}</option>)}</select></td><td className="py-1 pr-2"><select value={policy[key].schedule} onChange={e => updatePolicy(key, 'schedule', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white">{SCHEDULES.map(s => <option key={s} value={s}>{s}</option>)}</select></td><td className="py-1 pr-2 text-center"><input type="checkbox" checked={policy[key].notifyAdmin} onChange={e => updatePolicy(key, 'notifyAdmin', e.target.checked)} className="accent-cyan-500" /></td><td className="py-1 text-center"><input type="checkbox" checked={policy[key].logContent} onChange={e => updatePolicy(key, 'logContent', e.target.checked)} className="accent-cyan-500" /></td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )}
 
