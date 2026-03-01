@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const SAMPLE_CATEGORIES = [
   {
@@ -236,6 +236,19 @@ export default function AIDLPDemo() {
 
   const BINARY_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.pptx', '.jpg', '.jpeg', '.png']
   const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
+  // Pre-warm Cloudflare Workers AI on page load to avoid cold start
+  useEffect(() => {
+    const warmup = async () => {
+      try {
+        await fetch('/api/warmup-cloudflare')
+        console.log('Cloudflare AI pre-warmed successfully')
+      } catch (e) {
+        console.warn('Cloudflare AI warmup failed:', e)
+      }
+    }
+    warmup()
+  }, [])
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
