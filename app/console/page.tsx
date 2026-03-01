@@ -39,7 +39,7 @@ interface Policy {
   id: string
   name: string
   description: string
-  framework: string
+  complianceFramework: string
   severity: string
   action: string
   channels: string[]
@@ -77,7 +77,7 @@ export default function ConsoleDashboard() {
       }
       if (policiesRes.ok) {
         const pd = await policiesRes.json()
-        setPolicies(pd.policies || [])
+        setPolicies(pd.bundle?.policies || [])
       }
     } catch (e) { console.error('Fetch error:', e) }
     finally { setLoading(false) }
@@ -294,7 +294,7 @@ export default function ConsoleDashboard() {
                           <div className="font-medium">{p.name}</div>
                           <div className="text-xs text-gray-500">{p.description}</div>
                         </td>
-                        <td className="px-4 py-3 text-xs">{p.framework}</td>
+                        <td className="px-4 py-3 text-xs">{p.complianceFramework}</td>
                         <td className="px-4 py-3"><span className={`px-2 py-1 rounded text-xs font-medium text-white ${severityColor(p.severity)}`}>{p.severity}</span></td>
                         <td className="px-4 py-3 capitalize">{p.action}</td>
                         <td className="px-4 py-3 text-xs text-gray-400">{p.channels?.join(', ')}</td>
