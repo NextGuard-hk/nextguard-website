@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // === COMPLETE AGENT FEATURE CONFIGURATION ===
 // Organized by category matching Skyguard SecGator Endpoint specification
-const AGENT_CONFIG = {
+let AGENT_CONFIG = {
   configVersion: '2.0.0',
   lastUpdated: new Date().toISOString(),
 
@@ -230,4 +230,45 @@ export async function GET() {
     config: AGENT_CONFIG,
     summary: { totalFeatures, enabledFeatures, disabledFeatures: totalFeatures - enabledFeatures, byCategory: summary }
   })
+}
+
+
+// POST: Toggle feature enabled/disabled
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { featureId, enabled, categoryKey, featureKey } = body
+
+    if (!featureId && (!categoryKey || !featureKey)) {
+      return NextResponse.json({ success: false, error: 'featureId or categoryKey+featureKey required' }, { status: 400 })
+    }
+
+    // Find and toggle the feature
+    let found = false
+    const configEntries = Object.entries(AGENT_CONFIG).filter(([k]) => !['configVersion', 'lastUpdated'].includes(k))
+
+    for (const [catKey, catVal] of configEntries) {
+      if (typeof catVal === 'object' && catVal !== null && 'features' in catVal) {
+        const cat = catVal as { features: Record<string, { id: string; enabled: boolean }> }
+        for (const [fKey, feature] of Object.entries(cat.features)) {
+          if (feature.id === featureId || (catKey === categoryKey && fKey === featureKey)) {
+            feature.enabled = typeof enabled === 'boolean' ? enabled : !feature.enabled
+            found = true
+            AGENT_CONFIG.lastUpdated = new Date().toISOString()
+            return NextResponse.json({
+              success: true,
+              feature: { id: feature.id, enabled: feature.enabled },
+              message: `Feature ${feature.id} ${feature.enabled ? 'enabled' : 'disabled'}`
+            })
+          }
+        }
+      }
+    }
+
+    if (!found) {
+      return NextResponse.json({ success: false, error: 'Feature not found' }, { status: 404 })
+    }
+  } catch (e) {
+    return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
+  }
 }
