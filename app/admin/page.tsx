@@ -104,6 +104,7 @@ export default function AdminPage() {
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
     const [moveLoading, setMoveLoading] = useState(false)
   const [r2Budget, setR2Budget] = useState<any>(null)
+    const [aiRefreshKey, setAiRefreshKey] = useState(0)
   const [r2Loading, setR2Loading] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
@@ -563,7 +564,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
           <div className="flex gap-2">
-            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") { fetchDownloads(dlPath); fetchR2Budget() }; if (tab === "logs") fetchLogs() }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
+            <button onClick={() => { fetchContacts(); fetchRsvps(); if (tab === "downloads") { fetchDownloads(dlPath); fetchR2Budget() }; if (tab === "logs") fetchLogs(); if (tab === "ai") setAiRefreshKey(k => k + 1); if (tab === "accounts") fetchAccounts() }} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
             <button onClick={handleLogout} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm">Logout</button>
           </div>
         </div>
@@ -931,7 +932,7 @@ export default function AdminPage() {
 
           </div>
         )}
-            {tab === "ai" && <AIDashboard />}
+            {tab === "ai" && <AIDashboard key={aiRefreshKey} />}
     </div>
   )
 }
