@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import IdleTimer from "./IdleTimer"
+import AIDashboard from "./AIDashboard"
 
 interface Contact {
   id: string
@@ -65,7 +66,7 @@ export default function AdminPage() {
   const [totpLoading, setTotpLoading] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [totpExpiry, setTotpExpiry] = useState(0)
-    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog" | "tokens" | "accounts">("contacts")
+    const [tab, setTab] = useState<"contacts" | "rsvp" | "downloads" | "logs" | "news" | "syslog" | "tokens" | "accounts" | "ai">("contacts")
   const [contacts, setContacts] = useState<Contact[]>([])
   const [rsvps, setRsvps] = useState<Registration[]>([])
   const [dlItems, setDlItems] = useState<FileItem[]>([])
@@ -576,6 +577,7 @@ export default function AdminPage() {
                           <button onClick={() => { setTab("syslog"); fetchSyslogFiles() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "syslog" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Syslog</button>
                         <button onClick={() => { setTab("tokens"); fetchTokens(); fetchTokenRequests() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "tokens" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Tokens</button>
                         <button onClick={() => { setTab("accounts"); fetchAccounts() }} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "accounts" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>Accounts ({accounts.length})</button>
+                  <button onClick={() => setTab("ai")} className={"px-4 py-2 rounded-md text-sm font-medium transition-colors " + (tab === "ai" ? "bg-cyan-600 text-white" : "text-zinc-400 hover:text-white")}>AI Dashboard</button>
         </div>
 
         {tab === "contacts" && (
@@ -924,6 +926,8 @@ export default function AdminPage() {
                 </table>
               </div>
             )}
+
+                  {tab === "ai" && <AIDashboard />}
           </div>
         )}
     </div>
