@@ -116,7 +116,7 @@ export default function EmailDLPPage() {
   const [results, setResults] = useState<any>(null)
   const [latencies, setLatencies] = useState<any>(null)
   const [policyEnabled, setPolicyEnabled] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(DLP_POLICIES.map(p => [p.id, p.defaultOn]))
+    () => Object.fromEntries(DLP_POLICIES.map(p => [p.id, p.defaultOn])))
 
       // Enterprise DLP Settings
   const [direction, setDirection] = useState('outbound')
@@ -138,7 +138,6 @@ export default function EmailDLPPage() {
   const [evaluationMode, setEvaluationMode] = useState('first-match')
   const [quarantineReviewRequired, setQuarantineReviewRequired] = useState(true)
   const [logLevel, setLogLevel] = useState('detailed')
-  )
   const [severity, setSeverity] = useState('High')
   const [action, setAction] = useState('Block')
   const [showPolicyPanel, setShowPolicyPanel] = useState(false)
