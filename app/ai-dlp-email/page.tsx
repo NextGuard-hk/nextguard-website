@@ -84,6 +84,13 @@ const DLP_POLICIES = [
 
 const POLICY_CATEGORIES = ['PII', 'Financial', 'Confidential', 'Credentials', 'IP & Code', 'Compliance', 'Business']
 
+const SEVERITY_COLORS: Record<string, string> = {
+  CRITICAL: 'bg-red-600 text-white',
+  HIGH: 'bg-orange-600 text-white',
+  MEDIUM: 'bg-yellow-600 text-black',
+  LOW: 'bg-blue-600 text-white',
+}
+
 async function scanPart(content: string, engine: string, policyContext?: string) {
   const res = await fetch(`/api/ai-dlp-${engine === 'traditional' ? 'traditional' : engine === 'pplx' ? 'cloudflare' : 'cloudflare'}`, {
     method: 'POST',
@@ -107,7 +114,6 @@ export default function EmailDLPPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [results, setResults] = useState<any>(null)
   const [latencies, setLatencies] = useState<any>(null)
-  // Policy settings
   const [policyEnabled, setPolicyEnabled] = useState<Record<string, boolean>>(
     () => Object.fromEntries(DLP_POLICIES.map(p => [p.id, p.defaultOn]))
   )
@@ -189,8 +195,8 @@ export default function EmailDLPPage() {
     setScanning(false)
   }
 
-  // Helper to render a single engine result card
-  const renderEngineCard = (eng: 'traditional' | 'pplx' | 'cloudflare', label: string) => (
+  // Render AI engine result card (for pplx and cloudflare)
+  const renderAIEngineCard = (eng: 'pplx' | 'cloudflare', label: string) => (
     <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-sm">{label}</h3>
@@ -217,6 +223,68 @@ export default function EmailDLPPage() {
       })}
     </div>
   )
+
+  // Render Traditional DLP result card with policy hit details
+  const renderTraditionalCard = () => {
+    const eng = 'traditional'
+    return (
+      <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-sm">Perplexity Sonar</h3>
+          {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
+        </div>
+        {['subject', 'body', 'attachment'].map(part => {
+          const result = results[eng]?.[part]
+          if (!result) return null
+          return (
+            <div key={part} className="mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold text-zinc-400 uppercase">{part}</span>
+                {result.detected ? (
+                  <span className="text-xs px-1.5 py-0.5 bg-red-900/50 text-red-400 rounded">VIOLATION</span>
+                ) : (
+                  <span className="text-xs px-1.5 py-0.5 bg-green-900/50 text-green-400 rounded">CLEAN</span>
+                )}
+                {result.totalMatches > 0 && (
+                  <span className="text-xs text-zinc-500">{result.totalMatches} match{result.totalMatches > 1 ? 'es' : ''}</span>
+                )}
+              </div>
+              {/* Show method info */}
+              {result.method && (
+                <div className="text-xs text-zinc-600 mb-2 ml-2">{result.method}</div>
+              )}
+              {/* Show findings details */}
+              {result.findings && result.findings.length > 0 && (
+                <div className="ml-2 space-y-2">
+                  {result.findings.map((f: any, i: number) => (
+                    <div key={i} className="bg-zinc-800/80 border border-zinc-700/50 rounded p-2">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-bold text-white">{f.rule}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${SEVERITY_COLORS[f.severity] || 'bg-zinc-600 text-white'}`}>{f.severity}</span>
+                        <span className="text-xs px-1.5 py-0.5 bg-zinc-700 text-zinc-300 rounded">{f.category}</span>
+                        <span className="text-xs px-1.5 py-0.5 bg-zinc-700 text-zinc-300 rounded">Action: {f.action}</span>
+                        <span className="text-xs text-zinc-500">{f.count} hit{f.count > 1 ? 's' : ''}</span>
+                      </div>
+                      {f.matches && f.matches.length > 0 && (
+                        <div className="mt-1">
+                          <div className="text-xs text-zinc-500 mb-0.5">Matched:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {f.matches.map((m: string, j: number) => (
+                              <code key={j} className="text-xs bg-red-900/30 text-red-300 px-1.5 py-0.5 rounded font-mono">{m}</code>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -272,7 +340,6 @@ export default function EmailDLPPage() {
                 </div>
               </div>
             </div>
-            {/* Policy Categories */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {POLICY_CATEGORIES.map(cat => {
                 const policies = DLP_POLICIES.filter(p => p.category === cat)
@@ -345,14 +412,14 @@ export default function EmailDLPPage() {
               {/* LEFT: Traditional DLP */}
               <div>
                 <h3 className="text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Traditional DLP (Regex/Keyword)</h3>
-                {renderEngineCard('traditional', 'Perplexity Sonar')}
+                {renderTraditionalCard()}
               </div>
               {/* RIGHT: AI-Powered DLP */}
               <div>
                 <h3 className="text-sm font-bold text-cyan-400 mb-2 uppercase tracking-wider">AI-Powered DLP</h3>
                 <div className="space-y-4">
-                  {renderEngineCard('pplx', 'Perplexity Sonar Pro')}
-                  {renderEngineCard('cloudflare', 'Cloudflare Workers AI')}
+                  {renderAIEngineCard('pplx', 'Perplexity Sonar Pro')}
+                  {renderAIEngineCard('cloudflare', 'Cloudflare Workers AI')}
                 </div>
               </div>
             </div>
