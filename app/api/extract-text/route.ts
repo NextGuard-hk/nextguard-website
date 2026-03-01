@@ -4,14 +4,14 @@ export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_SIZE = 10 * 1024 * 1024 // 10MB
 
 // OCR via OCR.space free API (Vercel serverless compatible - no binary deps)
 async function ocrFromImage(buffer: Buffer, filename: string): Promise<string> {
   try {
     const base64 = buffer.toString('base64')
     const ext = filename.toLowerCase().split('.').pop() || 'png'
-    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png'
+    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'bmp' ? 'image/bmp' : ext === 'tiff' || ext === 'tif' ? 'image/tiff' : 'image/png'
     const body = new URLSearchParams({
       apikey: process.env.OCR_SPACE_API_KEY || 'helloworld',
       base64Image: `data:${mimeType};base64,${base64}`,
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const file = formData.get('file') as File
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    if (file.size > MAX_SIZE) return NextResponse.json({ error: `File too large. Maximum size is 5MB. Your file: ${(file.size / 1024 / 1024).toFixed(1)}MB` }, { status: 400 })
+    if (file.size > MAX_SIZE) return NextResponse.json({ error: `File too large. Maximum size is 10MB. Your file: ${(file.size / 1024 / 1024).toFixed(1)}MB` }, { status: 400 })
 
     const name = file.name.toLowerCase()
     const buffer = Buffer.from(await file.arrayBuffer())
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
         isScanned = true
         ocrText = await ocrFromPdf(buffer, file.name)
       }
-    } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
+    } else if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.bmp') || name.endsWith('.tiff') || name.endsWith('.tif')) {
       isScanned = true
       ocrText = await ocrFromImage(buffer, file.name)
     } else if (name.endsWith('.docx')) {
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     } else if (name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json') || name.endsWith('.xml') || name.endsWith('.log') || name.endsWith('.md') || name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sql') || name.endsWith('.yml') || name.endsWith('.yaml') || name.endsWith('.env') || name.endsWith('.cfg') || name.endsWith('.conf') || name.endsWith('.ini')) {
       rawText = buffer.toString('utf-8')
     } else {
-      return NextResponse.json({ error: `Unsupported file type: ${file.name}` }, { status: 400 })
+      rawText = `[Unsupported file type: ${file.name}. Please convert to a supported format (PDF, DOCX, XLSX, PPTX, JPG, PNG, TXT, CSV, JSON).]`
     }
 
     const displayText = ocrText || rawText || '[No text content extracted from file]'
