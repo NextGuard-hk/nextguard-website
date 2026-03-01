@@ -179,20 +179,23 @@ export default function EmailDLPPage() {
       ...(scanScope.body ? [{ key: 'body', content: emailBody }] : []),
       ...(scanScope.attachment ? [{ key: 'attachment', content: attachmentText }] : []),
     ]
-    const res: any = {}
-    const lat: any = {}
-    await Promise.all(engines.map(async (eng) => {
-      res[eng] = {}
+        setResults({})
+    setLatencies({})
+    let done = 0
+    const total = engines.length
+    engines.forEach(async (eng) => {
+      const engRes: any = {}
       const t0 = performance.now()
       await Promise.all(parts.map(async (p) => {
-        try { res[eng][p.key] = await scanPart(p.content, eng, policyContext) }
-        catch { res[eng][p.key] = { detected: false, error: true, summary: 'Scan failed' } }
+        try { engRes[p.key] = await scanPart(p.content, eng, policyContext) }
+        catch { engRes[p.key] = { detected: false, error: true, summary: 'Scan failed' } }
       }))
-      lat[eng] = Math.round(performance.now() - t0)
-    }))
-    setResults(res)
-    setLatencies(lat)
-    setScanning(false)
+      const engLat = Math.round(performance.now() - t0)
+      setResults(prev => ({ ...(prev || {}), [eng]: engRes }))
+      setLatencies(prev => ({ ...(prev || {}), [eng]: engLat }))
+      done++
+      if (done === total) setScanning(false)
+    })
   }
 
   // Render AI engine result card (for pplx and cloudflare)
