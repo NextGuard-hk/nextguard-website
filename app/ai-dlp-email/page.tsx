@@ -221,6 +221,32 @@ export default function EmailDLPPage() {
             {result.detected && result.summary && (
               <div className="text-xs text-zinc-500 mt-1 ml-2">{result.summary}</div>
             )}
+                          {result.detected && result.findings && result.findings.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {result.findings.map((f: any, i: number) => (
+                    <div key={i} className="bg-zinc-800 border border-zinc-700 rounded p-2">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="font-bold text-zinc-200">{f.type}</span>
+                        {f.confidence && <span className="px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-300">{f.confidence}% conf</span>}
+                        {f.action && <span className="px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-300">Action: {f.action}</span>}
+                        {f.evasion_technique && f.evasion_technique !== 'none' && <span className="px-1.5 py-0.5 rounded bg-yellow-800 text-yellow-200">Evasion: {f.evasion_technique}</span>}
+                      </div>
+                      {f.original_text && (
+                        <div className="mt-1">
+                          <span className="text-xs text-zinc-500">Found:</span>
+                          <code className="ml-1 text-xs bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded">{f.original_text}</code>
+                        </div>
+                      )}
+                      {f.decoded_value && f.decoded_value !== f.original_text && (
+                        <div className="mt-1">
+                          <span className="text-xs text-zinc-500">Decoded:</span>
+                          <code className="ml-1 text-xs bg-orange-900/40 text-orange-300 px-1.5 py-0.5 rounded">{f.decoded_value}</code>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
           </div>
         )
       })}
