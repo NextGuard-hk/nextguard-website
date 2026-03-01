@@ -110,7 +110,7 @@ export default function AdminPage() {
   useEffect(() => { checkAuth() }, [])
 
   async function checkAuth() {
-    try { const r = await fetch("/api/contact/auth"); if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps() } } catch {} finally { setChecking(false) }
+    try { const r = await fetch("/api/contact/auth"); if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps(); fetchAccounts() } } catch {} finally { setChecking(false) }
   }
 
   async function sendCode() {
@@ -130,7 +130,7 @@ export default function AdminPage() {
     try {
       const r = await fetch("/api/contact/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, totpCode }) })
       const d = await r.json()
-      if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps() } else setError(d.message || "Login failed")
+      if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps(); fetchAccounts() } else setError(d.message || "Login failed")
     } catch { setError("Network error") } finally { setLoading(false) }
   }
 
