@@ -30,6 +30,7 @@ export function Header() {
         { href: "/news/ai-feed", label: t.nav.aiFeed || "AI News" },
     { href: "https://kb.next-guard.com", label: t.nav.kb },
         { href: "/soc-review", label: "AI SOC" },
+        { href: "/web-dlp-compare", label: "Web DLP" },
     { href: "/console", label: "Console" },
   ]
   const languages: { code: Locale; label: string }[] = [
