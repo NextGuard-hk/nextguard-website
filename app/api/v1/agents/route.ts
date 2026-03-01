@@ -1,16 +1,12 @@
 // Main Agents API - GET /api/v1/agents
 // Returns list of registered agents for Console dashboard
+// Shares globalThis.__nextguard_agents with register and heartbeat routes
 import { NextResponse } from 'next/server'
 
-function getAgents(): Record<string, any> {
-  if (!(globalThis as any).__nextguard_agents) {
-    (globalThis as any).__nextguard_agents = {}
-  }
-  return (globalThis as any).__nextguard_agents
-}
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const agents = getAgents()
+  const agents: Record<string, any> = (globalThis as any).__nextguard_agents || {}
   const agentList = Object.values(agents)
 
   // Mark offline if no heartbeat in 5 minutes
@@ -21,14 +17,14 @@ export async function GET() {
 
   // Map to Console-expected format
   const mapped = agentList.map((a: any) => ({
-    id: a.agentId,
+    id: a.agentId || a.deviceId || 'unknown',
     hostname: a.hostname || 'unknown',
     username: a.username || 'unknown',
     os: a.os || 'unknown',
     version: a.agentVersion || 'unknown',
     status: a.status || 'offline',
-    lastHeartbeat: a.lastHeartbeat,
-    registeredAt: a.registeredAt,
+    lastHeartbeat: a.lastHeartbeat || '',
+    registeredAt: a.registeredAt || '',
     ip: a.ipAddress || '',
   }))
 
