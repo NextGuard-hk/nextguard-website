@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const SAMPLE_CATEGORIES = [
   {
@@ -228,6 +228,19 @@ export default function ComparePage() {
   const [virusScanning, setVirusScanning] = useState(false)
   const [virusScanResult, setVirusScanResult] = useState<{safe: boolean; message: string; skipped?: boolean} | null>(null)
   const BINARY_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.pptx', '.jpg', '.jpeg', '.png']
+
+    // Pre-warm Cloudflare Workers AI on page load to avoid cold start
+  useEffect(() => {
+    const warmup = async () => {
+      try {
+        await fetch('/api/warmup-cloudflare')
+        console.log('Cloudflare AI pre-warmed successfully')
+      } catch (e) {
+        console.warn('Cloudflare AI warmup failed:', e)
+      }
+    }
+    warmup()
+  }, [])
   const MAX_FILE_SIZE = 5 * 1024 * 1024
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
