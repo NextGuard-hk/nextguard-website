@@ -121,7 +121,7 @@ export default function ConsoleDashboard() {
       if (incidentsRes.ok) { const d = await incidentsRes.json(); setIncidents(d.incidents || []); setIncidentStats(d.stats || null) }
       if (policiesRes.ok) { const d = await policiesRes.json(); setPolicies(d.bundle?.policies || []); if (d.aiConfig?.globalDetectionMode) setGlobalDetectionMode(d.aiConfig.globalDetectionMode) }
       if (configRes.ok) { const d = await configRes.json(); setAgentConfig(d.config || null); setConfigSummary(d.summary || null) }
-              if (syslogRes.ok) { const d = await syslogRes.json(); setSyslogEntries(d.entries || []); setSyslogStats(d.stats || null); setSyslogFacilities(d.facilities || []) }
+              if (syslogRes.ok) { const d = await syslogRes.json(); setSyslogEntries(d.logs || []); setSyslogStats(d.stats || null); setSyslogFacilities(d.facilities || []) }
       setLastRefresh(new Date())
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [])
