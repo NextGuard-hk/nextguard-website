@@ -109,6 +109,17 @@ export default function ConsoleDashboard() {
   useEffect(() => { fetchData() }, [fetchData])
   useEffect(() => { const t = setInterval(fetchData, 30000); return () => clearInterval(t) }, [fetchData])
 
+  const toggleFeature = async (featureId: string, currentEnabled: boolean) => {
+    try {
+      const res = await fetch(`${API_BASE}/agent-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ featureId, enabled: !currentEnabled })
+      })
+      if (res.ok) { fetchData() }
+    } catch (e) { console.error(e) }
+  }
+
   const onlineAgents = agents.filter(a => a.status === 'online').length
   const offlineAgents = agents.filter(a => a.status === 'offline').length
   const criticalIncidents = incidents.filter(i => i.severity === 'critical').length
@@ -394,7 +405,7 @@ export default function ConsoleDashboard() {
                         </div>
                         <div className="flex items-center gap-3 ml-4">
                           {feature.action && <span className="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400">{feature.action}</span>}
-                          <div className={`w-10 h-5 rounded-full flex items-center transition-colors cursor-pointer ${feature.enabled ? 'bg-green-500/30 justify-end' : 'bg-gray-700 justify-start'}`}>
+                          <div  onClick={() => toggleFeature(feature.id, feature.enabled)}className={`w-10 h-5 rounded-full flex items-center transition-colors cursor-pointer ${feature.enabled ? 'bg-green-500/30 justify-end' : 'bg-gray-700 justify-start'}`}>
                             <div className={`w-4 h-4 rounded-full mx-0.5 ${feature.enabled ? 'bg-green-400' : 'bg-gray-500'}`} />
                           </div>
                           <span className={`text-xs px-2 py-0.5 rounded ${feature.enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{feature.enabled ? 'ON' : 'OFF'}</span>
