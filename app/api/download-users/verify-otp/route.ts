@@ -16,6 +16,7 @@ interface DownloadUser {
   lastLogin?: string
   loginCount: number
   mustResetPassword?: boolean
+  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean }
 }
 async function writeLog(entry: Record<string, string>) {
   try {
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
       company: user.company,
       contactName: user.contactName,
       mustResetPassword: user.mustResetPassword || false,
+      permissions: user.permissions || { kb: false, download: true, socReview: false },
     })
     // Set download user session cookie (24 hours)
     res.cookies.set('download_user_session', sessionToken, {

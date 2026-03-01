@@ -75,6 +75,7 @@ export default function SocAuthWrapper({ children }: { children: React.ReactNode
       const res = await fetch("/api/download-users/verify-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, otp: otpCode }) })
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Verification failed."); return }
+        if (data.permissions && !data.permissions.socReview) { setError("Your account does not have permission to access AI SOC. Please contact your administrator."); return }
       if (data.mustResetPassword) {
         setAuthStep("force-reset-password")
       } else {
