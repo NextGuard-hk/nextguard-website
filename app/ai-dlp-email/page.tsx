@@ -230,7 +230,7 @@ export default function EmailDLPPage() {
     return (
       <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-sm">Perplexity Sonar</h3>
+          <h3 className="font-bold text-sm">Regex + Keyword Engine</h3>
           {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
         </div>
         {['subject', 'body', 'attachment'].map(part => {
