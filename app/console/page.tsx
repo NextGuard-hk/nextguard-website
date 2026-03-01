@@ -69,10 +69,21 @@ interface AgentConfigData {
   [key: string]: unknown
 }
 
+interface SyslogEntry {
+  id: string
+  timestamp: string
+  level: string
+  facility: string
+  source: string
+  hostname: string
+  message: string
+  details?: Record<string, unknown>
+}
+
 const API_BASE = '/api/v1'
 
 export default function ConsoleDashboard() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agents' | 'policies' | 'incidents' | 'reports' | 'configuration'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agents' | 'policies' | 'incidents' | 'reports' | 'configuration' | 'logs'>('dashboard')
   const [agents, setAgents] = useState<Agent[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
@@ -92,16 +103,25 @@ export default function ConsoleDashboard() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [agentsRes, incidentsRes, policiesRes, configRes] = await Promise.all([
+  const [syslogEntries, setSyslogEntries] = useState<SyslogEntry[]>([])
+  const [syslogStats, setSyslogStats] = useState<{total: number; byLevel: Record<string, number>; byFacility: Record<string, number>} | null>(null)
+  const [syslogFacilities, setSyslogFacilities] = useState<string[]>([])
+  const [logLevel, setLogLevel] = useState('all')
+  const [logFacility, setLogFacility] = useState('all')
+  const [logSearch, setLogSearch] = useState('')
+  const [expandedLog, setExpandedLog] = useState<string | null>(null)
+      const [agentsRes, incidentsRes, policiesRes, configRes, syslogRes] = await Promise.all([
         fetch(`${API_BASE}/agents`),
         fetch(`${API_BASE}/incidents`),
         fetch(`${API_BASE}/policies/bundle`),
-        fetch(`${API_BASE}/agent-config`)
+        fetch(`${API_BASE}/agent-config`),
+        fetch(`${API_BASE}/syslog`)
       ])
       if (agentsRes.ok) { const d = await agentsRes.json(); setAgents(d.agents || []) }
       if (incidentsRes.ok) { const d = await incidentsRes.json(); setIncidents(d.incidents || []); setIncidentStats(d.stats || null) }
       if (policiesRes.ok) { const d = await policiesRes.json(); setPolicies(d.bundle?.policies || []); if (d.aiConfig?.globalDetectionMode) setGlobalDetectionMode(d.aiConfig.globalDetectionMode) }
       if (configRes.ok) { const d = await configRes.json(); setAgentConfig(d.config || null); setConfigSummary(d.summary || null) }
+              if (syslogRes.ok) { const d = await syslogRes.json(); setSyslogEntries(d.entries || []); setSyslogStats(d.stats || null); setSyslogFacilities(d.facilities || []) }
       setLastRefresh(new Date())
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [])
@@ -191,7 +211,7 @@ export default function ConsoleDashboard() {
             {tabBtn('agents', `Agents (${agents.length})`)}
             {tabBtn('policies', `Policies (${policies.length})`)}
             {tabBtn('incidents', `Incidents (${incidents.length})`)}
-            {tabBtn('reports', 'Reports')}
+            {tabBtn('reports', 'Reports')}             {tabBtn('syslog', 'Syslog')}             {tabBtn('config', 'Config')}
             {tabBtn('configuration', `Configuration (${configSummary?.totalFeatures || 0})`)}
           </div>
         </div>
@@ -417,6 +437,73 @@ export default function ConsoleDashboard() {
               )
             })}
             {filteredConfigCategories.length === 0 && <p className="text-gray-500 text-sm text-center py-8">No features match your search</p>}
+          </div>
+        )}
+
+                {activeTab === 'syslog' && (
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap">
+              <input value={logSearch} onChange={e => setLogSearch(e.target.value)} placeholder="Search syslog..." className="flex-1 min-w-48 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-cyan-500" />
+              <select value={logLevel} onChange={e => setLogLevel(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none">
+                <option value="all">All Levels</option>
+                <option value="emergency">Emergency</option>
+                <option value="alert">Alert</option>
+                <option value="critical">Critical</option>
+                <option value="error">Error</option>
+                <option value="warning">Warning</option>
+                <option value="notice">Notice</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+              </select>
+              <select value={logFacility} onChange={e => setLogFacility(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none">
+                <option value="all">All Facilities</option>
+                {syslogFacilities.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            {syslogStats && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                  <p className="text-xs text-gray-500 mb-1">Total Entries</p>
+                  <p className="text-2xl font-bold">{syslogStats.total}</p>
+                </div>
+                <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                  <p className="text-xs text-gray-500 mb-1">By Level</p>
+                  <div className="flex flex-wrap gap-1 mt-1">{syslogStats.byLevel && Object.entries(syslogStats.byLevel).map(([k,v]) => <span key={k} className="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">{k}: {v}</span>)}</div>
+                </div>
+                <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                  <p className="text-xs text-gray-500 mb-1">By Facility</p>
+                  <div className="flex flex-wrap gap-1 mt-1">{syslogStats.byFacility && Object.entries(syslogStats.byFacility).map(([k,v]) => <span key={k} className="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">{k}: {v}</span>)}</div>
+                </div>
+              </div>
+            )}
+            <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-gray-800 text-gray-500 text-xs">
+                  <th className="text-left p-3">Time</th>
+                  <th className="text-left p-3">Level</th>
+                  <th className="text-left p-3">Facility</th>
+                  <th className="text-left p-3">Host</th>
+                  <th className="text-left p-3">Message</th>
+                </tr></thead>
+                <tbody>
+                  {syslogEntries.filter(e => {
+                    const matchLevel = logLevel === 'all' || e.level === logLevel
+                    const matchFacility = logFacility === 'all' || e.facility === logFacility
+                    const matchSearch = !logSearch || e.message?.toLowerCase().includes(logSearch.toLowerCase()) || e.hostname?.toLowerCase().includes(logSearch.toLowerCase())
+                    return matchLevel && matchFacility && matchSearch
+                  }).slice(0, 100).map((entry, i) => (
+                    <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="p-3 text-xs text-gray-500 whitespace-nowrap">{new Date(entry.timestamp).toLocaleString()}</td>
+                      <td className="p-3"><span className={`text-xs px-2 py-0.5 rounded ${entry.level === 'error' || entry.level === 'critical' || entry.level === 'emergency' ? 'bg-red-500/20 text-red-400' : entry.level === 'warning' || entry.level === 'alert' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-400'}`}>{entry.level}</span></td>
+                      <td className="p-3 text-xs text-gray-400">{entry.facility}</td>
+                      <td className="p-3 text-xs text-gray-400">{entry.hostname}</td>
+                      <td className="p-3 text-xs text-gray-300 max-w-md truncate cursor-pointer" onClick={() => setExpandedLog(expandedLog === entry.id ? null : entry.id)}>{entry.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {syslogEntries.length === 0 && <p className="text-gray-500 text-sm text-center py-8">No syslog entries. Configure agents to forward syslog data.</p>}
+            </div>
           </div>
         )}
 
