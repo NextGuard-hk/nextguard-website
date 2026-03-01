@@ -83,10 +83,10 @@ interface SyslogEntry {
 const API_BASE = '/api/v1'
 
 export default function ConsoleDashboard() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'agents' | 'policies' | 'incidents' | 'reports' | 'configuration' | 'logs'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'agents' | 'policies' | 'incidents' | 'reports' | 'configuration' | 'syslog' | 'config'>('dashboard')
   const [agents, setAgents] = useState<Agent[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
-  const [policies, setPolicies] = useState<Policy[]>([])
+    const [policies, setPolicies] = useState<Policy[]>([])
   const [incidentStats, setIncidentStats] = useState<IncidentStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(new Date())
@@ -100,16 +100,16 @@ export default function ConsoleDashboard() {
   const [configSearch, setConfigSearch] = useState('')
   const [configCategory, setConfigCategory] = useState('all')
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true)
-  const [syslogEntries, setSyslogEntries] = useState<SyslogEntry[]>([])
+    const [syslogEntries, setSyslogEntries] = useState<SyslogEntry[]>([])
   const [syslogStats, setSyslogStats] = useState<{total: number; byLevel: Record<string, number>; byFacility: Record<string, number>} | null>(null)
   const [syslogFacilities, setSyslogFacilities] = useState<string[]>([])
   const [logLevel, setLogLevel] = useState('all')
   const [logFacility, setLogFacility] = useState('all')
   const [logSearch, setLogSearch] = useState('')
   const [expandedLog, setExpandedLog] = useState<string | null>(null)
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
       const [agentsRes, incidentsRes, policiesRes, configRes, syslogRes] = await Promise.all([
         fetch(`${API_BASE}/agents`),
         fetch(`${API_BASE}/incidents`),
