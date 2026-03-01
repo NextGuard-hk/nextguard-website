@@ -60,13 +60,13 @@ function ScanResultBadge({ label, result }: { label: string; result: any }) {
   return (
     <div className="mb-2">
       <div className={`text-xs font-bold ${result.detected ? 'text-red-400' : 'text-green-400'}`}>
-        {label}: {result.detected ? '\u26a0\ufe0f VIOLATION' : '\u2705 CLEAN'}
+        {label}: {result.detected ? '⚠️ VIOLATION' : '✅ CLEAN'}
       </div>
       {result.detected && result.findings && result.findings.length > 0 && (
         <div className="ml-2 mt-1">
           {result.findings.slice(0, 5).map((f: any, i: number) => (
             <div key={i} className="text-xs text-zinc-400">
-              \u2022 <span className="text-orange-400">{f.rule || f.type}</span>
+              • <span className="text-orange-400">{f.rule || f.type}</span>
               {f.matches && <span className="text-zinc-500"> ({f.matches.slice(0, 3).join(', ')})</span>}
               {f.confidence && <span className="text-zinc-500"> {f.confidence}%</span>}
             </div>
@@ -176,7 +176,7 @@ export default function EmailDLPPage() {
   return (
     <div className="min-h-screen bg-black text-white pt-24 px-4 pb-12">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-cyan-400 mb-2 text-center">\ud83d\udce7 Email DLP Simulation</h1>
+        <h1 className="text-3xl font-bold text-cyan-400 mb-2 text-center">📧 Email DLP Simulation</h1>
         <p className="text-zinc-400 mb-6 text-center">Simulate sending an email with Subject, Body & Attachment — DLP scans each part separately</p>
 
         {/* Scenario Selector */}
@@ -191,7 +191,7 @@ export default function EmailDLPPage() {
 
         {/* Email Compose Form */}
         <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 mb-4">
-          <div className="text-lg font-bold text-white mb-4">\u2709\ufe0f Compose Email</div>
+          <div className="text-lg font-bold text-white mb-4">✉️ Compose Email</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <div>
               <label className="text-xs text-zinc-500">From:</label>
@@ -211,26 +211,25 @@ export default function EmailDLPPage() {
             <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Email body content..." className="w-full h-32 bg-zinc-800 border border-yellow-700 rounded px-3 py-2 text-sm text-white mt-1 font-mono" />
           </div>
           <div className="mb-3">
-            <label className="text-xs text-zinc-500">\ud83d\udcce Attachment: <span className="text-yellow-500">(DLP extracts & scans file content)</span></label>
+            <label className="text-xs text-zinc-500">📎 Attachment: <span className="text-yellow-500">(DLP extracts & scans file content)</span></label>
             <div className="flex items-center gap-3 mt-1">
               <input ref={fileInputRef} type="file" accept=".txt,.csv,.json,.xml,.pdf,.docx,.xlsx,.xls,.pptx,.jpg,.jpeg,.png" onChange={handleAttachment} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">\ud83d\udcc2 Attach File</button>
-              {attachmentName && <span className="text-xs text-cyan-400">\ud83d\udcc4 {attachmentName}</span>}
+              <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors">📂 Attach File</button>
+              {attachmentName && <span className="text-xs text-cyan-400">📄 {attachmentName}</span>}
               {extracting && <span className="text-xs text-yellow-400 animate-pulse">Extracting text...</span>}
-              {attachmentText && !extracting && <span className="text-xs text-green-400">\u2705 {attachmentText.length} chars extracted</span>}
+              {attachmentText && !extracting && <span className="text-xs text-green-400">✅ {attachmentText.length} chars extracted</span>}
             </div>
             {selectedScenario && !attachmentName && (
-              <div className="text-xs text-zinc-600 mt-1">\ud83d\udca1 {EMAIL_SCENARIOS.find(s => s.name === selectedScenario)?.attachmentHint}</div>
+              <div className="text-xs text-zinc-600 mt-1">💡 {EMAIL_SCENARIOS.find(s => s.name === selectedScenario)?.attachmentHint}</div>
             )}
           </div>
           <button onClick={runEmailScan} disabled={!hasContent || scanning || extracting} className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 text-white font-bold py-3 px-8 rounded-xl transition">
-            {scanning ? '\ud83d\udd0d Scanning Email...' : '\ud83d\udd0d Scan Email Before Sending'}
+            {scanning ? '🔍 Scanning Email...' : '🔍 Scan Email Before Sending'}
           </button>
         </div>
 
         {/* Results */}
-        {scanning && <div className="text-cyan-400 animate-pulse text-center py-8 text-lg">\ud83d\udd0d Scanning Subject, Body & Attachment across all 3 engines...</div>}
-
+        {scanning && <div className="text-cyan-400 animate-pulse text-center py-8 text-lg">🔍 Scanning Subject, Body & Attachment across all 3 engines...</div>}
         {results && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Traditional DLP */}
@@ -238,27 +237,27 @@ export default function EmailDLPPage() {
               <h3 className="text-lg font-bold text-white mb-1">Traditional DLP</h3>
               <div className="text-xs text-zinc-500 mb-1">Regex + Dictionary</div>
               {latencies?.traditional && <div className="text-xl font-mono font-bold text-green-400 mb-3">{latencies.traditional}ms</div>}
-              <ScanResultBadge label="\ud83d\udccc Subject" result={results.traditional?.subject} />
-              <ScanResultBadge label="\ud83d\udcdd Body" result={results.traditional?.body} />
-              <ScanResultBadge label="\ud83d\udcce Attachment" result={results.traditional?.attachment} />
+              <ScanResultBadge label="📌 Subject" result={results.traditional?.subject} />
+              <ScanResultBadge label="📝 Body" result={results.traditional?.body} />
+              <ScanResultBadge label="📎 Attachment" result={results.traditional?.attachment} />
             </div>
             {/* Perplexity Sonar */}
             <div className="bg-zinc-900 border border-cyan-600 rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-1">Perplexity Sonar</h3>
               <div className="text-xs text-zinc-500 mb-1">Cloud AI - high accuracy</div>
               {latencies?.pplx && <div className="text-xl font-mono font-bold text-cyan-400 mb-3">{(latencies.pplx / 1000).toFixed(2)}s</div>}
-              <ScanResultBadge label="\ud83d\udccc Subject" result={results.pplx?.subject} />
-              <ScanResultBadge label="\ud83d\udcdd Body" result={results.pplx?.body} />
-              <ScanResultBadge label="\ud83d\udcce Attachment" result={results.pplx?.attachment} />
+              <ScanResultBadge label="📌 Subject" result={results.pplx?.subject} />
+              <ScanResultBadge label="📝 Body" result={results.pplx?.body} />
+              <ScanResultBadge label="📎 Attachment" result={results.pplx?.attachment} />
             </div>
             {/* Cloudflare Workers AI */}
             <div className="bg-zinc-900 border border-purple-600 rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-1">Cloudflare Workers AI</h3>
               <div className="text-xs text-zinc-500 mb-1">Edge AI - data stays local</div>
               {latencies?.cloudflare && <div className="text-xl font-mono font-bold text-purple-400 mb-3">{(latencies.cloudflare / 1000).toFixed(2)}s</div>}
-              <ScanResultBadge label="\ud83d\udccc Subject" result={results.cloudflare?.subject} />
-              <ScanResultBadge label="\ud83d\udcdd Body" result={results.cloudflare?.body} />
-              <ScanResultBadge label="\ud83d\udcce Attachment" result={results.cloudflare?.attachment} />
+              <ScanResultBadge label="📌 Subject" result={results.cloudflare?.subject} />
+              <ScanResultBadge label="📝 Body" result={results.cloudflare?.body} />
+              <ScanResultBadge label="📎 Attachment" result={results.cloudflare?.attachment} />
             </div>
           </div>
         )}
@@ -266,7 +265,7 @@ export default function EmailDLPPage() {
         {/* Summary */}
         {results && latencies && (
           <div className="mt-8 bg-zinc-900 border border-zinc-700 rounded-xl p-6">
-            <h3 className="text-lg font-bold mb-4">\ud83d\udcca Email DLP Performance Summary</h3>
+            <h3 className="text-lg font-bold mb-4">📊 Email DLP Performance Summary</h3>
             <div className="grid grid-cols-3 gap-4 text-center mb-4">
               <div>
                 <div className="text-2xl font-mono font-bold text-green-400">{latencies.traditional}ms</div>
@@ -289,7 +288,7 @@ export default function EmailDLPPage() {
 
         {/* Back Link */}
         <div className="mt-6 text-center">
-          <a href="/ai-dlp-compare" className="text-cyan-400 hover:text-cyan-300 text-sm">\u2190 Back to DLP Engine Comparison (Text Mode)</a>
+          <a href="/ai-dlp-compare" className="text-cyan-400 hover:text-cyan-300 text-sm">← Back to DLP Engine Comparison (Text Mode)</a>
         </div>
       </div>
     </div>
