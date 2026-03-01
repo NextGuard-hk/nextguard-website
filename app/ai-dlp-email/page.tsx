@@ -111,11 +111,10 @@ export default function EmailDLPPage() {
   const [policyEnabled, setPolicyEnabled] = useState<Record<string, boolean>>(
     () => Object.fromEntries(DLP_POLICIES.map(p => [p.id, p.defaultOn]))
   )
-  const [severity, setSeverity] = useState<string>('High')
-  const [action, setAction] = useState<string>('Block')
+  const [severity, setSeverity] = useState('High')
+  const [action, setAction] = useState('Block')
   const [showPolicyPanel, setShowPolicyPanel] = useState(false)
   const [scanScope, setScanScope] = useState({ subject: true, body: true, attachment: true })
-
   const enabledPolicySummary = DLP_POLICIES.filter(p => policyEnabled[p.id]).map(p => p.label)
 
   useEffect(() => {
@@ -133,9 +132,7 @@ export default function EmailDLPPage() {
       const res = await fetch('/api/ai-dlp/extract', { method: 'POST', body: formData })
       const data = await res.json()
       setAttachmentText(data.text || '')
-    } catch {
-      setAttachmentText('[Extraction failed]')
-    }
+    } catch { setAttachmentText('[Extraction failed]') }
     setExtracting(false)
   }
 
@@ -182,11 +179,8 @@ export default function EmailDLPPage() {
       res[eng] = {}
       const t0 = performance.now()
       await Promise.all(parts.map(async (p) => {
-        try {
-          res[eng][p.key] = await scanPart(p.content, eng, policyContext)
-        } catch {
-          res[eng][p.key] = { detected: false, error: true, summary: 'Scan failed' }
-        }
+        try { res[eng][p.key] = await scanPart(p.content, eng, policyContext) }
+        catch { res[eng][p.key] = { detected: false, error: true, summary: 'Scan failed' } }
       }))
       lat[eng] = Math.round(performance.now() - t0)
     }))
@@ -195,83 +189,109 @@ export default function EmailDLPPage() {
     setScanning(false)
   }
 
+  // Helper to render a single engine result card
+  const renderEngineCard = (eng: 'traditional' | 'pplx' | 'cloudflare', label: string) => (
+    <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-sm">{label}</h3>
+        {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
+      </div>
+      {['subject', 'body', 'attachment'].map(part => {
+        const result = results[eng]?.[part]
+        if (!result) return null
+        return (
+          <div key={part} className="mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-zinc-400 uppercase">{part}</span>
+              {result.detected ? (
+                <span className="text-xs px-1.5 py-0.5 bg-red-900/50 text-red-400 rounded">VIOLATION</span>
+              ) : (
+                <span className="text-xs px-1.5 py-0.5 bg-green-900/50 text-green-400 rounded">CLEAN</span>
+              )}
+            </div>
+            {result.detected && result.summary && (
+              <div className="text-xs text-zinc-500 mt-1 ml-2">{result.summary}</div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold mb-1">Email DLP Scanning Demo</h1>
-        <p className="text-zinc-400 text-sm mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Perplexity Sonar), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
+    <div className="min-h-screen bg-black text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Email DLP Scanning Demo</h1>
+        <p className="text-sm text-zinc-400 mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Perplexity Sonar), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
 
         {/* Scenario Selector */}
         <div className="mb-4">
           <label className="text-xs text-zinc-400 block mb-1">Load Test Scenario</label>
-          <select value={selectedScenario} onChange={e => loadScenario(Number(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm">
+          <select value={selectedScenario} onChange={e => loadScenario(Number(e.target.value))} className="w-full sm:w-96 bg-zinc-800 border border-cyan-500 rounded px-3 py-2 text-sm">
             <option value="">-- Select a scenario --</option>
             {EMAIL_SCENARIOS.map((s, i) => <option key={i} value={i}>{s.name}</option>)}
           </select>
         </div>
 
         {/* Policy Settings Toggle */}
-        <div className="mb-4">
-          <button onClick={() => setShowPolicyPanel(!showPolicyPanel)} className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300">
-            <span>{showPolicyPanel ? '\u25BC' : '\u25B6'}</span>
-            <span>DLP Policy Settings</span>
-            <span className="text-xs text-zinc-500">({enabledPolicySummary.length}/{DLP_POLICIES.length} policies active)</span>
-          </button>
-        </div>
+        <button onClick={() => setShowPolicyPanel(!showPolicyPanel)} className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 mb-4">
+          <span>{showPolicyPanel ? '\u25BC' : '\u25B6'}</span>
+          <span>DLP Policy Settings</span>
+          <span className="text-zinc-500">({enabledPolicySummary.length}/{DLP_POLICIES.length} policies active)</span>
+        </button>
 
         {/* Policy Panel */}
         {showPolicyPanel && (
-          <div className="mb-6 bg-zinc-900 border border-zinc-700 rounded-lg p-4">
-            <div className="flex flex-wrap gap-4 mb-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <div>
-                <span className="text-xs text-zinc-400 block mb-1">Severity Level</span>
-                <div className="flex gap-1">
+                <label className="text-xs text-zinc-400 block mb-1">Severity Level</label>
+                <div className="flex gap-1 flex-wrap">
                   {['Low','Medium','High','Critical'].map(s => (
                     <button key={s} onClick={() => setSeverity(s)} className={`px-2 py-1 text-xs rounded ${severity === s ? 'bg-cyan-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>{s}</button>
                   ))}
                 </div>
               </div>
               <div>
-                <span className="text-xs text-zinc-400 block mb-1">Action</span>
-                <div className="flex gap-1">
+                <label className="text-xs text-zinc-400 block mb-1">Action</label>
+                <div className="flex gap-1 flex-wrap">
                   {['Monitor','Warn','Block','Quarantine'].map(a => (
                     <button key={a} onClick={() => setAction(a)} className={`px-2 py-1 text-xs rounded ${action === a ? 'bg-cyan-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>{a}</button>
                   ))}
                 </div>
               </div>
               <div>
-                <span className="text-xs text-zinc-400 block mb-1">Scan Scope</span>
-                <div className="flex gap-2">
+                <label className="text-xs text-zinc-400 block mb-1">Scan Scope</label>
+                <div className="flex gap-3 flex-wrap">
                   {(['subject','body','attachment'] as const).map(s => (
-                    <label key={s} className="flex items-center gap-1 text-xs cursor-pointer">
+                    <label key={s} className="flex items-center gap-1 text-xs">
                       <input type="checkbox" checked={scanScope[s]} onChange={() => setScanScope(prev => ({ ...prev, [s]: !prev[s] }))} />
-                      <span className="text-zinc-300 capitalize">{s}</span>
+                      <span>{s}</span>
                     </label>
                   ))}
                 </div>
               </div>
             </div>
-
             {/* Policy Categories */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {POLICY_CATEGORIES.map(cat => {
                 const policies = DLP_POLICIES.filter(p => p.category === cat)
                 const enabledCount = policies.filter(p => policyEnabled[p.id]).length
                 return (
-                  <div key={cat} className="bg-zinc-800 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-zinc-300">{cat}</span>
+                  <div key={cat} className="bg-zinc-800 rounded p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold">{cat}</span>
                       <button onClick={() => toggleCategory(cat)} className="text-xs text-cyan-400 hover:text-cyan-300">
                         {enabledCount === policies.length ? 'Disable All' : 'Enable All'}
                       </button>
                     </div>
                     {policies.map(p => (
-                      <label key={p.id} className="flex items-center gap-2 py-0.5 cursor-pointer">
+                      <label key={p.id} className="flex items-center gap-1 text-xs mb-0.5">
                         <input type="checkbox" checked={policyEnabled[p.id]} onChange={() => setPolicyEnabled(prev => ({ ...prev, [p.id]: !prev[p.id] }))} />
-                        <span className={`text-xs ${policyEnabled[p.id] ? 'text-zinc-200' : 'text-zinc-600'}`}>{p.label}</span>
+                        <span>{p.label}</span>
                       </label>
                     ))}
-                    <div className="text-xs text-zinc-600 mt-1">{enabledCount}/{policies.length} active</div>
+                    <div className="text-xs text-zinc-500 mt-1">{enabledCount}/{policies.length} active</div>
                   </div>
                 )
               })}
@@ -280,8 +300,8 @@ export default function EmailDLPPage() {
         )}
 
         {/* Email Form */}
-        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 sm:p-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="text-xs text-zinc-400 block mb-1">From</label>
               <input value={emailFrom} onChange={e => setEmailFrom(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm" placeholder="sender@company.com" />
@@ -291,15 +311,15 @@ export default function EmailDLPPage() {
               <input value={emailTo} onChange={e => setEmailTo(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm" placeholder="recipient@external.com" />
             </div>
           </div>
-          <div className="mb-3">
+          <div className="mb-4">
             <label className="text-xs text-zinc-400 block mb-1">Subject</label>
             <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm" placeholder="Email subject" />
           </div>
-          <div className="mb-3">
+          <div className="mb-4">
             <label className="text-xs text-zinc-400 block mb-1">Body</label>
             <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={8} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm font-mono" placeholder="Email body content..." />
           </div>
-          <div className="mb-3">
+          <div className="mb-4">
             <label className="text-xs text-zinc-400 block mb-1">Attachment</label>
             <div className="flex items-center gap-2">
               <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm hover:bg-zinc-700">
@@ -312,43 +332,29 @@ export default function EmailDLPPage() {
               <textarea value={attachmentText} onChange={e => setAttachmentText(e.target.value)} rows={4} className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm font-mono mt-2" />
             )}
           </div>
-          <button onClick={handleScan} disabled={scanning || !hasContent} className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded text-sm font-bold">
+          <button onClick={handleScan} disabled={scanning || !hasContent} className="w-full sm:w-auto px-8 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded text-sm font-bold">
             {scanning ? 'Scanning with 3 AI Engines...' : 'Scan Email for DLP Violations'}
           </button>
         </div>
 
-        {/* Results */}
+        {/* Results - Traditional DLP on LEFT, AI DLP on RIGHT */}
         {results && (
           <div>
-            <h2 className="text-lg font-bold mb-3">Scan Results</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {(['traditional', 'pplx', 'cloudflare'] as const).map(eng => (
-                <div key={eng} className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-sm capitalize">{eng === 'pplx' ? 'Perplexity Sonar Pro' : eng === 'traditional' ? 'Perplexity Sonar' : 'Cloudflare Workers AI'}</h3>
-                    {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
-                  </div>
-                  {['subject', 'body', 'attachment'].map(part => {
-                    const result = results[eng]?.[part]
-                    if (!result) return null
-                    return (
-                      <div key={part} className="mb-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-zinc-400 uppercase">{part}</span>
-                          {result.detected ? (
-                            <span className="text-xs px-1.5 py-0.5 bg-red-900/50 text-red-400 rounded">VIOLATION</span>
-                          ) : (
-                            <span className="text-xs px-1.5 py-0.5 bg-green-900/50 text-green-400 rounded">CLEAN</span>
-                          )}
-                        </div>
-                        {result.detected && result.summary && (
-                          <div className="text-xs text-zinc-500 mt-1 ml-2">{result.summary}</div>
-                        )}
-                      </div>
-                    )
-                  })}
+            <h2 className="text-lg font-bold mb-4">Scan Results</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* LEFT: Traditional DLP */}
+              <div>
+                <h3 className="text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Traditional DLP (Regex/Keyword)</h3>
+                {renderEngineCard('traditional', 'Perplexity Sonar')}
+              </div>
+              {/* RIGHT: AI-Powered DLP */}
+              <div>
+                <h3 className="text-sm font-bold text-cyan-400 mb-2 uppercase tracking-wider">AI-Powered DLP</h3>
+                <div className="space-y-4">
+                  {renderEngineCard('pplx', 'Perplexity Sonar Pro')}
+                  {renderEngineCard('cloudflare', 'Cloudflare Workers AI')}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
