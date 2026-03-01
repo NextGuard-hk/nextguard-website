@@ -20,7 +20,8 @@ export function Header() {
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  }, 24
+  [])
   const links = [
     { href: "/company", label: t.nav.aboutUs },
     { href: "/products", label: t.nav.products },
@@ -29,6 +30,7 @@ export function Header() {
     { href: "/partner-day-2026-registration", label: "RSVP" },
         { href: "/news/ai-feed", label: t.nav.aiFeed || "AI News" },
     { href: "https://kb.next-guard.com", label: t.nav.kb },
+  34
         { href: "/soc-review", label: "AI SOC" },
     { href: "/console", label: "Console" },
   ]
