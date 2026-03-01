@@ -26,123 +26,147 @@ export default function AIDashboard() {
 
   useEffect(() => { fetchUsage() }, [])
 
-  if (loading && !data) return <div className="text-zinc-400 text-center py-12">Loading AI Dashboard...</div>
-  if (error && !data) return <div className="text-red-400 text-center py-12">{error}</div>
-  if (!data) return null
+  if (loading) return <div className="p-8 text-center text-gray-400">Loading AI usage data...</div>
+  if (error) return <div className="p-8 text-center text-red-400">{error}</div>
+  if (!data) return <div className="p-8 text-center text-gray-400">No data</div>
 
-  const maxBar = Math.max(...data.dailyBreakdown.map((d: any) => d.total), 1)
+  const { scans, summary, costs } = data
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">AI Dashboard</h2>
-        <button onClick={fetchUsage} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
-      </div>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-white">AI Usage Dashboard</h2>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <div className="text-3xl font-bold text-cyan-400">{data.total}</div>
-          <div className="text-sm text-zinc-400">Total Scans</div>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <div className="text-3xl font-bold text-green-400">{data.today.total}</div>
-          <div className="text-sm text-zinc-400">Today</div>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <div className="text-3xl font-bold text-purple-400">{data.week.total}</div>
-          <div className="text-sm text-zinc-400">This Week</div>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <div className="text-3xl font-bold text-orange-400">{data.detectionRate}%</div>
-          <div className="text-sm text-zinc-400">Detection Rate</div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card label="Total Scans" value={summary?.totalScans ?? 0} />
+        <Card label="Detections" value={summary?.detections ?? 0} color="text-red-400" />
+        <Card label="Avg Latency" value={`${summary?.avgLatency ?? 0}ms`} />
+        <Card label="Detection Rate" value={`${summary?.detectionRate ?? 0}%`} color="text-yellow-400" />
       </div>
 
       {/* Engine Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-zinc-900 border border-orange-600/30 rounded-xl p-4">
-          <h3 className="text-sm font-bold text-orange-400 mb-2">Traditional DLP</h3>
-          <div className="text-2xl font-bold text-white">{data.month.traditional}</div>
-          <div className="text-xs text-zinc-500">scans this month</div>
-          <div className="text-xs text-zinc-400 mt-2">Avg latency: <span className="text-green-400 font-mono">{data.avgLatency.traditional}ms</span></div>
-        </div>
-        <div className="bg-zinc-900 border border-cyan-600/30 rounded-xl p-4">
-          <h3 className="text-sm font-bold text-cyan-400 mb-2">Perplexity Sonar</h3>
-          <div className="text-2xl font-bold text-white">{data.month.perplexity}</div>
-          <div className="text-xs text-zinc-500">scans this month</div>
-          <div className="text-xs text-zinc-400 mt-2">Avg latency: <span className="text-cyan-400 font-mono">{data.avgLatency.perplexity > 1000 ? (data.avgLatency.perplexity / 1000).toFixed(2) + 's' : data.avgLatency.perplexity + 'ms'}</span></div>
-        </div>
-        <div className="bg-zinc-900 border border-purple-600/30 rounded-xl p-4">
-          <h3 className="text-sm font-bold text-purple-400 mb-2">Cloudflare Workers AI</h3>
-          <div className="text-2xl font-bold text-white">{data.month.cloudflare}</div>
-          <div className="text-xs text-zinc-500">scans this month</div>
-          <div className="text-xs text-zinc-400 mt-2">Avg latency: <span className="text-purple-400 font-mono">{data.avgLatency.cloudflare > 1000 ? (data.avgLatency.cloudflare / 1000).toFixed(2) + 's' : data.avgLatency.cloudflare + 'ms'}</span></div>
-        </div>
-      </div>
-
-      {/* Daily Chart (last 7 days) */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6">
-        <h3 className="text-sm font-bold text-white mb-4">Last 7 Days</h3>
-        <div className="flex items-end gap-2 h-40">
-          {data.dailyBreakdown.map((day: any, i: number) => (
-            <div key={i} className="flex-1 flex flex-col items-center">
-              <div className="w-full flex flex-col-reverse" style={{ height: '120px' }}>
-                {day.total > 0 && (
-                  <div className="w-full rounded-t" style={{ height: Math.max(4, (day.total / maxBar) * 120) + 'px', background: 'linear-gradient(to top, #06b6d4, #8b5cf6)' }} />
-                )}
-              </div>
-              <div className="text-xs text-zinc-500 mt-1">{day.date.slice(5)}</div>
-              <div className="text-xs text-zinc-400 font-mono">{day.total}</div>
+      {summary?.byEngine && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Object.entries(summary.byEngine).map(([engine, s]: any) => (
+            <div key={engine} className="bg-gray-800 rounded-lg p-4">
+              <h4 className="text-sm text-gray-400 uppercase mb-2">{engine}</h4>
+              <p className="text-xl font-bold text-white">{s.count} scans</p>
+              <p className="text-sm text-gray-400">{s.detections} detections &middot; {s.avgLatency}ms avg</p>
             </div>
           ))}
         </div>
-      </div>
+      )}
 
-      {/* Recent Scans */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-white mb-3">Recent Scans ({data.recentScans.length})</h3>
-        {data.recentScans.length === 0 ? (
-          <div className="text-zinc-500 text-sm">No scans recorded yet. Use the AI DLP Compare page to generate scan data.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-zinc-500 border-b border-zinc-800">
-                  <th className="pb-2 pr-4">Time</th>
-                  <th className="pb-2 pr-4">Engine</th>
-                  <th className="pb-2 pr-4">Result</th>
-                  <th className="pb-2 pr-4">Latency</th>
-                  <th className="pb-2">Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.recentScans.map((s: any) => (
-                  <tr key={s.id} className="border-b border-zinc-800/50">
-                    <td className="py-2 pr-4 text-zinc-400">{new Date(s.timestamp).toLocaleString()}</td>
-                    <td className="py-2 pr-4">
-                      <span className={s.engine === 'traditional' ? 'text-orange-400' : s.engine === 'perplexity' ? 'text-cyan-400' : 'text-purple-400'}>
-                        {s.engine === 'traditional' ? 'Traditional' : s.engine === 'perplexity' ? 'Perplexity' : 'Cloudflare'}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-4">
-                      <span className={s.detected ? 'text-red-400' : 'text-green-400'}>
-                        {s.detected ? 'DETECTED' : 'CLEAN'}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-4 font-mono text-zinc-300">
-                      {s.latencyMs > 1000 ? (s.latencyMs / 1000).toFixed(2) + 's' : s.latencyMs + 'ms'}
-                    </td>
-                    <td className="py-2 text-zinc-500">{s.source}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Cost & Usage Tracking */}
+      {costs && (
+        <>
+          <h3 className="text-xl font-semibold text-white mt-4">Usage & Costs</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Perplexity Sonar */}
+            <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+              <h4 className="text-lg font-semibold text-blue-400 mb-3">Perplexity Sonar API</h4>
+              <div className="space-y-2 text-sm">
+                <Row label="Input Tokens Used" value={costs.perplexity?.inputTokens?.toLocaleString() ?? '0'} />
+                <Row label="Output Tokens Used" value={costs.perplexity?.outputTokens?.toLocaleString() ?? '0'} />
+                <Row label="Total Requests" value={costs.perplexity?.requests?.toLocaleString() ?? '0'} />
+                <Row label="Input Token Cost" value={`$${costs.perplexity?.inputCost?.toFixed(4) ?? '0.0000'}`} />
+                <Row label="Output Token Cost" value={`$${costs.perplexity?.outputCost?.toFixed(4) ?? '0.0000'}`} />
+                <Row label="Request Fees" value={`$${costs.perplexity?.requestCost?.toFixed(4) ?? '0.0000'}`} />
+                <div className="border-t border-gray-600 pt-2 mt-2">
+                  <Row label="Total Spent" value={`$${costs.perplexity?.totalCost?.toFixed(4) ?? '0.0000'}`} bold />
+                  <Row label="Monthly Budget" value={`$${costs.perplexity?.monthlyBudget ?? 50}`} />
+                  <Row label="Remaining" value={`$${costs.perplexity?.remaining?.toFixed(4) ?? '0.0000'}`} color={costs.perplexity?.remaining < 10 ? 'text-red-400' : 'text-green-400'} bold />
+                </div>
+              </div>
+            </div>
+
+            {/* Cloudflare Workers AI */}
+            <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+              <h4 className="text-lg font-semibold text-orange-400 mb-3">Cloudflare Workers AI</h4>
+              <div className="space-y-2 text-sm">
+                <Row label="Neurons Used" value={costs.cloudflare?.neuronsUsed?.toLocaleString() ?? '0'} />
+                <Row label="Free Tier (Daily)" value={`${costs.cloudflare?.freeDailyNeurons?.toLocaleString() ?? '10,000'} neurons`} />
+                <Row label="Billable Neurons" value={costs.cloudflare?.billableNeurons?.toLocaleString() ?? '0'} />
+                <Row label="Neuron Cost" value={`$${costs.cloudflare?.neuronCost?.toFixed(4) ?? '0.0000'}`} />
+                <div className="border-t border-gray-600 pt-2 mt-2">
+                  <Row label="Total Spent" value={`$${costs.cloudflare?.totalCost?.toFixed(4) ?? '0.0000'}`} bold />
+                  <Row label="Monthly Budget" value={`$${costs.cloudflare?.monthlyBudget ?? 20}`} />
+                  <Row label="Remaining" value={`$${costs.cloudflare?.remaining?.toFixed(4) ?? '0.0000'}`} color={costs.cloudflare?.remaining < 5 ? 'text-red-400' : 'text-green-400'} bold />
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+
+          {/* Total Cost Summary */}
+          <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg p-5 border border-gray-600">
+            <div className="flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <p className="text-sm text-gray-400">Combined Monthly Spend</p>
+                <p className="text-2xl font-bold text-white">${costs.totalSpent?.toFixed(4) ?? '0.0000'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Combined Budget</p>
+                <p className="text-2xl font-bold text-white">${costs.totalBudget ?? 70}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Remaining</p>
+                <p className={`text-2xl font-bold ${(costs.totalRemaining ?? 0) < 15 ? 'text-red-400' : 'text-green-400'}`}>${costs.totalRemaining?.toFixed(4) ?? '0.0000'}</p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Recent Scans Table */}
+      <h3 className="text-xl font-semibold text-white">Recent Scans</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-gray-400 border-b border-gray-700">
+            <tr>
+              <th className="py-2 px-3">Time</th>
+              <th className="py-2 px-3">Engine</th>
+              <th className="py-2 px-3">Detected</th>
+              <th className="py-2 px-3">Latency</th>
+              <th className="py-2 px-3">Tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(scans ?? []).slice(0, 20).map((s: any) => (
+              <tr key={s.id} className="border-b border-gray-800 text-gray-300">
+                <td className="py-2 px-3">{new Date(s.timestamp).toLocaleString()}</td>
+                <td className="py-2 px-3">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    s.engine === 'perplexity' ? 'bg-blue-900 text-blue-300' :
+                    s.engine === 'cloudflare' ? 'bg-orange-900 text-orange-300' :
+                    'bg-gray-700 text-gray-300'
+                  }`}>{s.engine}</span>
+                </td>
+                <td className="py-2 px-3">{s.detected ? <span className="text-red-400">Yes</span> : <span className="text-green-400">No</span>}</td>
+                <td className="py-2 px-3">{s.latencyMs}ms</td>
+                <td className="py-2 px-3">{s.tokensUsed ?? '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+    </div>
+  )
+}
+
+function Card({ label, value, color = 'text-white' }: { label: string; value: any; color?: string }) {
+  return (
+    <div className="bg-gray-800 rounded-lg p-4">
+      <p className="text-sm text-gray-400">{label}</p>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+    </div>
+  )
+}
+
+function Row({ label, value, color = 'text-gray-200', bold = false }: { label: string; value: string; color?: string; bold?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-gray-400">{label}</span>
+      <span className={`${color} ${bold ? 'font-semibold' : ''}`}>{value}</span>
     </div>
   )
 }
