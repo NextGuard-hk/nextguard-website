@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import EnterpriseSettings from './EnterpriseSettings'
 
 const EMAIL_SCENARIOS = [
   {
@@ -116,6 +117,27 @@ export default function EmailDLPPage() {
   const [latencies, setLatencies] = useState<any>(null)
   const [policyEnabled, setPolicyEnabled] = useState<Record<string, boolean>>(
     () => Object.fromEntries(DLP_POLICIES.map(p => [p.id, p.defaultOn]))
+
+      // Enterprise DLP Settings
+  const [direction, setDirection] = useState('outbound')
+  const [senderDomains, setSenderDomains] = useState('')
+  const [senderDomainMode, setSenderDomainMode] = useState('include')
+  const [recipientDomains, setRecipientDomains] = useState('')
+  const [recipientDomainMode, setRecipientDomainMode] = useState('include')
+  const [matchThreshold, setMatchThreshold] = useState(1)
+  const [messageSizeThreshold, setMessageSizeThreshold] = useState(25)
+  const [maxAttachments, setMaxAttachments] = useState(10)
+  const [blockedFileTypes, setBlockedFileTypes] = useState('.exe,.bat,.cmd,.ps1,.vbs,.js,.scr')
+  const [maxAttachmentSize, setMaxAttachmentSize] = useState(25)
+  const [notifySender, setNotifySender] = useState(true)
+  const [notifyAdmin, setNotifyAdmin] = useState(true)
+  const [notifyManager, setNotifyManager] = useState(false)
+  const [adminEmail, setAdminEmail] = useState('dlp-admin@nextguard.com')
+  const [userNotificationMsg, setUserNotificationMsg] = useState('Your email was blocked by DLP policy. Contact {admin_email} for assistance.')
+  const [encryptOnRelease, setEncryptOnRelease] = useState(false)
+  const [evaluationMode, setEvaluationMode] = useState('first-match')
+  const [quarantineReviewRequired, setQuarantineReviewRequired] = useState(true)
+  const [logLevel, setLogLevel] = useState('detailed')
   )
   const [severity, setSeverity] = useState('High')
   const [action, setAction] = useState('Block')
@@ -392,6 +414,31 @@ export default function EmailDLPPage() {
                 )
               })}
             </div>
+
+                      {/* Enterprise DLP Configuration */}
+          <EnterpriseSettings
+            direction={direction} setDirection={setDirection}
+            senderDomains={senderDomains} setSenderDomains={setSenderDomains}
+            senderDomainMode={senderDomainMode} setSenderDomainMode={setSenderDomainMode}
+            recipientDomains={recipientDomains} setRecipientDomains={setRecipientDomains}
+            recipientDomainMode={recipientDomainMode} setRecipientDomainMode={setRecipientDomainMode}
+            matchThreshold={matchThreshold} setMatchThreshold={setMatchThreshold}
+            messageSizeThreshold={messageSizeThreshold} setMessageSizeThreshold={setMessageSizeThreshold}
+            maxAttachments={maxAttachments} setMaxAttachments={setMaxAttachments}
+            blockedFileTypes={blockedFileTypes} setBlockedFileTypes={setBlockedFileTypes}
+            maxAttachmentSize={maxAttachmentSize} setMaxAttachmentSize={setMaxAttachmentSize}
+            notifySender={notifySender} setNotifySender={setNotifySender}
+            notifyAdmin={notifyAdmin} setNotifyAdmin={setNotifyAdmin}
+            notifyManager={notifyManager} setNotifyManager={setNotifyManager}
+            adminEmail={adminEmail} setAdminEmail={setAdminEmail}
+            userNotificationMsg={userNotificationMsg} setUserNotificationMsg={setUserNotificationMsg}
+            encryptOnRelease={encryptOnRelease} setEncryptOnRelease={setEncryptOnRelease}
+            evaluationMode={evaluationMode} setEvaluationMode={setEvaluationMode}
+            quarantineReviewRequired={quarantineReviewRequired} setQuarantineReviewRequired={setQuarantineReviewRequired}
+            logLevel={logLevel} setLogLevel={setLogLevel}
+            severity={severity}
+            action={action}
+          />
           </div>
         )}
 
