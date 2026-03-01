@@ -1,92 +1,68 @@
 // Agent Heartbeat API - NextGuard Management Console
-// Reference: PA Panorama heartbeat, CP SIC, Zscaler forwarding profile health
-// Implements: FCAPS Performance Management (PM) & Fault Management (FM)
-
+// Compatible with NextGuard Endpoint DLP Agent v1.1.0
 import { NextRequest, NextResponse } from 'next/server'
+
+function getAgents(): Record<string, any> {
+  if (!(globalThis as any).__nextguard_agents) {
+    (globalThis as any).__nextguard_agents = {}
+  }
+  return (globalThis as any).__nextguard_agents
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { deviceId, hostname, agentVersion, policyVersion, stats } = body
+    // Accept both agentId and deviceId for compatibility
+    const agentId = body.agentId || body.deviceId
+    const { hostname, username, os, agentVersion, status, uptime } = body
 
-    if (!deviceId) {
+    if (!agentId) {
       return NextResponse.json(
-        { error: 'Missing deviceId', code: 'VALIDATION_ERROR' },
+        { error: 'Missing agentId', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
 
-    const agents: Record<string, any> = (globalThis as any).__nextguard_agents || {}
+    const agents = getAgents()
     const now = new Date().toISOString()
+    const clientIp = request.headers.get('x-forwarded-for') || 'unknown'
 
-    if (agents[deviceId]) {
+    if (agents[agentId]) {
       // Update existing agent
-      agents[deviceId].lastHeartbeat = now
-      agents[deviceId].status = 'online'
-      if (agentVersion) agents[deviceId].agentVersion = agentVersion
-      if (hostname) agents[deviceId].hostname = hostname
-      if (policyVersion !== undefined) agents[deviceId].policyVersion = policyVersion
-
-      // Store performance stats (PM)
-      if (stats) {
-        agents[deviceId].lastStats = {
-          cpuUsage: stats.cpuUsage,
-          memoryUsage: stats.memoryUsage,
-          eventsToday: stats.eventsToday,
-          blockedToday: stats.blockedToday,
-          scanQueueSize: stats.scanQueueSize,
-          uptimeSeconds: stats.uptimeSeconds,
-          timestamp: now,
-        }
-      }
+      agents[agentId].lastHeartbeat = now
+      agents[agentId].status = 'online'
+      if (hostname) agents[agentId].hostname = hostname
+      if (username) agents[agentId].username = username
+      if (os) agents[agentId].os = os
+      if (agentVersion) agents[agentId].agentVersion = agentVersion
+      if (uptime) agents[agentId].uptime = uptime
+      agents[agentId].ipAddress = clientIp
     } else {
       // Auto-register if not found
-      agents[deviceId] = {
-        deviceId,
+      agents[agentId] = {
+        agentId,
         hostname: hostname || 'unknown',
-        os: body.os || 'unknown',
-        osVersion: body.osVersion || 'unknown',
+        username: username || 'unknown',
+        os: os || 'unknown',
         agentVersion: agentVersion || 'unknown',
+        ipAddress: clientIp,
         registeredAt: now,
         lastHeartbeat: now,
         status: 'online',
-        policyVersion: policyVersion || 0,
+        uptime: uptime || 0,
+        policyVersion: 0,
       }
     }
 
-    ;(globalThis as any).__nextguard_agents = agents
-
-    // Check if agent needs policy update
-    const policies: any[] = (globalThis as any).__nextguard_policies || []
-    const latestPolicyVersion = policies.length > 0
-      ? Math.max(...policies.map((p: any) => p.version || 1))
-      : 1
-    const needsPolicyUpdate = (policyVersion || 0) < latestPolicyVersion
-
-    // Check for pending commands (FM - remote management)
-    const pendingCommands: any[] = (globalThis as any).__nextguard_commands?.[deviceId] || []
-
     return NextResponse.json({
       success: true,
+      agentId,
+      status: 'online',
       serverTime: now,
-      nextHeartbeatSeconds: 300,
-      // Policy sync signal (like PA Panorama push notification)
-      policyUpdate: needsPolicyUpdate ? {
-        available: true,
-        currentVersion: policyVersion || 0,
-        latestVersion: latestPolicyVersion,
-        syncEndpoint: '/api/v1/policies/bundle',
-      } : { available: false },
-      // Remote commands (like CP SmartEndpoint push operations)
-      commands: pendingCommands,
-      // Agent health status acknowledgment
-      status: 'acknowledged',
+      nextHeartbeatSeconds: 60,
     })
   } catch (error) {
     console.error('Heartbeat error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
