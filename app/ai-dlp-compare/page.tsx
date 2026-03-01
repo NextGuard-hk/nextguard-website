@@ -66,7 +66,7 @@ const SAMPLE_CATEGORIES = [
   },
   {
     category: 'Contract & Legal',
-    icon: '\ud83d\udcc4',
+    icon: '📄',
     description: 'Simulate DLP scanning contract text, NDA clauses, M&A terms',
     samples: [
       { name: 'NDA Agreement Excerpt', content: 'NON-DISCLOSURE AGREEMENT\n\nThis Agreement is entered into as of 15 February 2026 between NextGuard Technology Limited ("Disclosing Party") and Skyguard Holdings Co. Ltd. ("Receiving Party").\n\n1. CONFIDENTIAL INFORMATION\nThe Receiving Party agrees to keep strictly confidential all proprietary information including but not limited to: source code, customer lists, financial projections, product roadmaps, and pricing structures disclosed by the Disclosing Party.\n\n2. RESTRICTED PERSONNEL\nAccess shall be limited to: James Wong (CEO, HKID: K234567(8), james.wong@nextguard.com), Sarah Lam (CTO, HKID: L345678(9), sarah.lam@nextguard.com).\n\n3. PENALTY\nBreach of this agreement shall result in liquidated damages of HKD 5,000,000.' },
@@ -333,12 +333,12 @@ export default function ComparePage() {
         {/* Policy Settings Toggle */}
         <div className="mb-4">
           <button onClick={() => setShowPolicy(!showPolicy)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-            \u2699\ufe0f DLP Policy Settings {showPolicy ? '\u25b2' : '\u25bc'}
+            ⚙️ DLP Policy Settings {showPolicy ? '\u25b2' : '\u25bc'}
           </button>
           {showPolicy && (
             <div className="mt-3 bg-zinc-900 border border-zinc-700 rounded-xl p-4">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-bold text-white">\u2699\ufe0f DLP Policy Configuration</h3>
+                <h3 className="text-sm font-bold text-white">⚙️ DLP Policy Configuration</h3>
                 <button onClick={resetPolicy} className="text-xs text-cyan-400 hover:text-cyan-300">Reset to Default</button>
               </div>
               <p className="text-xs text-zinc-500 mb-3">Configure detection rules, actions, and severity levels.</p>
@@ -376,9 +376,9 @@ export default function ComparePage() {
           {/* File Upload */}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input ref={fileInputRef} type="file" accept=".txt,.csv,.json,.xml,.log,.md,.html,.js,.ts,.py,.sql,.yml,.yaml,.env,.cfg,.conf,.ini,.pdf,.docx,.xlsx,.xls,.pptx,.jpg,.jpeg,.png" onChange={handleFileUpload} className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">\ud83d\udcc2 Upload File</button>
-            {uploadedFileName && <span className="text-xs text-cyan-400">\ud83d\udcc4 {uploadedFileName}</span>}
-            {virusScanning && <span className="text-xs text-yellow-400 animate-pulse">\ud83d\udd12 Scanning for viruses...</span>}
+            <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">📂 Upload File</button>
+            {uploadedFileName && <span className="text-xs text-cyan-400">📄 {uploadedFileName}</span>}
+            {virusScanning && <span className="text-xs text-yellow-400 animate-pulse">🔒 Scanning for viruses...</span>}
             {extracting && <span className="text-xs text-cyan-400 animate-pulse">Extracting text from file...</span>}
             {virusScanResult && !virusScanning && <span className="text-xs text-zinc-400">{virusScanResult.safe ? '\u2705' : '\u26a0\ufe0f'} {virusScanResult.message}</span>}
             <span className="text-xs text-zinc-600">Supports: .pdf, .docx, .xlsx, .pptx, .jpg, .txt, .csv, .json, .xml and more (max 5MB per file)</span>
