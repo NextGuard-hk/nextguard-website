@@ -31,19 +31,19 @@ function TradResultCard({ result, loading, error, latency }: any) {
           <div className="text-sm text-zinc-400 mt-1">Method: {result.method}</div>
           {result.totalMatches !== undefined && <div className="text-sm text-zinc-400">Total Matches: {result.totalMatches}</div>}
           {result.findings && result.findings.length > 0 && (
-            <div className="mt-3">
+            <div className="mt-2">
               <div className="text-xs text-zinc-500 mb-1">Findings ({result.findings.length}):</div>
               {result.findings.map((f: any, i: number) => (
-                <div key={i} className="text-xs bg-zinc-800 rounded p-2 mb-1">
+                <div key={i} className="bg-zinc-800 rounded p-3 max-h-40 overflow-y-auto">
                   <span className="text-orange-400 font-bold">{f.rule}</span>
-                  <span className={`ml-2 px-1 rounded text-xs ${f.action === 'BLOCK' ? 'bg-red-900 text-red-300' : f.action === 'QUARANTINE' ? 'bg-yellow-900 text-yellow-300' : 'bg-blue-900 text-blue-300'}`}>{f.action}</span>
-                  <span className="text-zinc-500 ml-1">({f.severity})</span>
-                  <div className="text-zinc-400 mt-0.5">Matches: {f.matches?.join(', ')}</div>
+                  &nbsp;&nbsp;<span className="text-zinc-400">{f.action}</span>
+                  &nbsp;&nbsp;<span className="text-zinc-500">({f.severity})</span>
+                  <div className="text-xs text-zinc-400 mt-1">Matches: {f.matches?.join(', ')}</div>
                 </div>
               ))}
             </div>
           )}
-          {!result.detected && <div className="text-zinc-500 mt-2">No pattern matches found.</div>}
+          {!result.detected && <div className="text-sm text-zinc-500 mt-2">No pattern matches found.</div>}
         </div>
       )}
       {!result && !loading && !error && <div className="text-zinc-600">Click Compare to start</div>}
@@ -57,7 +57,7 @@ function AIResultCard({ title, color, result, loading, error, latency }: any) {
     <div className={`bg-zinc-900 border ${color} rounded-xl p-6`}>
       <h3 className="text-lg font-bold text-white mb-1">{title}</h3>
       {latency !== null && (
-        <div className="text-2xl font-mono font-bold mb-3 text-white">
+        <div className="text-2xl font-mono font-bold mb-3 text-cyan-400">
           {latency < 1000 ? latency + 'ms' : (latency / 1000).toFixed(2) + 's'}
         </div>
       )}
@@ -68,19 +68,24 @@ function AIResultCard({ title, color, result, loading, error, latency }: any) {
           <div className={`text-lg font-bold ${result.detected ? 'text-red-400' : 'text-green-400'}`}>
             {result.detected ? '\u26a0\ufe0f VIOLATION DETECTED' : '\u2705 CLEAN'}
           </div>
-          {result.confidence && <div className="text-sm text-zinc-400 mt-1">Confidence: {result.confidence}</div>}
-          {result.categories && result.categories.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {result.categories.map((c: string, i: number) => (
-                <span key={i} className="text-xs bg-zinc-800 text-zinc-300 rounded px-2 py-0.5">{c}</span>
+          {result.risk_level && <div className="text-sm text-zinc-400 mt-1">Risk: {result.risk_level}</div>}
+          {result.summary && (
+            <div className="text-sm text-zinc-400 mt-2 bg-zinc-800 rounded p-3 max-h-40 overflow-y-auto">{result.summary}</div>
+          )}
+          {result.findings && result.findings.length > 0 && (
+            <div className="mt-2">
+              <div className="text-xs text-zinc-500 mb-1">Findings ({result.findings.length}):</div>
+              {result.findings.map((f: any, i: number) => (
+                <div key={i} className="bg-zinc-800 rounded p-2 mb-1 text-xs">
+                  <span className="text-orange-400">{f.type}</span>
+                  {f.decoded_value && <span className="text-zinc-400 ml-2">= {f.decoded_value}</span>}
+                  {f.confidence && <span className="text-zinc-500 ml-2">({f.confidence}%)</span>}
+                  {f.evasion_technique && f.evasion_technique !== 'none' && <div className="text-yellow-500 mt-1">Evasion: {f.evasion_technique}</div>}
+                </div>
               ))}
             </div>
           )}
-          {result.reasoning && (
-            <div className="mt-3 text-xs text-zinc-400 bg-zinc-800 rounded p-3 max-h-40 overflow-y-auto">
-              {result.reasoning}
-            </div>
-          )}
+          {!result.detected && <div className="text-sm text-zinc-500 mt-2">No issues detected.</div>}
         </div>
       )}
       {!result && !loading && !error && <div className="text-zinc-600">Click Compare to start</div>}
@@ -124,7 +129,7 @@ export default function ComparePage() {
     const pplxPromise = (async () => {
       const t1 = performance.now()
       try {
-        const res = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) })
+        const res = await fetch('/api/ai-dlp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text, mode: 'ai' }) })
         const data = await res.json()
         setPplxLatency(Math.round(performance.now() - t1))
         setPplxResult(data)
@@ -147,7 +152,7 @@ export default function ComparePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 pt-24">
+    <div className="min-h-screen bg-black text-white pt-24 px-4 pb-12">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">NextGuard DLP Engine Comparison</h1>
         <p className="text-zinc-400 mb-6">Compare Traditional DLP vs AI-Powered DLP (Perplexity Sonar vs Cloudflare Workers AI)</p>
