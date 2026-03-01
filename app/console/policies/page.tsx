@@ -34,7 +34,7 @@ export default function PolicyManagement() {
       const res = await fetch(`${API_BASE}/policies/bundle?agentId=console`)
       if (res.ok) {
         const data = await res.json()
-        setPolicies(data.policies || [])
+        setPolicies(data.bundle?.policies || data.policies || [])
       }
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
