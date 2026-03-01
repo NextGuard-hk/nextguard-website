@@ -200,7 +200,7 @@ export default function EmailDLPPage() {
 
   // Render AI engine result card (for pplx and cloudflare)
   const renderAIEngineCard = (eng: 'pplx' | 'cloudflare', label: string) => (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+    <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-sm">{label}</h3>
         {latencies?.[eng] && <span className="text-xs text-zinc-500">{(latencies[eng] / 1000).toFixed(1)}s</span>}
@@ -234,13 +234,13 @@ export default function EmailDLPPage() {
                       {f.original_text && (
                         <div className="mt-1">
                           <span className="text-xs text-zinc-500">Found:</span>
-                          <code className="ml-1 text-xs bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded">{f.original_text}</code>
+                          <code className="ml-1 text-xs bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded break-all">{f.original_text}</code>
                         </div>
                       )}
                       {f.decoded_value && f.decoded_value !== f.original_text && (
                         <div className="mt-1">
                           <span className="text-xs text-zinc-500">Decoded:</span>
-                          <code className="ml-1 text-xs bg-orange-900/40 text-orange-300 px-1.5 py-0.5 rounded">{f.decoded_value}</code>
+                          <code className="ml-1 text-xs bg-orange-900/40 text-orange-300 px-1.5 py-0.5 rounded break-all">{f.decoded_value}</code>
                         </div>
                       )}
                     </div>
@@ -257,7 +257,7 @@ export default function EmailDLPPage() {
   const renderTraditionalCard = () => {
     const eng = 'traditional'
     return (
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 sm:p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-sm">Regex + Keyword Engine</h3>
           {latencies?.[eng] && <span className="text-xs text-zinc-500">{(latencies[eng] / 1000).toFixed(1)}s</span>}
@@ -319,7 +319,7 @@ export default function EmailDLPPage() {
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">Email DLP Scanning Demo</h1>
-        <p className="text-sm text-zinc-400 mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Perplexity Sonar), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
+        <p className="text-xs sm:text-sm text-zinc-400 mb-4 sm:mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Perplexity Sonar), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
 
         {/* Scenario Selector */}
         <div className="mb-4">
@@ -339,7 +339,7 @@ export default function EmailDLPPage() {
 
         {/* Policy Panel */}
         {showPolicyPanel && (
-          <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mb-6">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 sm:p-4 mb-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="text-xs text-zinc-400 block mb-1">Severity Level</label>
@@ -436,8 +436,8 @@ export default function EmailDLPPage() {
         {/* Results - Traditional DLP on LEFT, AI DLP on RIGHT */}
         {results && (
           <div>
-            <h2 className="text-lg font-bold mb-4">Scan Results</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">Scan Results</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* LEFT: Traditional DLP */}
               <div>
                 <h3 className="text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Traditional DLP (Regex/Keyword)</h3>
