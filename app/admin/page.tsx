@@ -927,9 +927,9 @@ export default function AdminPage() {
               </div>
             )}
 
-                  {tab === "ai" && <AIDashboard />}
           </div>
         )}
+            {tab === "ai" && <AIDashboard />}
     </div>
   )
 }
