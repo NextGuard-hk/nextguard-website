@@ -135,7 +135,7 @@ export default function EmailDLPPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/ai-dlp/extract', { method: 'POST', body: formData })
+      const res = await fetch('/api/extract-text', { method: 'POST', body: formData })
       const data = await res.json()
       setAttachmentText(data.text || '')
     } catch { setAttachmentText('[Extraction failed]') }
@@ -392,7 +392,7 @@ export default function EmailDLPPage() {
               <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm hover:bg-zinc-700">
                 {extracting ? 'Extracting...' : 'Upload File'}
               </button>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.py,.ts,.js,.env" />
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.txt,.json,.xml,.log,.md,.html,.py,.ts,.js,.sql,.yml,.yaml,.env,.cfg,.conf,.ini" />
               {attachmentName && <span className="text-xs text-zinc-400">{attachmentName}</span>}
             </div>
             {attachmentText && (
