@@ -208,6 +208,55 @@ let AGENT_CONFIG = {
       metaDataExport: { id: 'int-meta', name: 'Metadata Export', description: 'Export file metadata for external analysis', enabled: true, platforms: ['windows', 'macos'] },
     }
   },
+
+      // =========== 15. macOS APPLICATION DLP ===========
+    macosAppDlp: {
+      category: 'macOS Application DLP',
+      description: 'Comprehensive DLP monitoring for macOS native and third-party applications',
+      features: {
+        // --- Office 365 Suite for Mac ---
+        macWordDlp: { id: 'mac-word', name: 'Microsoft Word for Mac', description: 'Monitor Word document save, export, share & clipboard operations on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macExcelDlp: { id: 'mac-excel', name: 'Microsoft Excel for Mac', description: 'Monitor Excel spreadsheet operations including CSV/XLSX export on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macPowerPointDlp: { id: 'mac-ppt', name: 'Microsoft PowerPoint for Mac', description: 'Monitor PowerPoint presentation save/export/share on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macOneNoteDlp: { id: 'mac-onenote', name: 'Microsoft OneNote for Mac', description: 'Monitor OneNote notebook export and content sharing on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macOutlookDlp: { id: 'mac-outlook', name: 'Microsoft Outlook for Mac', description: 'Monitor Outlook email compose, attachment and calendar sharing on macOS. Includes new Outlook for Mac', enabled: true, action: 'audit', platforms: ['macos'] },
+        macOneDriveDlp: { id: 'mac-onedrive', name: 'OneDrive for Mac', description: 'Monitor OneDrive sync folder file operations and sharing links on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macSharePointDlp: { id: 'mac-sharepoint', name: 'SharePoint Browser Access', description: 'Monitor SharePoint Online file upload/download via browser on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        // --- Instant Messaging Apps for Mac ---
+        macWhatsAppDlp: { id: 'mac-whatsapp', name: 'WhatsApp for Mac', description: 'Monitor WhatsApp Desktop native app - message, file transfer, image/video sharing, voice note and document DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macWhatsAppWebDlp: { id: 'mac-whatsapp-web', name: 'WhatsApp Web (Browser)', description: 'Monitor WhatsApp Web accessed via Safari/Chrome - file upload, image paste and message content DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        macWeChatDlp: { id: 'mac-wechat', name: 'WeChat for Mac', description: 'Enhanced WeChat macOS monitoring - message content, file transfer, Mini Program data sharing, Moments and clipboard operations', enabled: true, action: 'audit', platforms: ['macos'] },
+        macTeamsDlp: { id: 'mac-teams', name: 'Microsoft Teams for Mac', description: 'Monitor Teams chat messages, file sharing, meeting chat, channel posts and screen sharing content on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macTelegramDlp: { id: 'mac-telegram', name: 'Telegram for Mac', description: 'Monitor Telegram Desktop native app - message, file transfer, secret chat and channel content DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macLineDlp: { id: 'mac-line', name: 'LINE for Mac', description: 'Monitor LINE Desktop app - message, file transfer, album sharing and Keep content DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macSignalDlp: { id: 'mac-signal', name: 'Signal for Mac', description: 'Monitor Signal Desktop - message content and file attachment DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macSlackDlp: { id: 'mac-slack', name: 'Slack for Mac', description: 'Enhanced Slack macOS monitoring - channel messages, DM, file upload, snippet and workflow DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        macZoomDlp: { id: 'mac-zoom', name: 'Zoom for Mac', description: 'Monitor Zoom chat messages, file transfer in meetings, and recording content on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macDingTalkDlp: { id: 'mac-dingtalk', name: 'DingTalk for Mac', description: 'Monitor DingTalk macOS app - message, file transfer, doc sharing and mini-app DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        macLarkDlp: { id: 'mac-lark', name: 'Lark/Feishu for Mac', description: 'Monitor Lark (Feishu) macOS app - message, doc, sheet, file sharing and approval DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        // --- macOS Native Apps ---
+        macIMessageDlp: { id: 'mac-imessage', name: 'iMessage / Messages.app', description: 'Monitor macOS native Messages app (iMessage/SMS) - text, attachment, image and Tapback content DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        macMailDlp: { id: 'mac-mail', name: 'Apple Mail.app', description: 'Monitor macOS native Mail app - email compose, reply, forward and attachment DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        macNotesDlp: { id: 'mac-notes', name: 'Apple Notes.app', description: 'Monitor macOS Notes app - note creation, sharing, export and attachment DLP', enabled: true, action: 'audit', platforms: ['macos'] },
+        macFinderDlp: { id: 'mac-finder', name: 'Finder File Operations', description: 'Monitor Finder copy, move, rename, compress, share and Quick Actions for sensitive files on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macPreviewDlp: { id: 'mac-preview', name: 'Preview.app', description: 'Monitor Preview app document/image export, markup, print and share operations on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macTerminalDlp: { id: 'mac-terminal', name: 'Terminal / iTerm2', description: 'Monitor command-line file transfer (scp, rsync, curl, wget, git push) and clipboard operations', enabled: true, action: 'audit', platforms: ['macos'] },
+        macSafariDlp: { id: 'mac-safari', name: 'Safari Browser DLP', description: 'Safari-specific file upload, form submission, webmail and cloud storage DLP monitoring', enabled: true, action: 'audit', platforms: ['macos'] },
+        // --- Cloud Storage & Productivity ---
+        macGoogleDriveDlp: { id: 'mac-gdrive', name: 'Google Drive for Mac', description: 'Monitor Google Drive Desktop sync folder and browser upload/download DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macDropboxDlp: { id: 'mac-dropbox', name: 'Dropbox for Mac', description: 'Monitor Dropbox Desktop sync folder and sharing link generation DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macBoxDlp: { id: 'mac-box', name: 'Box for Mac', description: 'Monitor Box Drive sync and Box web upload/download DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        macNotionDlp: { id: 'mac-notion', name: 'Notion for Mac', description: 'Monitor Notion Desktop page export, database export, file upload and sharing DLP on macOS', enabled: true, action: 'audit', platforms: ['macos'] },
+        // --- macOS System Features ---
+        macAirDropDlp: { id: 'mac-airdrop-dlp', name: 'AirDrop Content DLP', description: 'Content-aware AirDrop DLP - scan file content before allowing AirDrop send/receive', enabled: true, action: 'block', platforms: ['macos'] },
+        macShareSheetDlp: { id: 'mac-sharesheet', name: 'Share Sheet / Extensions', description: 'Monitor macOS Share Sheet and share extensions for data exfiltration across all apps', enabled: true, action: 'audit', platforms: ['macos'] },
+        macUniversalClipboard: { id: 'mac-uclip', name: 'Universal Clipboard DLP', description: 'Monitor Handoff Universal Clipboard between Mac/iPhone/iPad for sensitive content', enabled: true, action: 'audit', platforms: ['macos'] },
+        macSidecarDlp: { id: 'mac-sidecar', name: 'Sidecar / Continuity DLP', description: 'Monitor data transfer via Sidecar, Continuity Camera and iPhone Mirroring', enabled: true, action: 'audit', platforms: ['macos'] },
+        macSpotlightDlp: { id: 'mac-spotlight', name: 'Spotlight Search DLP', description: 'Prevent sensitive file metadata from being indexed and exposed via Spotlight', enabled: false, action: 'audit', platforms: ['macos'] },
+        macPrintToPdfDlp: { id: 'mac-print-pdf', name: 'Print-to-PDF DLP', description: 'Monitor macOS Print-to-PDF and Save-as-PDF operations for content exfiltration', enabled: true, action: 'audit', platforms: ['macos'] },
+        macScreenRecordDlp: { id: 'mac-screenrec', name: 'Screen Recording DLP', description: 'Detect and control screen recording when sensitive content is displayed on macOS', enabled: true, action: 'block', platforms: ['macos'] }
+      }
+    },
 }
 
 export async function GET() {
