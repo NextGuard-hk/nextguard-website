@@ -40,6 +40,7 @@ export interface DownloadUser {
   lastLogin?: string
   loginCount: number
     mustResetPassword?: boolean
+  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean }
 }
 
 async function writeLog(entry: Record<string, string>) {
@@ -231,6 +232,7 @@ export async function GET(req: NextRequest) {
       lastLogin: u.lastLogin || null,
       loginCount: u.loginCount || 0,
               mustResetPassword: u.mustResetPassword || false,
+      permissions: u.permissions || { kb: false, download: true, socReview: false },
     }))
     return NextResponse.json({ users: safeUsers })
   } catch {
@@ -287,6 +289,21 @@ export async function PUT(req: NextRequest) {
       </div>`)
       await writeLog({ type: 'download-user', action: 'admin-reset-password', email: user.email })
       return NextResponse.json({ success: true, message: 'Password reset. Temporary password sent to ' + user.email })
+    }
+
+    if (action === 'set-permissions') {
+      const user = users.find(u => u.id === userId)
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      const permissions = req.nextUrl.searchParams.get('permissions')
+      if (!permissions) return NextResponse.json({ error: 'Permissions required' }, { status: 400 })
+      try {
+        user.permissions = JSON.parse(decodeURIComponent(permissions))
+      } catch {
+        return NextResponse.json({ error: 'Invalid permissions format' }, { status: 400 })
+      }
+      await saveUsers(users)
+      await writeLog({ type: 'download-user', action: 'set-permissions', email: user.email, permissions })
+      return NextResponse.json({ success: true, permissions: user.permissions })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
