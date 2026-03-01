@@ -407,12 +407,12 @@ export default function WebDLPComparePage() {
 
         {/* Policy Settings */}
         <button onClick={() => setShowPolicy(!showPolicy)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium mb-4 flex items-center gap-2">
-          \u2699\ufe0f Web DLP Policy Settings {showPolicy ? '\u25b2' : '\u25bc'}
+          Web DLP Policy Settings {showPolicy ? '\u25b2' : '\u25bc'}
         </button>
         {showPolicy && (
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mb-6">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold">\u2699\ufe0f Web DLP Policy Configuration</h3>
+              <h3 className="font-bold">Web DLP Policy Configuration</h3>
               <button onClick={resetPolicy} className="text-xs text-cyan-400 hover:text-cyan-300">Reset to Default</button>
             </div>
             <table className="w-full text-sm">
