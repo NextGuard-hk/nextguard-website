@@ -319,7 +319,7 @@ export default function EmailDLPPage() {
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-8">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">Email DLP Scanning Demo</h1>
-        <p className="text-xs sm:text-sm text-zinc-400 mb-4 sm:mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Perplexity Sonar), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
+        <p className="text-xs sm:text-sm text-zinc-400 mb-4 sm:mb-6">Test AI-powered Data Loss Prevention across 3 engines: Traditional (Regex/Keyword), PPLX (Perplexity Sonar Pro), and Cloudflare Workers AI</p>
 
         {/* Scenario Selector */}
         <div className="mb-4">
