@@ -203,7 +203,7 @@ export default function EmailDLPPage() {
     <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-sm">{label}</h3>
-        {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
+        {latencies?.[eng] && <span className="text-xs text-zinc-500">{(latencies[eng] / 1000).toFixed(1)}s</span>}
       </div>
       {['subject', 'body', 'attachment'].map(part => {
         const result = results[eng]?.[part]
@@ -260,7 +260,7 @@ export default function EmailDLPPage() {
       <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-sm">Regex + Keyword Engine</h3>
-          {latencies?.[eng] && <span className="text-xs text-zinc-500">{latencies[eng]}ms</span>}
+          {latencies?.[eng] && <span className="text-xs text-zinc-500">{(latencies[eng] / 1000).toFixed(1)}s</span>}
         </div>
         {['subject', 'body', 'attachment'].map(part => {
           const result = results[eng]?.[part]
