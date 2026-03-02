@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStore, Agent, generateId } from '@/lib/multi-tenant-store'
 import { signAgentToken } from '@/lib/auth'
+import { getAgentPolicies } from '@/lib/policy-bundle-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,11 +53,8 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get policies for this tenant
-    const policies: any[] = []
-    store.policies.forEach(p => {
-      if (p.tenantId === tid && p.isEnabled) policies.push(p)
-    })
+    // Get policies from the SHARED policy bundle store (same source as Console UI)
+    const policies = getAgentPolicies(tid)
 
     // Generate agent token for subsequent API calls
     const agentToken = signAgentToken(agentId, tid)
