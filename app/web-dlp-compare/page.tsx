@@ -1,5 +1,6 @@
 'use client'
 import { EnterprisePolicyConfig } from '@/components/web-dlp-policy-config'
+import WebProxySWGConfig from '@/components/web-proxy-swg-config'
 import { useState, useRef, useEffect } from 'react'
 
 // Web DLP Scenarios - Web Forms, Cloud Upload, GenAI, Social Media, SaaS, Webmail
