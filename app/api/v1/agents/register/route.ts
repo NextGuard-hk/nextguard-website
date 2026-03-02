@@ -1,67 +1,71 @@
 // Agent Registration API - NextGuard Management Console
-// Compatible with NextGuard Endpoint DLP Agent v1.1.0
+// Uses multi-tenant store for unified data
 import { NextRequest, NextResponse } from 'next/server'
+import { getStore, Agent, generateId } from '@/lib/multi-tenant-store'
 
-// Shared in-memory store (globalThis persists across requests in same serverless instance)
-function getAgents(): Record<string, any> {
-  if (!(globalThis as any).__nextguard_agents) {
-    (globalThis as any).__nextguard_agents = {}
-  }
-  return (globalThis as any).__nextguard_agents
-}
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { hostname, username, os, agentVersion, capabilities, deviceId } = body
-
+    const { hostname, username, os, agentVersion, capabilities, deviceId, tenantId,
+      osVersion, macAddress } = body
     if (!hostname) {
-      return NextResponse.json(
-        { error: 'Missing required field: hostname', code: 'VALIDATION_ERROR' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required field: hostname' }, { status: 400 })
     }
-
     const clientIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
     const now = new Date().toISOString()
-
-    // Generate agentId from deviceId or hostname+username
+    const store = getStore()
     const agentId = deviceId || `agent-${hostname}-${username || 'default'}`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+    const tid = tenantId || 'tenant-demo'
+    const existing = store.agents.get(agentId)
+    const isNew = !existing
 
-    const agents = getAgents()
-    const isNew = !agents[agentId]
-
-    agents[agentId] = {
-      agentId,
+    const agent: Agent = {
+      id: agentId,
+      tenantId: tid,
       hostname,
       username: username || 'unknown',
       os: os || 'unknown',
+      osVersion: osVersion || 'unknown',
       agentVersion: agentVersion || 'unknown',
-      capabilities: capabilities || [],
-      ipAddress: clientIp,
-      registeredAt: agents[agentId]?.registeredAt || now,
-      lastHeartbeat: now,
+      macAddress: macAddress || `mac_${Date.now()}`,
+      ip: clientIp,
       status: 'online',
-      policyVersion: agents[agentId]?.policyVersion || 0,
+      lastHeartbeat: now,
+      registeredAt: existing?.registeredAt || now,
+      policyVersion: existing?.policyVersion || 0,
+      pendingPolicyPush: true,
+      tags: existing?.tags || [],
+    }
+    store.agents.set(agentId, agent)
+
+    if (isNew) {
+      store.logs.push({
+        id: generateId('log'),
+        tenantId: tid, agentId,
+        timestamp: now, level: 'info', facility: 'agent-registration',
+        message: `New agent registered: ${hostname} (${macAddress || 'unknown'})`
+      })
     }
 
+    // Get policies for this tenant
+    const policies: any[] = []
+    store.policies.forEach(p => {
+      if (p.tenantId === tid && p.isEnabled) policies.push(p)
+    })
+
     return NextResponse.json({
-      success: true,
-      agentId,
-      isNewRegistration: isNew,
-      agent: {
-        agentId,
-        hostname,
-        status: 'online',
-        registeredAt: agents[agentId].registeredAt,
-      },
+      success: true, agentId, isNewRegistration: isNew,
+      agent: { agentId, hostname, status: 'online', registeredAt: agent.registeredAt },
       config: {
         heartbeatIntervalSeconds: 60,
         policySyncIntervalSeconds: 300,
         heartbeatEndpoint: '/api/v1/agents/heartbeat',
-        policySyncEndpoint: '/api/v1/policies/bundle',
+        policySyncEndpoint: '/api/v1/agent-sync',
         reportingEndpoint: '/api/v1/incidents',
       },
+      policies,
       message: isNew ? `Agent ${hostname} registered successfully` : `Agent ${hostname} re-registered`,
     })
   } catch (error) {
@@ -70,22 +74,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: List all registered agents
 export async function GET() {
-  const agents = getAgents()
-  const agentList = Object.values(agents)
-
-  // Mark offline if no heartbeat in 5 minutes
+  const store = getStore()
+  const agentList = Array.from(store.agents.values())
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-  agentList.forEach((a: any) => {
-    if (a.lastHeartbeat < fiveMinAgo) a.status = 'offline'
-  })
-
+  agentList.forEach(a => { if (a.lastHeartbeat < fiveMinAgo) a.status = 'offline' })
   return NextResponse.json({
     success: true,
     totalAgents: agentList.length,
-    onlineAgents: agentList.filter((a: any) => a.status === 'online').length,
-    offlineAgents: agentList.filter((a: any) => a.status === 'offline').length,
-    agents: agentList.sort((a: any, b: any) => b.lastHeartbeat.localeCompare(a.lastHeartbeat)),
+    onlineAgents: agentList.filter(a => a.status === 'online').length,
+    offlineAgents: agentList.filter(a => a.status === 'offline').length,
+    agents: agentList.sort((a, b) => b.lastHeartbeat.localeCompare(a.lastHeartbeat)),
   })
 }
