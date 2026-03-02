@@ -7,7 +7,7 @@ interface DownloadUser {
   email: string
   active: boolean
   emailVerified: boolean
-  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean }
+  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean }
 }
 
 async function getUsers(): Promise<DownloadUser[]> {
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   const page = req.nextUrl.searchParams.get('page')
-  if (!page || !['kb', 'download', 'socReview'].includes(page)) {
+  if (!page || !['kb', 'download', 'socReview', 'projectAccess'].includes(page)) {
     return NextResponse.json({ error: 'Invalid page parameter' }, { status: 400 })
   }
 
