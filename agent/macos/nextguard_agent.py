@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 NextGuard Endpoint DLP Agent for macOS
-Version: 2.0.2
+Version: 2.0.3
 Compatible with NextGuard Management Console v2.0
 
 Features:
@@ -45,7 +45,7 @@ from typing import Optional, Dict, List, Any
 # ============================================================
 # Configuration
 # ============================================================
-AGENT_VERSION = '2.0.2'
+AGENT_VERSION = '2.0.3'
 HEARTBEAT_INTERVAL = 60    # seconds
 POLICY_SYNC_INTERVAL = 300  # seconds
 CONFIG_DIR = Path.home() / '.nextguard'
