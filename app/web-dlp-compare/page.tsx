@@ -1,4 +1,5 @@
 'use client'
+import { EnterprisePolicyConfig } from '@/components/web-dlp-policy-config'
 import { useState, useRef, useEffect } from 'react'
 
 // Web DLP Scenarios - Web Forms, Cloud Upload, GenAI, Social Media, SaaS, Webmail
@@ -409,27 +410,7 @@ export default function WebDLPComparePage() {
         <button onClick={() => setShowPolicy(!showPolicy)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium mb-4 flex items-center gap-2">
           Web DLP Policy Settings {showPolicy ? '\u25b2' : '\u25bc'}
         </button>
-        {showPolicy && (
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mb-6">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold">Web DLP Policy Configuration</h3>
-              <button onClick={resetPolicy} className="text-xs text-cyan-400 hover:text-cyan-300">Reset to Default</button>
-            </div>
-            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[900px]">
-              <thead><tr className="text-zinc-500 text-xs"><th className="text-left py-1">Enabled</th><th className="text-left">Rule</th><th className="text-left">Action</th><th className="text-left">Severity</th><th className="text-left text-xs text-zinc-400 pb-2">Count</th><th className="text-left text-xs text-zinc-400 pb-2">Confidence</th><th className="text-left text-xs text-zinc-400 pb-2">Proximity</th><th className="text-left text-xs text-zinc-400 pb-2">Direction</th><th className="text-left text-xs text-zinc-400 pb-2">Schedule</th><th className="text-left text-xs text-zinc-400 pb-2">Notify</th><th className="text-left text-xs text-zinc-400 pb-2">Log</th></tr></thead>
-              <tbody>
-                {(Object.keys(policy) as PolicyKey[]).map(key => (
-                  <tr key={key} className="border-t border-zinc-800">
-                    <td className="py-1"><input type="checkbox" checked={policy[key].enabled} onChange={e => updatePolicy(key, 'enabled', e.target.checked)} className="accent-cyan-500" /></td>
-                    <td className="text-zinc-300">{POLICY_LABELS[key]}</td>
-                    <td><select value={policy[key].action} onChange={e => updatePolicy(key, 'action', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-xs text-white">{ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></td>
-                    <td><select value={policy[key].severity} onChange={e => updatePolicy(key, 'severity', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-xs text-white">{SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}</select></td><td className="py-1 pr-2"><input type="number" min={1} max={100} value={policy[key].matchCount} onChange={e => updatePolicy(key, 'matchCount', parseInt(e.target.value) || 1)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white w-12" /></td><td className="py-1 pr-2"><select value={policy[key].confidence} onChange={e => updatePolicy(key, 'confidence', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white">{CONFIDENCES.map(c => <option key={c} value={c}>{c}</option>)}</select></td><td className="py-1 pr-2"><input type="number" min={0} max={1000} step={50} value={policy[key].proximity} onChange={e => updatePolicy(key, 'proximity', parseInt(e.target.value) || 0)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white w-14" /></td><td className="py-1 pr-2"><select value={policy[key].direction} onChange={e => updatePolicy(key, 'direction', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white">{DIRECTIONS.map(d => <option key={d} value={d}>{d}</option>)}</select></td><td className="py-1 pr-2"><select value={policy[key].schedule} onChange={e => updatePolicy(key, 'schedule', e.target.value)} className="bg-zinc-800 border border-zinc-600 rounded px-1 py-1 text-xs text-white">{SCHEDULES.map(s => <option key={s} value={s}>{s}</option>)}</select></td><td className="py-1 pr-2 text-center"><input type="checkbox" checked={policy[key].notifyAdmin} onChange={e => updatePolicy(key, 'notifyAdmin', e.target.checked)} className="accent-cyan-500" /></td><td className="py-1 text-center"><input type="checkbox" checked={policy[key].logContent} onChange={e => updatePolicy(key, 'logContent', e.target.checked)} className="accent-cyan-500" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          </div>
-        )}
+        {showPolicy && <EnterprisePolicyConfig policy={policy} setPolicy={setPolicy} resetPolicy={resetPolicy} />}
 
         {/* Scenario Categories */}
         <div className="flex flex-wrap gap-2 mb-4">
