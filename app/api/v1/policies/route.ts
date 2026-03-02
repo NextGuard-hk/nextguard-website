@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getStore } from '@/lib/multi-tenant-store'
+import { getStore, generateId } from '@/lib/multi-tenant-store'
 import { authenticateRequest } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-function getTenantFromUser(user: { tenantId?: string; role: string }) {
+function getTenantId(user: { tenantId?: string; role: string }, url?: URL): string | null {
+  if (user.role === 'super_admin' && url) return url.searchParams.get('tenantId') || user.tenantId || null
   return user.tenantId || null
 }
 
@@ -14,12 +15,19 @@ export async function GET(request: Request) {
     const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const url = new URL(request.url)
-    const tenantId = user.role === 'super_admin' ? url.searchParams.get('tenantId') : getTenantFromUser(user)
+    const tenantId = getTenantId(user, url)
     if (!tenantId) return NextResponse.json({ success: false, error: 'tenantId required' }, { status: 400 })
     const store = getStore()
-    const tenant = store.tenants.get(tenantId)
-    if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
-    return NextResponse.json({ success: true, policies: tenant.policies })
+    if (!store.tenants.has(tenantId)) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
+
+    // Get policies from store.policies Map filtered by tenantId
+    const policies: any[] = []
+    store.policies.forEach((p) => {
+      if (p.tenantId === tenantId) policies.push(p)
+    })
+    policies.sort((a, b) => a.priority - b.priority)
+
+    return NextResponse.json({ success: true, policies, total: policies.length })
   } catch {
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
   }
@@ -31,23 +39,45 @@ export async function POST(request: Request) {
     const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const body = await request.json()
-    const { tenantId, name, rules, actions, enabled } = body
-    const effectiveTenantId = user.role === 'super_admin' ? tenantId : getTenantFromUser(user)
-    if (!effectiveTenantId) return NextResponse.json({ success: false, error: 'tenantId required' }, { status: 400 })
+    const tenantId = getTenantId(user) || body.tenantId
+    if (!tenantId) return NextResponse.json({ success: false, error: 'tenantId required' }, { status: 400 })
     const store = getStore()
-    const tenant = store.tenants.get(effectiveTenantId)
-    if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
+    if (!store.tenants.has(tenantId)) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
+
+    const policyId = generateId('pol')
+    const now = new Date().toISOString()
     const policy = {
-      id: `policy_${Date.now()}`,
-      tenantId: effectiveTenantId,
-      name: name || 'New Policy',
-      rules: rules || [],
-      actions: actions || ['log'],
-      enabled: enabled !== false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      id: policyId,
+      tenantId,
+      name: body.name || 'New Policy',
+      description: body.description || '',
+      version: 1,
+      isEnabled: body.enabled !== false,
+      priority: body.priority || 10,
+      channels: body.channels || ['filesystem'],
+      conditions: (body.patterns || []).map((p: string) => ({
+        type: 'regex', value: p, operator: 'matches', isCaseSensitive: false
+      })).concat((body.keywords || []).map((k: string) => ({
+        type: 'keyword', value: k, operator: 'contains', isCaseSensitive: false
+      }))),
+      action: body.action || 'audit',
+      severity: body.severity || 'medium',
+      notifyUser: body.notifyUser !== false,
+      notifyAdmin: true,
+      blockMessage: body.blockMessage || `Blocked by policy: ${body.name}`,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: user.userId || 'console',
+      appliedToAgents: [],
+      complianceFramework: body.complianceFramework || 'CUSTOM'
     }
-    tenant.policies.push(policy)
+    store.policies.set(policyId, policy as any)
+
+    // Mark all tenant agents for policy push
+    store.agents.forEach((a) => {
+      if (a.tenantId === tenantId) a.pendingPolicyPush = true
+    })
+
     return NextResponse.json({ success: true, policy })
   } catch {
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
@@ -60,32 +90,63 @@ export async function PUT(request: Request) {
     const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const body = await request.json()
-    const { policyId, tenantId, ...updates } = body
-    const effectiveTenantId = user.role === 'super_admin' ? tenantId : getTenantFromUser(user)
+    const { policyId, ...updates } = body
+    if (!policyId) return NextResponse.json({ success: false, error: 'policyId required' }, { status: 400 })
+
     const store = getStore()
-    const tenant = store.tenants.get(effectiveTenantId || '')
-    if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
-    const idx = tenant.policies.findIndex((p: any) => p.id === policyId)
-    if (idx === -1) return NextResponse.json({ success: false, error: 'Policy not found' }, { status: 404 })
-    tenant.policies[idx] = { ...tenant.policies[idx], ...updates, updatedAt: new Date().toISOString() }
-    return NextResponse.json({ success: true, policy: tenant.policies[idx] })
+    const existing = store.policies.get(policyId)
+    if (!existing) return NextResponse.json({ success: false, error: 'Policy not found' }, { status: 404 })
+
+    // Verify tenant access
+    const tenantId = getTenantId(user) || existing.tenantId
+    if (existing.tenantId !== tenantId && user.role !== 'super_admin') {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
+    }
+
+    const updated = {
+      ...existing,
+      ...updates,
+      version: existing.version + 1,
+      updatedAt: new Date().toISOString()
+    }
+    store.policies.set(policyId, updated)
+
+    // Mark agents for policy push
+    store.agents.forEach((a) => {
+      if (a.tenantId === existing.tenantId) a.pendingPolicyPush = true
+    })
+
+    return NextResponse.json({ success: true, policy: updated })
   } catch {
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
   }
 }
 
-// DELETE /api/v1/policies?policyId=xxx&tenantId=xxx
+// DELETE /api/v1/policies?policyId=xxx
 export async function DELETE(request: Request) {
   try {
     const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const url = new URL(request.url)
     const policyId = url.searchParams.get('policyId')
-    const effectiveTenantId = user.role === 'super_admin' ? url.searchParams.get('tenantId') : getTenantFromUser(user)
+    if (!policyId) return NextResponse.json({ success: false, error: 'policyId required' }, { status: 400 })
+
     const store = getStore()
-    const tenant = store.tenants.get(effectiveTenantId || '')
-    if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
-    tenant.policies = tenant.policies.filter((p: any) => p.id !== policyId)
+    const existing = store.policies.get(policyId)
+    if (!existing) return NextResponse.json({ success: false, error: 'Policy not found' }, { status: 404 })
+
+    const tenantId = getTenantId(user, url) || existing.tenantId
+    if (existing.tenantId !== tenantId && user.role !== 'super_admin') {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
+    }
+
+    store.policies.delete(policyId)
+
+    // Mark agents for policy push
+    store.agents.forEach((a) => {
+      if (a.tenantId === existing.tenantId) a.pendingPolicyPush = true
+    })
+
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
