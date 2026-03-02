@@ -248,6 +248,49 @@ export default function ProjectsPage() {
     setIssues(prev => prev.map(i => i.id === selectedIssue.id ? f : i)); setSelectedIssue(f);
   };
 
+
+    const handleCreateKB = () => {
+    if (!kbTitle.trim()) return;
+    const newArticle: KBArticle = {
+      id: `kb-${Date.now()}`,
+      title: kbTitle,
+      category: kbCategory || 'General',
+      department: kbDept,
+      author: currentUser?.id || 'u1',
+      content: kbContent,
+      views: 0,
+      helpful: 0,
+      updated: now(),
+    };
+    setKbArticles(prev => [...prev, newArticle]);
+    setKbTitle(''); setKbContent(''); setKbCategory('');
+    setShowCreateKB(false);
+  };
+
+  const openEditKB = (article: KBArticle) => {
+    setEditKBArticle(article);
+    setKbTitle(article.title);
+    setKbContent(article.content);
+    setKbCategory(article.category);
+    setKbDept(article.department);
+    setShowEditKB(true);
+  };
+
+  const handleEditKB = () => {
+    if (!editKBArticle || !kbTitle.trim()) return;
+    setKbArticles(prev => prev.map(a => a.id === editKBArticle.id ? { ...a, title: kbTitle, content: kbContent, category: kbCategory, department: kbDept, updated: now() } : a));
+    const updated = { ...editKBArticle, title: kbTitle, content: kbContent, category: kbCategory, department: kbDept, updated: now() };
+    setSelectedKBArticle(updated);
+    setShowEditKB(false); setEditKBArticle(null);
+    setKbTitle(''); setKbContent(''); setKbCategory('');
+  };
+
+  const handleDeleteKB = () => {
+    if (!selectedKBArticle) return;
+    setKbArticles(prev => prev.filter(a => a.id !== selectedKBArticle.id));
+    setShowDeleteKBConfirm(false);
+    setSelectedKBArticle(null);
+  };
   const filteredIssues = useMemo(() => {
     return issues.filter(issue => {
       if (searchQuery && !issue.title.toLowerCase().includes(searchQuery.toLowerCase()) && !issue.key.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -424,7 +467,7 @@ export default function ProjectsPage() {
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">\ud83d\udd0d</span>
                 </div>
               </div>
-              {/* Category Pills */}
+              <button onClick={() => setShowCreateKB(true)} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-sm transition-colors whitespace-nowrap">+ Create Article</button>{/* Category Pills */}
               <div className="flex flex-wrap gap-2 mb-6 justify-center">
                 <button onClick={() => setKbSelectedCategory('all')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${kbSelectedCategory === 'all' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'}`}>All Articles</button>
                 {kbCategories.map(cat => (
@@ -512,7 +555,7 @@ export default function ProjectsPage() {
                       <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2.5 py-1 rounded-full font-medium">{selectedKBArticle.category}</span>
                       <span className="text-xs bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full">{selectedKBArticle.department}</span>
                     </div>
-                    <h1 className="text-xl sm:text-2xl font-bold mb-4">{selectedKBArticle.title}</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold mb-4">{selectedKBArticle.title}</h1><div className="flex gap-2 mb-6"><button onClick={() => openEditKB(selectedKBArticle)} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-xs font-medium transition-colors">Edit</button><button onClick={() => setShowDeleteKBConfirm(true)} className="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-medium transition-colors">Delete</button></div>
                     <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-800">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold">{getUserAvatar(selectedKBArticle.author)}</div>
                       <div><p className="text-sm font-medium">{getUserName(selectedKBArticle.author)}</p><p className="text-xs text-gray-500">Updated {selectedKBArticle.updated} \u00b7 {selectedKBArticle.views} views</p></div>
@@ -658,7 +701,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Create Task Modal */}
+      {/* Create/Edit KB Modal */}{(showCreateKB || showEditKB) && (<div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={() => {setShowCreateKB(false);setShowEditKB(false);setEditKBArticle(null);setKbTitle('');setKbContent('');setKbCategory('');}}><div className="absolute inset-0 bg-black/60" /><div className="relative bg-gray-900 rounded-xl border border-gray-800 w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold">{showEditKB ? 'Edit Article' : 'Create New Article'}</h3><button onClick={() => {setShowCreateKB(false);setShowEditKB(false);setEditKBArticle(null);setKbTitle('');setKbContent('');setKbCategory('');}} className="text-gray-400 hover:text-white text-xl">X</button></div><div className="space-y-3"><div><label className="block text-sm text-gray-400 mb-1">Title</label><input type="text" value={kbTitle} onChange={e => setKbTitle(e.target.value)} placeholder="Article title" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><input type="text" value={kbCategory} onChange={e => setKbCategory(e.target.value)} placeholder="e.g. Configuration, Deployment" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none" /></div><div><label className="block text-sm text-gray-400 mb-1">Department</label><select value={kbDept} onChange={e => setKbDept(e.target.value as Department)} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">{departments.map(d => <option key={d}>{d}</option>)}</select></div><div><label className="block text-sm text-gray-400 mb-1">Content</label><textarea value={kbContent} onChange={e => setKbContent(e.target.value)} placeholder="Article content..." rows={8} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none resize-none" /></div><button onClick={showEditKB ? handleEditKB : handleCreateKB} className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-sm transition-colors">{showEditKB ? 'Save Changes' : 'Create Article'}</button></div></div></div>)}{/* Delete KB Confirm */}{showDeleteKBConfirm && selectedKBArticle && (<div className="fixed inset-0 z-[95] flex items-center justify-center p-4"><div className="absolute inset-0 bg-black/60" /><div className="relative bg-gray-900 rounded-xl border border-red-800 w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}><h3 className="text-lg font-semibold mb-2">Delete Article?</h3><p className="text-sm text-gray-400 mb-4">Delete <strong>{selectedKBArticle.title}</strong>? This cannot be undone.</p><div className="flex gap-2"><button onClick={handleDeleteKB} className="flex-1 py-2 bg-red-600 hover:bg-red-500 rounded-lg font-medium text-sm">Delete</button><button onClick={() => setShowDeleteKBConfirm(false)} className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">Cancel</button></div></div></div>)}{/* Create Task Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
           <div className="absolute inset-0 bg-black/60" />
