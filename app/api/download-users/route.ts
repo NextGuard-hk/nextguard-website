@@ -232,7 +232,7 @@ export async function GET(req: NextRequest) {
       lastLogin: u.lastLogin || null,
       loginCount: u.loginCount || 0,
               mustResetPassword: u.mustResetPassword || false,
-      permissions: u.permissions || { kb: false, download: true, socReview: false },
+      permissions: u.permissions || { kb: false, download: true, socReview: false, projectAccess: false },
     }))
     return NextResponse.json({ users: safeUsers })
   } catch {
