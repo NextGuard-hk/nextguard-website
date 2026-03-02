@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 NextGuard Endpoint DLP Agent for macOS
-Version: 2.0.3
+Version: 2.0.4
 Compatible with NextGuard Management Console v2.0
 
 Features:
@@ -10,12 +10,8 @@ Features:
   - File system monitoring (FSEvents)
   - USB device detection
   - Clipboard monitoring
-  - AirDrop detection
-  - Browser upload detection
-  - Print job monitoring
+  - Real block enforcement (quarantine + clipboard clear)
   - Incident reporting to console
-  - Tamper protection
-  - Offline policy cache
 
 Requirements: Python 3.9+, macOS 10.15+
 No external dependencies (stdlib only)
@@ -23,7 +19,6 @@ No external dependencies (stdlib only)
 Usage:
     sudo python3 nextguard_agent.py --server https://www.next-guard.com --tenant tenant-demo
 """
-
 import os
 import sys
 import json
@@ -50,22 +45,6 @@ CACHE_FILE = CONFIG_DIR / 'policy_cache.json'
 STATE_FILE = CONFIG_DIR / 'agent_state.json'
 LOG_FILE = CONFIG_DIR / 'agent.log'
 QUEUE_FILE = CONFIG_DIR / 'event_queue.json'
-
-def enforce_block(path=None, channel=None, policy_name=''):
-    """Enforce block action: quarantine file or clear clipboard."""
-    try:
-          if channel == 'clipboard':
-                  subprocess.run(['pbcopy'], input=b'[BLOCKED by NextGuard DLP]', timeout=5)
-                  log.warning(f'[BLOCKED] Clipboard cleared - {policy_name}')
-                elif path and Path(path).exists():
-                        q_dir = CONFIG_DIR / 'quarantine'
-                        q_dir.mkdir(parents=True, exist_ok=True)
-                        src = Path(path)
-                        dst = q_dir / f'{src.name}.{int(time.time())}.blocked'
-                        src.rename(dst)
-                        log.warning(f'[BLOCKED] File quarantined: {src.name} -> {dst}')
-                    except Exception as e:
-                          log.error(f'Enforcement failed: {e}')
 SKIP_VOLUMES = {'Macintosh HD', 'Macintosh HD - Data', 'Recovery', 'Preboot', 'VM', 'Update'}
 
 def setup_logging():
@@ -75,6 +54,22 @@ def setup_logging():
   return logging.getLogger('nextguard')
 
 log = setup_logging()
+
+def enforce_block(path=None, channel=None, policy_name=''):
+  """Enforce block action: quarantine file or clear clipboard."""
+  try:
+    if channel == 'clipboard':
+      subprocess.run(['pbcopy'], input=b'[BLOCKED by NextGuard DLP]', timeout=5)
+      log.warning(f'[BLOCKED] Clipboard cleared - {policy_name}')
+    elif path and Path(path).exists():
+      q_dir = CONFIG_DIR / 'quarantine'
+      q_dir.mkdir(parents=True, exist_ok=True)
+      src = Path(path)
+      dst = q_dir / f'{src.name}.{int(time.time())}.blocked'
+      src.rename(dst)
+      log.warning(f'[BLOCKED] File quarantined: {src.name} -> {dst}')
+  except Exception as e:
+    log.error(f'Enforcement failed: {e}')
 
 def get_system_info():
   hostname = socket.gethostname()
@@ -100,8 +95,7 @@ def get_system_info():
       if 'IOPlatformSerialNumber' in line: dev_id = f'mac-{hashlib.sha256(line.split(chr(34))[-2].encode()).hexdigest()[:12]}'; break
     if not dev_id: dev_id = f'mac-{hashlib.sha256(hostname.encode()).hexdigest()[:12]}'
   except: dev_id = f'mac-{hashlib.sha256(hostname.encode()).hexdigest()[:12]}'
-  return {'hostname': hostname, 'username': username, 'os': 'macOS', 'osVersion': f'{mac_ver} {os_name}',
-    'agentVersion': AGENT_VERSION, 'macAddress': mac_addr, 'ip': ip, 'deviceId': dev_id}
+  return {'hostname': hostname, 'username': username, 'os': 'macOS', 'osVersion': f'{mac_ver} {os_name}', 'agentVersion': AGENT_VERSION, 'macAddress': mac_addr, 'ip': ip, 'deviceId': dev_id}
 
 class APIClient:
   def __init__(self, server_url, tenant_id):
@@ -109,7 +103,6 @@ class APIClient:
     self.tenant_id = tenant_id
     self.agent_id = None
     self.token = None
-
   def _request(self, method, path, data=None):
     url = f'{self.server}/api/v1{path}'
     headers = {'Content-Type': 'application/json', 'User-Agent': f'NextGuard-Agent/{AGENT_VERSION}'}
@@ -117,17 +110,10 @@ class APIClient:
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-      with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-      log.error(f'API error {e.code}: {path}')
-      return None
-    except Exception as e:
-      log.error(f'Network error: {e}')
-      return None
-
+      with urllib.request.urlopen(req, timeout=30) as resp: return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e: log.error(f'API error {e.code}: {path}'); return None
+    except Exception as e: log.error(f'Network error: {e}'); return None
   def register(self, system_info):
-    """Register agent. Returns full response dict with policies and agentToken."""
     payload = {**system_info, 'tenantId': self.tenant_id}
     resp = self._request('POST', '/agents/register', payload)
     if resp and resp.get('success'):
@@ -138,21 +124,14 @@ class APIClient:
       return resp
     log.error('Registration failed')
     return {}
-
   def heartbeat(self):
-    return self._request('POST', '/agents/heartbeat', {
-      'agentId': self.agent_id, 'tenantId': self.tenant_id,
-      'status': 'online', 'timestamp': datetime.now(timezone.utc).isoformat()})
-
+    return self._request('POST', '/agents/heartbeat', {'agentId': self.agent_id, 'tenantId': self.tenant_id, 'status': 'online', 'timestamp': datetime.now(timezone.utc).isoformat()})
   def sync_policies(self):
-    resp = self._request('POST', '/agent-sync', {
-      'tenantId': self.tenant_id, 'agentId': self.agent_id, 'action': 'heartbeat'})
+    resp = self._request('POST', '/agent-sync', {'tenantId': self.tenant_id, 'agentId': self.agent_id, 'action': 'heartbeat'})
     if resp and resp.get('success'): return resp.get('policies', [])
     return None
-
   def report_incident(self, incident):
-    payload = {'agentId': self.agent_id, 'tenantId': self.tenant_id, **incident,
-      'timestamp': datetime.now(timezone.utc).isoformat()}
+    payload = {'agentId': self.agent_id, 'tenantId': self.tenant_id, **incident, 'timestamp': datetime.now(timezone.utc).isoformat()}
     resp = self._request('POST', '/incidents', payload)
     return bool(resp and resp.get('success'))
 
@@ -197,8 +176,7 @@ class PolicyEngine:
 class FileSystemMonitor:
   SENSITIVE_DIRS = [Path.home() / 'Documents', Path.home() / 'Desktop', Path.home() / 'Downloads', Path('/Volumes')]
   def __init__(self, engine, api): self.engine = engine; self.api = api; self.running = False; self._watched = {}
-  def start(self):
-    self.running = True; threading.Thread(target=self._loop, daemon=True).start(); log.info('File system monitor started')
+  def start(self): self.running = True; threading.Thread(target=self._loop, daemon=True).start(); log.info('File system monitor started')
   def stop(self): self.running = False
   def _loop(self):
     while self.running:
@@ -227,22 +205,19 @@ class FileSystemMonitor:
     channel = 'usb' if str(path).startswith('/Volumes') else 'filesystem'
     content = ''
     try:
-      if path.suffix.lower() in ('.txt', '.csv', '.md', '.json', '.xml', '.log'): content = path.read_text(errors='ignore')[:10000]
+      if path.suffix.lower() in ('.txt', '.csv', '.md', '.json', '.xml', '.log'):
+        content = path.read_text(errors='ignore')[:10000]
     except: pass
     event = {'channel': channel, 'fileName': path.name, 'filePath': str(path), 'fileSize': path.stat().st_size, 'content': content}
     matched = self.engine.evaluate(event)
     if matched:
       log.warning(f'Policy violation: {matched["name"]} - {event["fileName"]}')
-                  if matched.get('action') == 'block': enforce_block(path=str(path), channel=channel, policy_name=matched['name'])
-      self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER', 'unknown'),
-        'policyId': matched['id'], 'policyName': matched['name'], 'severity': matched.get('severity', 'medium'),
-        'action': matched.get('action', 'audit'), 'channel': channel, 'riskScore': 75,
-        'details': {'fileName': event.get('fileName'), 'filePath': event.get('filePath'), 'fileSize': event.get('fileSize')}})
+      if matched.get('action') == 'block': enforce_block(path=str(path), channel=channel, policy_name=matched['name'])
+      self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER', 'unknown'), 'policyId': matched['id'], 'policyName': matched['name'], 'severity': matched.get('severity', 'medium'), 'action': matched.get('action', 'audit'), 'channel': channel, 'riskScore': 75, 'details': {'fileName': event.get('fileName'), 'filePath': event.get('filePath'), 'fileSize': event.get('fileSize')}})
 
 class USBMonitor:
   def __init__(self, engine, api): self.engine = engine; self.api = api; self.running = False; self._known = set()
-  def start(self):
-    self.running = True; self._known = set(self._vols()); threading.Thread(target=self._loop, daemon=True).start(); log.info('USB monitor started')
+  def start(self): self.running = True; self._known = set(self._vols()); threading.Thread(target=self._loop, daemon=True).start(); log.info('USB monitor started')
   def stop(self): self.running = False
   def _vols(self):
     p = Path('/Volumes')
@@ -255,17 +230,14 @@ class USBMonitor:
         for vol in cur - self._known:
           log.warning(f'New USB volume: {vol}')
           m = self.engine.evaluate({'channel': 'usb', 'fileName': vol, 'content': ''})
-          if m: self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER','unknown'),
-            'policyId': m['id'], 'policyName': m['name'], 'severity': m.get('severity','high'),
-            'action': m.get('action','block'), 'channel': 'usb', 'riskScore': 80, 'details': {'fileName': vol}})
+          if m: self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER','unknown'), 'policyId': m['id'], 'policyName': m['name'], 'severity': m.get('severity','high'), 'action': m.get('action','block'), 'channel': 'usb', 'riskScore': 80, 'details': {'fileName': vol}})
         self._known = cur
       except Exception as e: log.error(f'USB error: {e}')
       time.sleep(3)
 
 class ClipboardMonitor:
   def __init__(self, engine, api): self.engine = engine; self.api = api; self.running = False; self._last = ''
-  def start(self):
-    self.running = True; threading.Thread(target=self._loop, daemon=True).start(); log.info('Clipboard monitor started')
+  def start(self): self.running = True; threading.Thread(target=self._loop, daemon=True).start(); log.info('Clipboard monitor started')
   def stop(self): self.running = False
   def _loop(self):
     while self.running:
@@ -277,10 +249,8 @@ class ClipboardMonitor:
           m = self.engine.evaluate({'channel': 'clipboard', 'content': c, 'fileName': ''})
           if m:
             log.warning(f'Clipboard policy violation: {m["name"]}')
-                          if m.get('action') == 'block': enforce_block(channel='clipboard', policy_name=m['name'])
-            self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER','unknown'),
-              'policyId': m['id'], 'policyName': m['name'], 'severity': m.get('severity','medium'),
-              'action': m.get('action','audit'), 'channel': 'clipboard', 'riskScore': 65, 'details': {'contentSnippet': c[:200]}})
+            if m.get('action') == 'block': enforce_block(channel='clipboard', policy_name=m['name'])
+            self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER','unknown'), 'policyId': m['id'], 'policyName': m['name'], 'severity': m.get('severity','medium'), 'action': m.get('action','audit'), 'channel': 'clipboard', 'riskScore': 65, 'details': {'contentSnippet': c[:200]}})
       except Exception as e: log.error(f'Clipboard error: {e}')
       time.sleep(2)
 
@@ -292,7 +262,6 @@ class NextGuardAgent:
     self.usb_monitor = USBMonitor(self.engine, self.api)
     self.clip_monitor = ClipboardMonitor(self.engine, self.api)
     self.running = False
-
   def start(self):
     log.info('=' * 50)
     log.info(f'NextGuard DLP Agent v{AGENT_VERSION} starting...')
@@ -300,7 +269,6 @@ class NextGuardAgent:
     sys_info = get_system_info()
     log.info(f'Host: {sys_info["hostname"]} | User: {sys_info["username"]}')
     log.info(f'OS: {sys_info["osVersion"]} | MAC: {sys_info["macAddress"]}')
-    # Register and get policies from response
     reg_resp = self.api.register(sys_info)
     if not reg_resp:
       log.warning('Registration failed. Loading cached policies.')
@@ -314,11 +282,8 @@ class NextGuardAgent:
       else:
         log.warning('No policies in register response, trying sync...')
         policies = self.api.sync_policies()
-        if policies:
-          self.engine.load(policies)
-          self.engine.save_cache()
-        else:
-          self.engine.load_cache()
+        if policies: self.engine.load(policies); self.engine.save_cache()
+        else: self.engine.load_cache()
     self._save_state(sys_info)
     self.running = True
     self.fs_monitor.start()
@@ -342,11 +307,9 @@ class NextGuardAgent:
         time.sleep(1)
     except KeyboardInterrupt: log.info('Shutting down...')
     finally: self.stop()
-
   def stop(self):
     self.running = False; self.fs_monitor.stop(); self.usb_monitor.stop(); self.clip_monitor.stop()
     log.info('Agent stopped.')
-
   def _save_state(self, sys_info):
     try: STATE_FILE.write_text(json.dumps({'agentId': self.api.agent_id, 'lastStart': datetime.now(timezone.utc).isoformat(), **sys_info}, indent=2))
     except: pass
@@ -361,5 +324,4 @@ def main():
   agent = NextGuardAgent(args.server, args.tenant)
   agent.start()
 
-if __name__ == '__main__':
-  main()
+if __name__ == '__main__': main()
