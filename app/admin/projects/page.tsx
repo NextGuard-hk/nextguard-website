@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 // ==================== TYPES ====================
 type Department = 'R&D' | 'Presales' | 'Support' | 'Management';
@@ -91,7 +91,7 @@ export default function ProjectsPage() {
   const [selectedKBArticle, setSelectedKBArticle] = useState<KBArticle | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false); useEffect(() => { const h = document.querySelector('header'); const f = document.querySelector('footer'); if (h) (h as HTMLElement).style.display = 'none'; if (f) (f as HTMLElement).style.display = 'none'; return () => { if (h) (h as HTMLElement).style.display = ''; if (f) (f as HTMLElement).style.display = ''; }; }, []);
 
   const handleLogin = () => {
     const user = mockUsers.find(u => u.email === emailInput);
@@ -161,10 +161,10 @@ export default function ProjectsPage() {
   return (
     <div className="min-h-screen bg-gray-950 flex">
       {/* Mobile sidebar overlay */}
-      {mobileSidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileSidebarOpen(false)} />}
+      {mobileSidebarOpen && <div className="fixed inset-0 bg-black/50 z-[60] lg:hidden" onClick={() => setMobileSidebarOpen(false)} />}
 
       {/* Sidebar - hidden on mobile, shown on lg+ */}
-      <div className={`fixed lg:static inset-y-0 left-0 z-50 ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-300 ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <div className={`fixed lg:static inset-y-0 left-0 z-[70] ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-300 ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-4 border-b border-gray-800 flex items-center justify-between">
           {!sidebarCollapsed && <h1 className="text-lg font-bold text-white">NextGuard DLP</h1>}
           <div className="flex gap-2">
@@ -446,7 +446,7 @@ export default function ProjectsPage() {
 
         {/* Issue Detail Modal */}
         {selectedIssue && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setSelectedIssue(null)}>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4" onClick={() => setSelectedIssue(null)}>
             <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-auto" onClick={e => e.stopPropagation()}>
               <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -480,7 +480,7 @@ export default function ProjectsPage() {
 
         {/* KB Article Detail Modal */}
         {selectedKBArticle && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setSelectedKBArticle(null)}>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4" onClick={() => setSelectedKBArticle(null)}>
             <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
               <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -517,7 +517,7 @@ export default function ProjectsPage() {
 
         {/* Create Task Modal */}
         {showCreateModal && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4" onClick={() => setShowCreateModal(false)}>
             <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
               <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-6">
