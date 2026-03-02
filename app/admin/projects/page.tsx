@@ -117,7 +117,7 @@ export default function ProjectsPage() {
     setActivityLogs(prev => [{ id: logId(), issueKey: issue.key, issueTitle: issue.title, action, field, oldValue: oldVal, newValue: newVal, user: currentUser?.name || 'System', timestamp: new Date().toLocaleString() }, ...prev]);
   }, [currentUser]);
 
-  const handleLogin = () => { const user = mockUsers.find(u => u.email === emailInput); if (user && passwordInput === 'nextguard2025') { setCurrentUser(user); setIsLoggedIn(true); setLoginError(''); } else { setLoginError('Invalid credentials. Try any user email with password: nextguard2025'); } };
+  const [loginLoading, setLoginLoading] = useState(false);   const [checking, setChecking] = useState(true);   useEffect(() => { fetch('/api/projects/auth').then(r => r.json()).then(d => { if (d.authenticated && d.user) { setCurrentUser({ id: d.user.id, name: d.user.name, email: d.user.email, department: 'R&D', role: 'User', avatar: d.user.name.split(' ').map((n: string) => n[0]).join('') }); setIsLoggedIn(true); } }).catch(() => {}).finally(() => setChecking(false)); }, []);   const handleLogin = async () => { setLoginLoading(true); setLoginError(''); try { const r = await fetch('/api/projects/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailInput, password: passwordInput }) }); const d = await r.json(); if (r.ok && d.success) { setCurrentUser({ id: d.user.id, name: d.user.name, email: d.user.email, department: 'R&D', role: 'User', avatar: d.user.name.split(' ').map((n: string) => n[0]).join('') }); setIsLoggedIn(true); } else { setLoginError(d.error || 'Login failed'); } } catch { setLoginError('Network error'); } finally { setLoginLoading(false); } };
 
   const handleCreateIssue = () => { if (!createTitle.trim()) return; const newIssue: Issue = { id: String(Date.now()), key: `NG-${113 + issues.length - 12}`, title: createTitle, description: createDesc, type: createType, status: 'To Do', priority: createPriority, assignee: createAssignee, reporter: currentUser?.id || 'u5', department: createDept, sprint: 'Sprint 12', points: 3, labels: [], created: now(), updated: now(), comments: 0, attachments: 0 }; setIssues(prev => [...prev, newIssue]); addLog('Created', newIssue); setCreateTitle(''); setCreateDesc(''); setShowCreateModal(false); };
 
@@ -143,7 +143,7 @@ export default function ProjectsPage() {
   const completedPoints = filteredIssues.filter(i => i.status === 'Done' || i.status === 'Closed').reduce((s, i) => s + i.points, 0);
   const totalPoints = filteredIssues.reduce((s, i) => s + i.points, 0);
 
-  if (!isLoggedIn) {
+  if (checking) return (<div className="min-h-screen bg-gray-950 flex items-center justify-center"><p className="text-gray-400">Checking authentication...</p></div>);   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
@@ -154,9 +154,9 @@ export default function ProjectsPage() {
             <div className="space-y-4">
               <div><label className="block text-sm text-gray-400 mb-1">Email</label><input type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)} placeholder="your@nextguard.com" className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">Password</label><input type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="Enter password" className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none" /></div>
-              <button onClick={handleLogin} className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition-colors text-white">Sign In</button>
+              <button onClick={handleLogin} className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition-colors text-white" disabled={loginLoading}>{loginLoading ? 'Signing in...' : 'Sign In'}</button>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-800"><p className="text-xs text-gray-500 mb-2">Demo Accounts (password: nextguard2025):</p>{mockUsers.map(u => (<button key={u.id} onClick={() => { setEmailInput(u.email); setPasswordInput('nextguard2025'); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-800 rounded flex justify-between"><span>{u.name} - {u.department}</span><span>{u.email}</span></button>))}</div>
+            <div className="mt-4 pt-4 border-t border-gray-800"><p className="text-xs text-gray-500">Use your registered account to sign in. Contact admin if you need Project Access permission.</p></div>
           </div>
         </div>
       </div>
@@ -190,7 +190,7 @@ export default function ProjectsPage() {
             <span>📝</span>{!sidebarCollapsed && <span>Activity Log</span>}{activityLogs.length > 0 && <span className="ml-auto bg-cyan-600 text-white text-xs px-1.5 py-0.5 rounded-full">{activityLogs.length}</span>}
           </button>
           <div className="flex items-center gap-3 px-3 py-2"><div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold">{currentUser?.avatar}</div>{!sidebarCollapsed && (<div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">{currentUser?.name}</p><p className="text-xs text-gray-500 truncate">{currentUser?.department} - {currentUser?.role}</p></div>)}</div>
-          {!sidebarCollapsed && <button onClick={() => { setIsLoggedIn(false); setCurrentUser(null); }} className="w-full mt-3 px-3 py-1.5 text-xs text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded transition-colors">Sign Out</button>}
+          {!sidebarCollapsed && <button onClick={() => { fetch('/api/projects/auth', { method: 'DELETE' }); setIsLoggedIn(false); setCurrentUser(null); }} className="w-full mt-3 px-3 py-1.5 text-xs text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded transition-colors">Sign Out</button>}
         </div>
       </div>
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
