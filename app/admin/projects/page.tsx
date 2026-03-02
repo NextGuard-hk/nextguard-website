@@ -168,17 +168,17 @@ export default function ProjectsPage() {
         <div className="p-4 border-b border-gray-800 flex items-center justify-between">
           {!sidebarCollapsed && <h1 className="text-lg font-bold text-white">NextGuard DLP</h1>}
           <div className="flex gap-2">
-            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="text-gray-400 hover:text-white hidden lg:block">{sidebarCollapsed ? '\u25b6' : '\u25c0'}</button>
-            <button onClick={() => setMobileSidebarOpen(false)} className="text-gray-400 hover:text-white lg:hidden">\u2715</button>
+            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="text-gray-400 hover:text-white hidden lg:block">{sidebarCollapsed ? '▶' : '◀'}</button>
+            <button onClick={() => setMobileSidebarOpen(false)} className="text-gray-400 hover:text-white lg:hidden">✕</button>
           </div>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {[
-            { key: 'board' as ViewMode, label: 'Board', icon: '\ud83d\udcca' },
-            { key: 'list' as ViewMode, label: 'List View', icon: '\ud83d\udcc3' },
-            { key: 'backlog' as ViewMode, label: 'Backlog', icon: '\ud83d\udce5' },
-            { key: 'reports' as ViewMode, label: 'Reports', icon: '\ud83d\udcc8' },
-            { key: 'kb' as ViewMode, label: 'Knowledge Base', icon: '\ud83d\udcda' },
+            { key: 'board' as ViewMode, label: 'Board', icon: '📊' },
+            { key: 'list' as ViewMode, label: 'List View', icon: '📃' },
+            { key: 'backlog' as ViewMode, label: 'Backlog', icon: '📥' },
+            { key: 'reports' as ViewMode, label: 'Reports', icon: '📈' },
+            { key: 'kb' as ViewMode, label: 'Knowledge Base', icon: '📚' },
           ].map(item => (
             <button key={item.key} onClick={() => { setActiveView(item.key); setMobileSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeView === item.key ? 'bg-cyan-600/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
               <span>{item.icon}</span>{!sidebarCollapsed && <span>{item.label}</span>}
@@ -206,7 +206,7 @@ export default function ProjectsPage() {
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 sm:py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <button onClick={() => setMobileSidebarOpen(true)} className="text-gray-400 hover:text-white lg:hidden text-xl">\u2630</button>
+                <button onClick={() => setMobileSidebarOpen(true)} className="text-gray-400 hover:text-white lg:hidden text-xl">☰</button>
                 <div>
                   <h1 className="text-lg sm:text-2xl font-bold">NextGuard DLP - Project Board</h1>
                   <p className="text-gray-400 text-xs sm:text-sm mt-0.5">Sprint 12 &middot; Jan 7, 2025</p>
@@ -506,8 +506,8 @@ export default function ProjectsPage() {
                 <div className="mt-6 pt-4 border-t border-gray-800 flex items-center justify-between">
                   <div className="text-sm text-gray-500">Was this article helpful?</div>
                   <div className="flex gap-2">
-                    <button className="px-4 py-1.5 text-sm bg-green-600/20 text-green-400 rounded-lg hover:bg-green-600/30 transition-colors">\ud83d\udc4d Yes</button>
-                    <button className="px-4 py-1.5 text-sm bg-gray-700 text-gray-400 rounded-lg hover:bg-gray-600 transition-colors">\ud83d\udc4e No</button>
+                    <button className="px-4 py-1.5 text-sm bg-green-600/20 text-green-400 rounded-lg hover:bg-green-600/30 transition-colors">👍 Yes</button>
+                    <button className="px-4 py-1.5 text-sm bg-gray-700 text-gray-400 rounded-lg hover:bg-gray-600 transition-colors">👎 No</button>
                   </div>
                 </div>
               </div>
