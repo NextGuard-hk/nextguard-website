@@ -85,12 +85,12 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
   const [activeTab, setActiveTab] = useState<'general'|'sender-recipient'|'attachment'|'action'|'notification'|'advanced'>('general')
   const p = props
   const tabs = [
-    { id: 'general', label: 'General', icon: '\u2699' },
-    { id: 'sender-recipient', label: 'Sender & Recipient', icon: '\u2709' },
-    { id: 'attachment', label: 'Attachment Rules', icon: '\uD83D\uDCCE' },
-    { id: 'action', label: 'Action & Response', icon: '\u26A1' },
-    { id: 'notification', label: 'Notification', icon: '\uD83D\uDD14' },
-    { id: 'advanced', label: 'Advanced', icon: '\uD83D\uDD12' },
+    { id: 'general', label: 'General', icon: '⚙' },
+    { id: 'sender-recipient', label: 'Sender & Recipient', icon: '✉' },
+    { id: 'attachment', label: 'Attachment Rules', icon: '📎' },
+    { id: 'action', label: 'Action & Response', icon: '⚡' },
+    { id: 'notification', label: 'Notification', icon: '🔔' },
+    { id: 'advanced', label: 'Advanced', icon: '🔒' },
   ] as const
 
   return (
@@ -201,7 +201,7 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
             <p className="text-xs text-zinc-600 mt-1">FortiMail: emails matching exceptions will not be scanned by DLP rules.</p>
           </div>
           <div className="bg-zinc-800/50 rounded p-2">
-            <p className="text-xs text-zinc-500">\u2139 Tip: Proofpoint and CheckPoint Harmony allow per-user/group DLP scope. Use Policy Scope in General tab to target specific users. FortiMail supports exception lists for VIP bypasses.</p>
+            <p className="text-xs text-zinc-500">Tip: Proofpoint and CheckPoint Harmony allow per-user/group DLP scope. Use Policy Scope in General tab to target specific users. FortiMail supports exception lists for VIP bypasses.</p>
           </div>
         </div>
       )}
@@ -225,7 +225,7 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
             <p className="text-xs text-zinc-600 mt-1">Common: .exe, .bat, .cmd, .ps1, .vbs, .js, .scr, .dll, .msi, .hta, .wsf</p>
           </div>
           <div className="border border-zinc-700 rounded p-3">
-            <label className="text-xs text-cyan-400 block mb-2 font-bold">\uD83D\uDD0D Document Fingerprinting (FortiMail IDM / Fortinet-style)</label>
+            <label className="text-xs text-cyan-400 block mb-2 font-bold">Document Fingerprinting (FortiMail IDM / Fortinet-style)</label>
             <div className="flex items-center gap-2 mb-2">
               <input type="checkbox" checked={p.documentFingerprinting} onChange={() => p.setDocumentFingerprinting(!p.documentFingerprinting)} />
               <span className="text-xs text-zinc-300">Enable Document Fingerprint Matching (IDM)</span>
@@ -321,7 +321,7 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
             </label>
           </div>
           <div className="bg-zinc-800/50 rounded p-2">
-            <p className="text-xs text-zinc-500">\u2139 Action hierarchy (most to least restrictive): Block &gt; Quarantine &gt; Drop Attachments &gt; Encrypt &gt; Warn &gt; Monitor</p>
+            <p className="text-xs text-zinc-500">Action hierarchy (most to least restrictive): Block &gt; Quarantine &gt; Drop Attachments &gt; Encrypt &gt; Warn &gt; Monitor</p>
           </div>
         </div>
       )}
@@ -353,7 +353,7 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
             <textarea value={p.userNotificationMsg} onChange={e => p.setUserNotificationMsg(e.target.value)} rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs" />
           </div>
           <div className="bg-zinc-800/50 rounded p-2">
-            <p className="text-xs text-zinc-500">\u2139 Proofpoint Adaptive DLP: contextual warnings empower users to correct mistakes. CheckPoint Harmony: separate notification settings for inbound/outbound. Template variables: {'{'}sender{'}'}, {'{'}recipient{'}'}, {'{'}policy_name{'}'}, {'{'}severity{'}'}, {'{'}action{'}'}, {'{'}timestamp{'}'}</p>
+            <p className="text-xs text-zinc-500">Proofpoint Adaptive DLP: contextual warnings empower users to correct mistakes. CheckPoint Harmony: separate notification settings for inbound/outbound. Template variables: {'{'}sender{'}'}, {'{'}recipient{'}'}, {'{'}policy_name{'}'}, {'{'}severity{'}'}, {'{'}action{'}'}, {'{'}timestamp{'}'}</p>
           </div>
         </div>
       )}
@@ -362,7 +362,7 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
       {activeTab === 'advanced' && (
         <div className="space-y-4">
           <div className="border border-cyan-800/50 rounded p-3 bg-cyan-950/20">
-            <label className="text-xs text-cyan-400 block mb-2 font-bold">\uD83E\uDDE0 Proofpoint Adaptive Email DLP</label>
+            <label className="text-xs text-cyan-400 block mb-2 font-bold">Proofpoint Adaptive Email DLP</label>
             <label className="flex items-center gap-2 text-xs text-zinc-300 mb-2">
               <input type="checkbox" checked={p.misdirectedEmailDetection} onChange={() => p.setMisdirectedEmailDetection(!p.misdirectedEmailDetection)} /> Misdirected Email Detection (Behavioral AI)
             </label>
@@ -372,7 +372,7 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
             <p className="text-xs text-zinc-600">Proofpoint Adaptive DLP uses ML to analyze normal email behavior patterns, flag wrong recipients, detect unauthorized data sharing, and prompt users before sending. Goes beyond rule-based DLP.</p>
           </div>
           <div className="border border-purple-800/50 rounded p-3 bg-purple-950/20">
-            <label className="text-xs text-purple-400 block mb-2 font-bold">\uD83C\uDFF7 CheckPoint Harmony Sensitivity Labels</label>
+            <label className="text-xs text-purple-400 block mb-2 font-bold">CheckPoint Harmony Sensitivity Labels</label>
             <label className="flex items-center gap-2 text-xs text-zinc-300 mb-2">
               <input type="checkbox" checked={p.sensitivityLabels} onChange={() => p.setSensitivityLabels(!p.sensitivityLabels)} /> Enable Sensitivity Label-Based DLP Rules
             </label>
@@ -381,25 +381,25 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
                 <p className="text-xs text-zinc-400">Label-to-action mapping (CheckPoint Harmony):</p>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-red-400 w-32">Highly Confidential</span>
-                  <span className="text-zinc-500">\u2192 Quarantine for review</span>
+                  <span className="text-zinc-500">→ Quarantine for review</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-orange-400 w-32">Confidential</span>
-                  <span className="text-zinc-500">\u2192 Block external sharing</span>
+                  <span className="text-zinc-500">→ Block external sharing</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-yellow-400 w-32">Internal Only</span>
-                  <span className="text-zinc-500">\u2192 Alert on external recipients</span>
+                  <span className="text-zinc-500">→ Alert on external recipients</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-green-400 w-32">Public</span>
-                  <span className="text-zinc-500">\u2192 Allow (no action)</span>
+                  <span className="text-zinc-500">→ Allow (no action)</span>
                 </div>
               </div>
             )}
           </div>
           <div className="border border-zinc-700 rounded p-3">
-            <label className="text-xs text-zinc-400 block mb-2 font-bold">\uD83D\uDD0D Subject Regex Matching (CheckPoint Harmony)</label>
+            <label className="text-xs text-zinc-400 block mb-2 font-bold">Subject Regex Matching (CheckPoint Harmony)</label>
             <label className="flex items-center gap-2 text-xs text-zinc-300 mb-2">
               <input type="checkbox" checked={p.subjectRegexEnabled} onChange={() => p.setSubjectRegexEnabled(!p.subjectRegexEnabled)} /> Enable matching based on subject regular expression
             </label>
@@ -411,14 +411,14 @@ export default function EnterpriseSettings(props: EnterpriseSettingsProps) {
             )}
           </div>
           <div className="bg-zinc-800/50 rounded p-2">
-            <p className="text-xs text-zinc-500 mb-1">\u2139 Vendor Feature Reference:</p>
-            <p className="text-xs text-zinc-600">\u2022 Proofpoint: Adaptive behavioral AI, misdirected email detection, relationship graph, smart identifiers</p>
-            <p className="text-xs text-zinc-600">\u2022 FortiMail: Document fingerprinting (IDM), match-all/any conditions, content action profiles, exception lists</p>
-            <p className="text-xs text-zinc-600">\u2022 CheckPoint Harmony: Sensitivity labels, 6-level sensitivity (Very High to Custom), subject regex, per-category tuning</p>
-            <p className="text-xs text-zinc-600">\u2022 Forcepoint: Direction control, sender/recipient filtering, quarantine review</p>
-            <p className="text-xs text-zinc-600">\u2022 Symantec: Blocked file types, content action hierarchy, encryption on release</p>
-            <p className="text-xs text-zinc-600">\u2022 Zscaler: First-match/most-restrictive evaluation, recipient allowlists</p>
-            <p className="text-xs text-zinc-600">\u2022 McAfee: Sender domain include/exclude, blocked extensions, policy scope</p>
+            <p className="text-xs text-zinc-500 mb-1">Vendor Feature Reference:</p>
+            <p className="text-xs text-zinc-600">Proofpoint: Adaptive behavioral AI, misdirected email detection, relationship graph, smart identifiers</p>
+            <p className="text-xs text-zinc-600">FortiMail: Document fingerprinting (IDM), match-all/any conditions, content action profiles, exception lists</p>
+            <p className="text-xs text-zinc-600">CheckPoint Harmony: Sensitivity labels, 6-level sensitivity (Very High to Custom), subject regex, per-category tuning</p>
+            <p className="text-xs text-zinc-600">Forcepoint: Direction control, sender/recipient filtering, quarantine review</p>
+            <p className="text-xs text-zinc-600">Symantec: Blocked file types, content action hierarchy, encryption on release</p>
+            <p className="text-xs text-zinc-600">Zscaler: First-match/most-restrictive evaluation, recipient allowlists</p>
+            <p className="text-xs text-zinc-600">McAfee: Sender domain include/exclude, blocked extensions, policy scope</p>
           </div>
         </div>
       )}
