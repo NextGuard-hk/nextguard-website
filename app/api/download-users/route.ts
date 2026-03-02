@@ -40,7 +40,7 @@ export interface DownloadUser {
   lastLogin?: string
   loginCount: number
     mustResetPassword?: boolean
-  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean }
+  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean  }
 }
 
 async function writeLog(entry: Record<string, string>) {
