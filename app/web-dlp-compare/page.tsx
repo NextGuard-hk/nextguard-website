@@ -487,6 +487,12 @@ export default function WebDLPComparePage() {
             </div>
           </div>
         )}
+
+              {/* Web Proxy SWG Configuration */}
+      <WebProxySWGConfig />
+
+      {/* SWG Live Testing Console */}
+      <SWGLiveTest />
       </div>
     </div>
   )
