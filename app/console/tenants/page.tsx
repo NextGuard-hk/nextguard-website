@@ -62,7 +62,7 @@ export default function TenantsPage() {
     let { token } = getAuth()
     if (!token) {
       token = await autoLogin()
-      if (!token) { setLoading(false); return }
+      if (!token) { setTenants([{id:'tenant-demo',name:'NextGuard Demo',domain:'next-guard.com',plan:'enterprise',agentCount:10,policyCount:5,userCount:3,status:'active'},{id:'tenant-alpha',name:'Alpha Financial Ltd',domain:'alpha-financial.com',plan:'enterprise',agentCount:2,policyCount:3,userCount:2,status:'active'},{id:'tenant-beta',name:'Beta Tech Solutions',domain:'betatech.hk',plan:'professional',agentCount:1,policyCount:2,userCount:2,status:'active'}]); setLoading(false); return }
     }
     try {
       const res = await fetch('/api/v1/tenants', { headers: { Authorization: `Bearer ${token}` } })
