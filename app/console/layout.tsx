@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: 'Reports', path: '/console/reports', icon: '📈' },
   { label: 'App Monitor', path: '/console/app-monitor', icon: '👁️' },
   { label: 'Settings', path: '/console/settings', icon: '⚙️' },
+  { label: 'Tenants', path: '/console/tenants', icon: '🏢' },
 ]
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
@@ -40,15 +41,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0a0e1a', color: '#e2e8f0' }}>
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }} />
       )}
 
-      {/* Mobile top bar */}
       <div style={{
-        display: 'none',
-        position: 'fixed', top: 0, left: 0, right: 0, height: 48, zIndex: 30,
+        display: 'none', position: 'fixed', top: 0, left: 0, right: 0, height: 48, zIndex: 30,
         background: '#0f1629', borderBottom: '1px solid #1e293b',
         alignItems: 'center', padding: '0 16px', gap: 12
       }} className="mobile-topbar">
@@ -59,14 +57,13 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <span style={{ marginLeft: 'auto', fontSize: 10, color: '#22c55e' }}>● Online</span>
       </div>
 
-      {/* Sidebar */}
       <aside style={{
         width: sidebarWidth, minWidth: sidebarWidth, background: '#0f1629',
         borderRight: '1px solid #1e293b', padding: '20px 12px',
         display: 'flex', flexDirection: 'column', gap: 4,
         position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 50,
         transform: mobileOpen ? 'translateX(0)' : undefined,
-        transition: 'transform 0.2s ease'
+        transition: 'transform 0.2s ease', overflowY: 'auto'
       }} className="console-sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 20px', borderBottom: '1px solid #1e293b', marginBottom: 8 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #00ffc8, #0066ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>NG</div>
@@ -102,9 +99,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         </div>
       </aside>
 
-      {/* Main content */}
       <div style={{ flex: 1, marginLeft: sidebarWidth, minHeight: '100vh', display: 'flex', flexDirection: 'column' }} className="console-main">
-        {/* Top bar */}
         <div style={{
           height: 48, borderBottom: '1px solid #1e293b', display: 'flex',
           alignItems: 'center', justifyContent: 'space-between', padding: '0 24px',
@@ -120,24 +115,13 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         </div>
       </div>
 
-      {/* Responsive CSS */}
       <style>{`
         @media (max-width: 768px) {
-          .console-sidebar {
-            transform: ${mobileOpen ? 'translateX(0)' : 'translateX(-100%)'} !important;
-          }
-          .console-main {
-            margin-left: 0 !important;
-          }
-          .mobile-topbar {
-            display: flex !important;
-          }
-          .console-main > div:first-child {
-            display: none !important;
-          }
-          .console-main > div:last-child {
-            padding-top: 60px !important;
-          }
+          .console-sidebar { transform: ${mobileOpen ? 'translateX(0)' : 'translateX(-100%)'} !important; }
+          .console-main { margin-left: 0 !important; }
+          .mobile-topbar { display: flex !important; }
+          .console-main > div:first-child { display: none !important; }
+          .console-main > div:last-child { padding-top: 60px !important; }
         }
       `}</style>
     </div>
