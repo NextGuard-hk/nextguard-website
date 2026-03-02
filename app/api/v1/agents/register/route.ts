@@ -1,7 +1,7 @@
 // Agent Registration API - NextGuard Management Console
-// Uses multi-tenant store for unified data
 import { NextRequest, NextResponse } from 'next/server'
 import { getStore, Agent, generateId } from '@/lib/multi-tenant-store'
+import { signAgentToken } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { hostname, username, os, agentVersion, capabilities, deviceId, tenantId,
-      osVersion, macAddress } = body
+            osVersion, macAddress } = body
     if (!hostname) {
       return NextResponse.json({ error: 'Missing required field: hostname' }, { status: 400 })
     }
@@ -43,8 +43,11 @@ export async function POST(request: NextRequest) {
     if (isNew) {
       store.logs.push({
         id: generateId('log'),
-        tenantId: tid, agentId,
-        timestamp: now, level: 'info', facility: 'agent-registration',
+        tenantId: tid,
+        agentId,
+        timestamp: now,
+        level: 'info',
+        facility: 'agent-registration',
         message: `New agent registered: ${hostname} (${macAddress || 'unknown'})`
       })
     }
@@ -55,8 +58,14 @@ export async function POST(request: NextRequest) {
       if (p.tenantId === tid && p.isEnabled) policies.push(p)
     })
 
+    // Generate agent token for subsequent API calls
+    const agentToken = signAgentToken(agentId, tid)
+
     return NextResponse.json({
-      success: true, agentId, isNewRegistration: isNew,
+      success: true,
+      agentId,
+      agentToken,
+      isNewRegistration: isNew,
       agent: { agentId, hostname, status: 'online', registeredAt: agent.registeredAt },
       config: {
         heartbeatIntervalSeconds: 60,
@@ -66,6 +75,7 @@ export async function POST(request: NextRequest) {
         reportingEndpoint: '/api/v1/incidents',
       },
       policies,
+      policyCount: policies.length,
       message: isNew ? `Agent ${hostname} registered successfully` : `Agent ${hostname} re-registered`,
     })
   } catch (error) {
