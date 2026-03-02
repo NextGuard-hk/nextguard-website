@@ -370,7 +370,7 @@ export async function GET() {
 // POST: Toggle feature enabled/disabled
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const body = await request.json(); if (body.detectionMode) { const vm = ['traditional','ai','hybrid']; if (vm.includes(body.detectionMode)) { (AGENT_CONFIG as any).globalDetectionMode = body.detectionMode; AGENT_CONFIG.lastUpdated = new Date().toISOString(); return NextResponse.json({ success: true, detectionMode: body.detectionMode }); } return NextResponse.json({ success: false, error: 'Invalid' }, { status: 400 }); }
     const { featureId, enabled, categoryKey, featureKey } = body
 
     if (!featureId && (!categoryKey || !featureKey)) {
