@@ -50,9 +50,9 @@ export default function TenantsPage() {
         body: JSON.stringify({ email: 'admin@next-guard.com', password: 'Admin@123' })
       })
       const data = await res.json()
-      if (data.success && data.token) {
-        localStorage.setItem('ng_token', data.token)
-        return data.token
+      if (data.success && (data.token || data.data?.token)) {
+        const t = data.token || data.data?.token; localStorage.setItem('ng_token', t)
+        const tk = data.token || data.data?.token; return tk
       }
     } catch {}
     return null
