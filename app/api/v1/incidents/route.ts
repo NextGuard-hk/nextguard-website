@@ -1,92 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getStore, DLPEvent } from '@/lib/multi-tenant-store'
 
-// In-memory incident store (replace with database in production)
-interface DLPIncident {
-  id: string
-  agentId: string
-  hostname: string
-  username: string
-  policyId: string
-  policyName: string
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
-  action: 'block' | 'audit' | 'encrypt' | 'quarantine' | 'alert'
-  channel: 'file' | 'clipboard' | 'email' | 'browser' | 'usb' | 'print' | 'network'
-  status: 'open' | 'investigating' | 'resolved' | 'false_positive' | 'escalated'
-  details: {
-    sourceApp?: string
-    destinationApp?: string
-    filePath?: string
-    fileName?: string
-    fileSize?: number
-    fileHash?: string
-    url?: string
-    emailRecipient?: string
-    contentSnippet?: string
-    matchedPatterns?: string[]
-    matchedKeywords?: string[]
-  }
-  timestamp: string
-  reportedAt: string
-  resolvedAt?: string
-  resolvedBy?: string
-  notes?: string
-}
-
-const incidents: DLPIncident[] = []
+export const dynamic = 'force-dynamic'
 
 // POST - Agent reports a new incident
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      agentId, hostname, username, policyId, policyName,
-      severity, action, channel, details
-    } = body
-
+    const { agentId, hostname, username, policyId, policyName, severity, action, channel, details, tenantId } = body
     if (!agentId || !policyId || !channel) {
-      return NextResponse.json(
-        { error: 'Missing required fields: agentId, policyId, channel' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required fields: agentId, policyId, channel' }, { status: 400 })
     }
-
-    const incident: DLPIncident = {
-      id: `INC-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-      agentId,
-      hostname: hostname || 'unknown',
-      username: username || 'unknown',
-      policyId,
-      policyName: policyName || 'Unknown Policy',
-      severity: severity || 'medium',
-      action: action || 'audit',
-      channel,
-      status: 'open',
-      details: details || {},
+    const store = getStore()
+    const id = `INC-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+    const event: DLPEvent = {
+      id, tenantId: tenantId || 'tenant-demo', agentId,
+      hostname: hostname || 'unknown', username: username || 'unknown',
+      policyId, policyName: policyName || 'Unknown Policy',
+      channel: channel as DLPEvent['channel'],
+      action: action || 'audit', severity: severity || 'medium',
+      status: severity === 'critical' ? 'blocked' : 'flagged',
       timestamp: body.timestamp || new Date().toISOString(),
-      reportedAt: new Date().toISOString(),
+      details: typeof details === 'string' ? details : JSON.stringify(details || {}),
+      fileName: details?.fileName, filePath: details?.filePath,
+      fileSize: details?.fileSize, fileHash: details?.fileHash,
+      destination: details?.destination || details?.url,
+      processName: details?.sourceApp, riskScore: body.riskScore || 50
     }
-
-    // Auto-escalate critical incidents
-    if (incident.severity === 'critical') {
-      incident.status = 'escalated'
-    }
-
-    incidents.push(incident)
-
-    // Keep max 10000 incidents in memory
-    if (incidents.length > 10000) {
-      incidents.splice(0, incidents.length - 10000)
-    }
-
-    return NextResponse.json({
-      success: true,
-      incidentId: incident.id,
-      status: incident.status,
-      message: incident.severity === 'critical'
-        ? 'Critical incident reported and auto-escalated'
-        : 'Incident reported successfully',
-    })
-  } catch (error) {
+    store.events.push(event)
+    if (store.events.length > 10000) store.events.splice(0, store.events.length - 10000)
+    return NextResponse.json({ success: true, incidentId: id, status: event.status })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -94,6 +38,7 @@ export async function POST(request: NextRequest) {
 // GET - Console retrieves incidents with filtering
 export async function GET(request: NextRequest) {
   try {
+    const store = getStore()
     const { searchParams } = new URL(request.url)
     const agentId = searchParams.get('agentId')
     const severity = searchParams.get('severity')
@@ -105,8 +50,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
 
-    let filtered = [...incidents]
-
+    let filtered = [...store.events]
     if (agentId) filtered = filtered.filter(i => i.agentId === agentId)
     if (severity) filtered = filtered.filter(i => i.severity === severity)
     if (status) filtered = filtered.filter(i => i.status === status)
@@ -115,88 +59,82 @@ export async function GET(request: NextRequest) {
     if (from) filtered = filtered.filter(i => i.timestamp >= from)
     if (to) filtered = filtered.filter(i => i.timestamp <= to)
 
-    // Sort by timestamp descending (newest first)
     filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
     const total = filtered.length
     const start = (page - 1) * limit
     const paginated = filtered.slice(start, start + limit)
 
-    // Compute summary stats
+    // Map events to incident format expected by console
+    const incidents = paginated.map(e => ({
+      id: e.id, agentId: e.agentId, hostname: e.hostname, username: e.username,
+      policyId: e.policyId, policyName: e.policyName, severity: e.severity,
+      action: e.action, channel: e.channel, status: mapStatus(e.status),
+      details: { filePath: e.filePath, fileName: e.fileName, fileSize: e.fileSize,
+        fileHash: e.fileHash, url: e.destination, sourceApp: e.processName,
+        contentSnippet: e.details },
+      timestamp: e.timestamp, reportedAt: e.timestamp
+    }))
+
+    const allEvents = store.events
     const stats = {
-      total: incidents.length,
+      total: allEvents.length,
       bySeverity: {
-        critical: incidents.filter(i => i.severity === 'critical').length,
-        high: incidents.filter(i => i.severity === 'high').length,
-        medium: incidents.filter(i => i.severity === 'medium').length,
-        low: incidents.filter(i => i.severity === 'low').length,
+        critical: allEvents.filter(i => i.severity === 'critical').length,
+        high: allEvents.filter(i => i.severity === 'high').length,
+        medium: allEvents.filter(i => i.severity === 'medium').length,
+        low: allEvents.filter(i => i.severity === 'low').length,
       },
       byStatus: {
-        open: incidents.filter(i => i.status === 'open').length,
-        investigating: incidents.filter(i => i.status === 'investigating').length,
-        escalated: incidents.filter(i => i.status === 'escalated').length,
-        resolved: incidents.filter(i => i.status === 'resolved').length,
+        open: allEvents.filter(i => i.status === 'flagged').length,
+        investigating: 0, escalated: allEvents.filter(i => i.status === 'blocked').length,
+        resolved: allEvents.filter(i => i.status === 'allowed').length,
       },
       byChannel: {
-        file: incidents.filter(i => i.channel === 'file').length,
-        clipboard: incidents.filter(i => i.channel === 'clipboard').length,
-        email: incidents.filter(i => i.channel === 'email').length,
-        browser: incidents.filter(i => i.channel === 'browser').length,
-        usb: incidents.filter(i => i.channel === 'usb').length,
-        network: incidents.filter(i => i.channel === 'network').length,
+        file: allEvents.filter(i => ['filesystem','cloud_storage'].includes(i.channel)).length,
+        clipboard: allEvents.filter(i => i.channel === 'clipboard').length,
+        email: allEvents.filter(i => i.channel === 'email').length,
+        browser: allEvents.filter(i => ['browser_upload','browser_download'].includes(i.channel)).length,
+        usb: allEvents.filter(i => i.channel === 'usb').length,
+        network: allEvents.filter(i => ['network','messaging','airdrop','print'].includes(i.channel)).length,
       },
     }
 
     return NextResponse.json({
-      success: true,
-      incidents: paginated,
+      success: true, incidents,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       stats,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// PATCH - Update incident status (for console operators)
+function mapStatus(s: string): string {
+  if (s === 'blocked') return 'escalated'
+  if (s === 'flagged') return 'open'
+  if (s === 'allowed') return 'resolved'
+  if (s === 'quarantined') return 'investigating'
+  return 'open'
+}
+
+// PATCH - Update incident status
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { incidentId, status, notes, resolvedBy } = body
-
+    const { incidentId, status } = body
     if (!incidentId || !status) {
-      return NextResponse.json(
-        { error: 'Missing required fields: incidentId, status' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
-
-    const validStatuses = ['open', 'investigating', 'resolved', 'false_positive', 'escalated']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
-        { status: 400 }
-      )
-    }
-
-    const incident = incidents.find(i => i.id === incidentId)
-    if (!incident) {
-      return NextResponse.json({ error: 'Incident not found' }, { status: 404 })
-    }
-
-    incident.status = status as DLPIncident['status']
-    if (notes) incident.notes = notes
-    if (status === 'resolved' || status === 'false_positive') {
-      incident.resolvedAt = new Date().toISOString()
-      incident.resolvedBy = resolvedBy || 'admin'
-    }
-
-    return NextResponse.json({
-      success: true,
-      incident,
-      message: `Incident ${incidentId} updated to ${status}`,
-    })
-  } catch (error) {
+    const store = getStore()
+    const event = store.events.find(e => e.id === incidentId)
+    if (!event) return NextResponse.json({ error: 'Incident not found' }, { status: 404 })
+    // Map console status back to event status
+    if (status === 'resolved') event.status = 'allowed'
+    else if (status === 'escalated') event.status = 'blocked'
+    else if (status === 'investigating') event.status = 'quarantined'
+    else event.status = 'flagged'
+    return NextResponse.json({ success: true, message: `Incident ${incidentId} updated` })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
