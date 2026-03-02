@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getStore } from '@/lib/multi-tenant-store'
-import { verifyUserToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
 
 function getTenantFromUser(user: { tenantId?: string; role: string }) {
   return user.tenantId || null
@@ -9,10 +11,7 @@ function getTenantFromUser(user: { tenantId?: string; role: string }) {
 // GET /api/v1/policies?tenantId=xxx
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const user = verifyUserToken(token)
+    const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const url = new URL(request.url)
     const tenantId = user.role === 'super_admin' ? url.searchParams.get('tenantId') : getTenantFromUser(user)
@@ -29,10 +28,7 @@ export async function GET(request: Request) {
 // POST /api/v1/policies - create policy
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const user = verifyUserToken(token)
+    const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const body = await request.json()
     const { tenantId, name, rules, actions, enabled } = body
@@ -61,10 +57,7 @@ export async function POST(request: Request) {
 // PUT /api/v1/policies - update policy
 export async function PUT(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const user = verifyUserToken(token)
+    const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const body = await request.json()
     const { policyId, tenantId, ...updates } = body
@@ -72,7 +65,7 @@ export async function PUT(request: Request) {
     const store = getStore()
     const tenant = store.tenants.get(effectiveTenantId || '')
     if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
-    const idx = tenant.policies.findIndex(p => p.id === policyId)
+    const idx = tenant.policies.findIndex((p: any) => p.id === policyId)
     if (idx === -1) return NextResponse.json({ success: false, error: 'Policy not found' }, { status: 404 })
     tenant.policies[idx] = { ...tenant.policies[idx], ...updates, updatedAt: new Date().toISOString() }
     return NextResponse.json({ success: true, policy: tenant.policies[idx] })
@@ -84,10 +77,7 @@ export async function PUT(request: Request) {
 // DELETE /api/v1/policies?policyId=xxx&tenantId=xxx
 export async function DELETE(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const user = verifyUserToken(token)
+    const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const url = new URL(request.url)
     const policyId = url.searchParams.get('policyId')
@@ -95,7 +85,7 @@ export async function DELETE(request: Request) {
     const store = getStore()
     const tenant = store.tenants.get(effectiveTenantId || '')
     if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
-    tenant.policies = tenant.policies.filter(p => p.id !== policyId)
+    tenant.policies = tenant.policies.filter((p: any) => p.id !== policyId)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
