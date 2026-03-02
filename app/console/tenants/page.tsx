@@ -126,10 +126,10 @@ export default function TenantsPage() {
         <button onClick={() => setShowUserForm(!showUserForm)} style={{ ...btn, background: '#7c3aed' }}>+ Add User</button>
         <button onClick={() => setShowCreate(!showCreate)} style={btn}>{showCreate ? 'Cancel' : '+ Add Tenant'}</button>
         <button onClick={() => setShowPermTable(!showPermTable)} style={{ ...btn, background: '#059669' }}>{showPermTable ? 'Hide' : 'Show'} RBAC Permission Matrix</button>
-        <Link href="/console" style={{ ...btn, background: '#475569', textDecoration: 'none' }}>&larr; Console</Link>
+        <Link href="/console" style={{ ...btn, background: '#475569', textDecoration: 'none' }}>← Console</Link>
       </div>
 
-      {error && <div style={{ background: '#7f1d1d', border: '1px solid #dc2626', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>{error}</span><button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer' }}>&times;</button></div>}
+      {error && <div style={{ background: '#7f1d1d', border: '1px solid #dc2626', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>{error}</span><button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer' }}>✗</button></div>}
       {success && <div style={{ background: '#14532d', border: '1px solid #22c55e', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>{success}</div>}
 
       {showPermTable && (
@@ -144,7 +144,7 @@ export default function TenantsPage() {
             <tbody>{ROLES.map(role => (
               <tr key={role} style={{ borderBottom: '1px solid #1e293b' }}>
                 <td style={{ padding: 6 }}><span style={{ background: ROLE_COLORS[role], padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{role}</span><br/><span style={{ fontSize: 10, color: '#94a3b8' }}>{ROLE_DESC[role]}</span></td>
-                {PERMISSIONS.map(p => <td key={p} style={{ textAlign: 'center', padding: 4 }}>{ROLE_PERMS[role]?.includes(p) ? <span style={{ color: '#22c55e' }}>&check;</span> : <span style={{ color: '#475569' }}>&mdash;</span>}</td>)}
+                {PERMISSIONS.map(p => <td key={p} style={{ textAlign: 'center', padding: 4 }}>{ROLE_PERMS[role]?.includes(p) ? <span style={{ color: '#22c55e' }}>✓</span> : <span style={{ color: '#475569' }}>—</span>}</td>)}
               </tr>
             ))}</tbody>
           </table>
