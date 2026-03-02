@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getStore } from '@/lib/multi-tenant-store'
-import { verifyAgentToken } from '@/lib/auth'
+import { authenticateAgent } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,22 +8,19 @@ export const dynamic = 'force-dynamic'
 // Agent must send: Authorization: Bearer <agentToken>
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const agentAuth = verifyAgentToken(token)
+    const agentAuth = authenticateAgent(request)
     if (!agentAuth) return NextResponse.json({ success: false, error: 'Invalid agent token' }, { status: 401 })
     const store = getStore()
     const tenant = store.tenants.get(agentAuth.tenantId)
     if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
     // Update agent lastSeen
-    const agent = tenant.agents.find(a => a.id === agentAuth.agentId)
+    const agent = tenant.agents.find((a: any) => a.id === agentAuth.agentId)
     if (agent) {
       agent.lastSeen = new Date().toISOString()
       agent.status = 'online'
     }
     // Return only enabled policies
-    const enabledPolicies = tenant.policies.filter(p => p.enabled)
+    const enabledPolicies = tenant.policies.filter((p: any) => p.enabled)
     return NextResponse.json({
       success: true,
       tenantId: agentAuth.tenantId,
@@ -46,7 +43,7 @@ export async function POST(request: Request) {
     const tenant = store.tenants.get(tenantId)
     if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 })
     if (action === 'heartbeat' && agentId) {
-      const agent = tenant.agents.find(a => a.id === agentId)
+      const agent = tenant.agents.find((a: any) => a.id === agentId)
       if (agent) {
         agent.lastSeen = new Date().toISOString()
         agent.status = 'online'
@@ -54,7 +51,7 @@ export async function POST(request: Request) {
       }
     }
     // Register new agent
-    let agent = macAddress ? tenant.agents.find(a => a.macAddress === macAddress) : null
+    let agent = macAddress ? tenant.agents.find((a: any) => a.macAddress === macAddress) : null
     if (!agent) {
       agent = {
         id: `agent_${Date.now()}`,
@@ -73,7 +70,7 @@ export async function POST(request: Request) {
       agent.status = 'online'
       agent.hostname = hostname || agent.hostname
     }
-    const enabledPolicies = tenant.policies.filter(p => p.enabled)
+    const enabledPolicies = tenant.policies.filter((p: any) => p.enabled)
     return NextResponse.json({
       success: true,
       agentId: agent.id,
