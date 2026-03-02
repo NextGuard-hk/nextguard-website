@@ -47,7 +47,7 @@ export default function TenantsPage() {
       const res = await fetch('/api/v1/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@next-guard.com', password: 'Admin@123' })
+        body: JSON.stringify({ action: 'login', email: 'admin@next-guard.com', password: 'Admin@123' })
       })
       const data = await res.json()
       if (data.success && (data.token || data.data?.token)) {
