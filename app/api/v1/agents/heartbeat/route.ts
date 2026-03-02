@@ -1,68 +1,37 @@
 // Agent Heartbeat API - NextGuard Management Console
-// Compatible with NextGuard Endpoint DLP Agent v1.1.0
 import { NextRequest, NextResponse } from 'next/server'
+import { getStore } from '@/lib/multi-tenant-store'
 
-function getAgents(): Record<string, any> {
-  if (!(globalThis as any).__nextguard_agents) {
-    (globalThis as any).__nextguard_agents = {}
-  }
-  return (globalThis as any).__nextguard_agents
-}
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    // Accept both agentId and deviceId for compatibility
-    const agentId = body.agentId || body.deviceId
-    const { hostname, username, os, agentVersion, status, uptime } = body
-
+    const { agentId, hostname, status, metrics, tenantId } = body
     if (!agentId) {
-      return NextResponse.json(
-        { error: 'Missing agentId', code: 'VALIDATION_ERROR' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing agentId' }, { status: 400 })
     }
-
-    const agents = getAgents()
-    const now = new Date().toISOString()
-    const clientIp = request.headers.get('x-forwarded-for') || 'unknown'
-
-    if (agents[agentId]) {
-      // Update existing agent
-      agents[agentId].lastHeartbeat = now
-      agents[agentId].status = 'online'
-      if (hostname) agents[agentId].hostname = hostname
-      if (username) agents[agentId].username = username
-      if (os) agents[agentId].os = os
-      if (agentVersion) agents[agentId].agentVersion = agentVersion
-      if (uptime) agents[agentId].uptime = uptime
-      agents[agentId].ipAddress = clientIp
-    } else {
-      // Auto-register if not found
-      agents[agentId] = {
-        agentId,
-        hostname: hostname || 'unknown',
-        username: username || 'unknown',
-        os: os || 'unknown',
-        agentVersion: agentVersion || 'unknown',
-        ipAddress: clientIp,
-        registeredAt: now,
-        lastHeartbeat: now,
-        status: 'online',
-        uptime: uptime || 0,
-        policyVersion: 0,
-      }
+    const store = getStore()
+    const agent = store.agents.get(agentId)
+    if (agent) {
+      agent.lastHeartbeat = new Date().toISOString()
+      agent.status = 'online'
+      if (hostname) agent.hostname = hostname
+      return NextResponse.json({
+        success: true, agentId,
+        serverTime: new Date().toISOString(),
+        pendingPolicyPush: agent.pendingPolicyPush,
+        commands: [],
+      })
     }
-
+    // Agent not found in store - still accept heartbeat
     return NextResponse.json({
-      success: true,
-      agentId,
-      status: 'online',
-      serverTime: now,
-      nextHeartbeatSeconds: 60,
+      success: true, agentId,
+      serverTime: new Date().toISOString(),
+      needsRegistration: true,
+      message: 'Agent not found. Please re-register.',
     })
-  } catch (error) {
-    console.error('Heartbeat error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
