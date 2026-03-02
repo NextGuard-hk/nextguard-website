@@ -124,7 +124,7 @@ const ACTIONS = ['BLOCK', 'QUARANTINE', 'AUDIT']
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ResultPanel({ title, result, loading, error, color }: { title: string; result: any; loading: boolean; error: string; color: string }) {
+function ResultPanel({ title, result, loading, error, color, latency }: { title: string; result: any; loading: boolean; error: string; color: string; latency: number | null }) {
   if (loading) return (
     <div>
       <h3 className="text-lg font-bold mb-3" style={{color}}>{title}</h3>
@@ -151,7 +151,7 @@ function ResultPanel({ title, result, loading, error, color }: { title: string; 
       <div className={`text-lg font-bold mb-2 ${result.detected ? 'text-red-400' : 'text-green-400'}`}>
         {result.detected ? '⚠️' : '✅'}&nbsp;&nbsp;{result.verdict || (result.detected ? 'DETECTED' : 'CLEAN')}
       </div>
-      {result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
+      {latency !== null && <div className="text-xs text-zinc-500 mt-1 mb-2">{latency < 1000 ? latency + 'ms' : (latency / 1000).toFixed(2) + 's'}</div>}{result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
       {result.recommended_action && result.detected && (
         <p className="text-sm mb-1">Action: <span className="font-bold text-yellow-400">{result.recommended_action}</span></p>
       )}
@@ -214,6 +214,9 @@ export default function AIDLPDemo() {
   const [showPolicy, setShowPolicy] = useState(false)
   const [policy, setPolicy] = useState<typeof DEFAULT_POLICY>(JSON.parse(JSON.stringify(DEFAULT_POLICY)))
   const [uploadedFileName, setUploadedFileName] = useState('')
+    const [tradLatency, setTradLatency] = useState<number | null>(null)
+    const [aiLatency, setAiLatency] = useState<number | null>(null)
+    const [hybridLatency, setHybridLatency] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
     const [fileRawText, setFileRawText] = useState('')
   const [fileOcrText, setFileOcrText] = useState('')
@@ -317,8 +320,8 @@ export default function AIDLPDemo() {
     if (!content.trim()) return
     setTradResult(null); setAiResult(null); setHybridResult(null)
     setTradError(''); setAiError(''); setHybridError('')
-    setTradLoading(true); setAiLoading(true); setHybridLoading(true)
-    let tradData: any = null
+    setTradLoading(true); setAiLoading(true); setHybridLoading(true); setTradLatency(null); setAiLatency(null); setHybridLatency(null)
+    let tradData: any = null; const scanT0 = performance.now()
     ;(async () => {
       try {
         const r1 = await fetch('/api/ai-dlp', {
@@ -328,7 +331,7 @@ export default function AIDLPDemo() {
         })
         const d1 = await r1.json()
         tradData = d1           // Immediately show pattern results in Hybrid panel           const patternFindings = d1.findings ? d1.findings.map((f: any) => ({ source: 'pattern', ...f })) : []           setHybridResult({ detected: d1.detected, verdict: d1.detected ? 'VIOLATION_DETECTED' : 'CLEAN', recommended_action: d1.detected ? d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { BLOCK: 3, QUARANTINE: 2, AUDIT: 1 }; return (p[f.action] || 0) > (p[max] || 0) ? f.action : max }, 'AUDIT') : 'NONE', method: 'Hybrid (Pattern-Based + AI LLM)', risk_level: d1.findings?.reduce((max: string, f: any) => { const p: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }; return (p[f.severity] || 0) > (p[max] || 0) ? f.severity : max }, 'none') || 'none', evasion_detected: false, pattern_engine: { detected: d1.detected, totalMatches: d1.totalMatches || 0, findingCount: d1.findings?.length || 0 }, ai_engine: { detected: false, risk_level: 'none', findingCount: 0, summary: 'AI analysis in progress...' }, findings: patternFindings })           setHybridLoading(false)
-        setTradResult(d1)
+        setTradResult(d1); setTradLatency(Math.round(performance.now() - scanT0))
       } catch (e: any) { setTradError(e.message) }
       finally { setTradLoading(false) }
     })()
@@ -340,7 +343,7 @@ export default function AIDLPDemo() {
           body: JSON.stringify({ content: isScannedFile ? (fileOcrText || content) : content, mode: 'ai', policy })
         })
         const d2 = await r2.json()
-        setAiResult(d2)
+        setAiResult(d2); setAiLatency(Math.round(performance.now() - scanT0))
         const trad = tradData
         const ai = d2
         const mergedFindings: any[] = []
@@ -365,7 +368,7 @@ export default function AIDLPDemo() {
           findings: mergedFindings,
         })
       } catch (e: any) { setAiError(e.message); setHybridError(e.message) }
-      finally { setAiLoading(false); setHybridLoading(false) }
+      finally { setAiLoading(false); setHybridLoading(false); setHybridLatency(Math.round(performance.now() - scanT0)) }
     })()
   }
 
@@ -459,13 +462,13 @@ export default function AIDLPDemo() {
         {/* Results Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <ResultPanel title="Traditional DLP (Pattern-Based)" result={tradResult} loading={tradLoading} error={tradError} color="#fb923c" />
+            <ResultPanel title="Traditional DLP (Pattern-Based)" result={tradResult} loading={tradLoading} error={tradError} latency={tradLatency} color="#fb923c" />
           </div>
           <div className="bg-zinc-900 border border-cyan-800 rounded-xl p-6">
-            <ResultPanel title="AI Detection" result={aiResult} loading={aiLoading} error={aiError} color="#22d3ee" />
+            <ResultPanel title="AI Detection" result={aiResult} loading={aiLoading} error={aiError} latency={aiLatency} color="#22d3ee" />
           </div>
           <div className="bg-zinc-900 border border-green-700 rounded-xl p-6 ring-2 ring-green-600/30">
-            <ResultPanel title="Hybrid DLP" result={hybridResult} loading={hybridLoading} error={hybridError} color="#4ade80" />
+            <ResultPanel title="Hybrid DLP" result={hybridResult} loading={hybridLoading} error={hybridError} latency={hybridLatency} color="#4ade80" />
           </div>
         </div>
 
