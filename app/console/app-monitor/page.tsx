@@ -88,7 +88,8 @@ export default function AppMonitorPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold">App DLP Monitor</h1>
-            <p className="text-gray-400 text-sm mt-1">Real-time application-level data loss prevention events</p>
+                        <p className="text-yellow-400/80 text-xs mt-2 bg-yellow-900/20 border border-yellow-700/30 rounded px-3 py-1 inline-block">Config: Monitoring rules are defined in <a href="/console/policies" className="text-blue-400 underline">Policy Management</a> | Detection engine mode is set in <a href="/console/settings" className="text-blue-400 underline">Settings &gt; Detection</a></p>
+            <p className="text-gray-400 text-sm mt-1">Real-time application-level data loss prevention events</p>             <p className="text-yellow-400/80 text-xs mt-1">&#x26A0; Monitoring rules are configured in <a href="/console/policies" className="text-blue-400 underline">Policy Management</a>. Detection engine is set in <a href="/console/settings" className="text-blue-400 underline">Settings</a>.</p>
           </div>
           <a href="/console" className="text-cyan-400 hover:text-cyan-300 text-sm">← Back to Console</a>
         </div>
