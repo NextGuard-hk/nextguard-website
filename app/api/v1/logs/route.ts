@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getStore } from '@/lib/multi-tenant-store'
-import { verifyAgentToken, verifyUserToken } from '@/lib/auth'
+import { authenticateAgent, authenticateRequest } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 // POST /api/v1/logs - agent uploads DLP event logs and forensics
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const agentAuth = verifyAgentToken(token)
+    const agentAuth = authenticateAgent(request)
     if (!agentAuth) return NextResponse.json({ success: false, error: 'Invalid agent token' }, { status: 401 })
     const store = getStore()
     const tenant = store.tenants.get(agentAuth.tenantId)
@@ -52,10 +49,7 @@ export async function POST(request: Request) {
 // GET /api/v1/logs - console queries logs
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const token = authHeader.replace('Bearer ', '')
-    const user = verifyUserToken(token)
+    const user = authenticateRequest(request)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     const url = new URL(request.url)
     const tenantId = user.role === 'super_admin' ? url.searchParams.get('tenantId') : user.tenantId
