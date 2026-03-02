@@ -42,7 +42,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any
 
-AGENT_VERSION = '2.0.3'
+AGENT_VERSION = '2.0.4'
 HEARTBEAT_INTERVAL = 60
 POLICY_SYNC_INTERVAL = 300
 CONFIG_DIR = Path.home() / '.nextguard'
@@ -50,6 +50,22 @@ CACHE_FILE = CONFIG_DIR / 'policy_cache.json'
 STATE_FILE = CONFIG_DIR / 'agent_state.json'
 LOG_FILE = CONFIG_DIR / 'agent.log'
 QUEUE_FILE = CONFIG_DIR / 'event_queue.json'
+
+def enforce_block(path=None, channel=None, policy_name=''):
+    """Enforce block action: quarantine file or clear clipboard."""
+    try:
+          if channel == 'clipboard':
+                  subprocess.run(['pbcopy'], input=b'[BLOCKED by NextGuard DLP]', timeout=5)
+                  log.warning(f'[BLOCKED] Clipboard cleared - {policy_name}')
+                elif path and Path(path).exists():
+                        q_dir = CONFIG_DIR / 'quarantine'
+                        q_dir.mkdir(parents=True, exist_ok=True)
+                        src = Path(path)
+                        dst = q_dir / f'{src.name}.{int(time.time())}.blocked'
+                        src.rename(dst)
+                        log.warning(f'[BLOCKED] File quarantined: {src.name} -> {dst}')
+                    except Exception as e:
+                          log.error(f'Enforcement failed: {e}')
 SKIP_VOLUMES = {'Macintosh HD', 'Macintosh HD - Data', 'Recovery', 'Preboot', 'VM', 'Update'}
 
 def setup_logging():
@@ -217,6 +233,7 @@ class FileSystemMonitor:
     matched = self.engine.evaluate(event)
     if matched:
       log.warning(f'Policy violation: {matched["name"]} - {event["fileName"]}')
+                  if matched.get('action') == 'block': enforce_block(path=str(path), channel=channel, policy_name=matched['name'])
       self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER', 'unknown'),
         'policyId': matched['id'], 'policyName': matched['name'], 'severity': matched.get('severity', 'medium'),
         'action': matched.get('action', 'audit'), 'channel': channel, 'riskScore': 75,
@@ -260,6 +277,7 @@ class ClipboardMonitor:
           m = self.engine.evaluate({'channel': 'clipboard', 'content': c, 'fileName': ''})
           if m:
             log.warning(f'Clipboard policy violation: {m["name"]}')
+                          if m.get('action') == 'block': enforce_block(channel='clipboard', policy_name=m['name'])
             self.api.report_incident({'hostname': socket.gethostname(), 'username': os.getenv('USER','unknown'),
               'policyId': m['id'], 'policyName': m['name'], 'severity': m.get('severity','medium'),
               'action': m.get('action','audit'), 'channel': 'clipboard', 'riskScore': 65, 'details': {'contentSnippet': c[:200]}})
