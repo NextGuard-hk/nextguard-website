@@ -248,7 +248,7 @@ export async function PUT(req: NextRequest) {
   if (secret !== 'nextguard-cron-2024-secure') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!userId) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    if (!userId && action !== 'admin-create') return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   try {
     let users = await getUsers()
     if (action === 'toggle-active') {
