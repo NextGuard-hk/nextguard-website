@@ -325,7 +325,7 @@ export default function ProjectsPage() {
   };
   // Layer 2: Section Group CRUD
   const handleCreateKBGroup = () => {
-    if (!formName.trim()) return;formImages
+    if (!formName.trim()) return;
     const newGrp: KBSectionGroup = { id: `grp-${Date.now()}`, name: formName, pages: [] };
     setKbSections(prev => prev.map(s => s.id === targetSectionId ? { ...s, groups: [...s.groups, newGrp] } : s));
     setFormName(''); setShowCreateGroup(false);
@@ -530,7 +530,7 @@ export default function ProjectsPage() {
                       <div key={grp.id}>
                         <div className="group flex items-center justify-between px-2 py-1.5 mb-1">
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate">{grp.name} ({grp.pages.length})</span>
-                          <div className="hidden group-hover:flex items-center gap-0.5">
+                          <div className="flex items-center gap-0.5">
                             <button onClick={() => { setTargetGroupId(grp.id); setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowCreatePage(true); }} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-green-400 hover:text-green-300 text-sm font-medium border border-gray-700 hover:border-green-500/50 transition-colors" title="Add Page">+ Page</button>
                             <button onClick={() => { setEditTargetId(grp.id); setFormName(grp.name); setShowEditGroup(true); }} className="px-2 py-1 text-gray-400 hover:text-cyan-400 hover:bg-gray-700 rounded text-sm transition-colors" title="Edit">✏</button>
                             <button onClick={() => { setEditTargetId(grp.id); setShowDeleteGroup(true); }} className="px-2 py-1 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded text-sm transition-colors" title="Delete">✕</button>
