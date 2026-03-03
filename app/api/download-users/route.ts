@@ -307,8 +307,12 @@ export async function PUT(req: NextRequest) {
     }
 
     if (action === 'admin-create') {
-      const body = await req.json()
-      const { email, password, company, contactName, permissions } = body
+      const email = req.nextUrl.searchParams.get('email') || ''
+      const password = req.nextUrl.searchParams.get('password') || ''
+      const company = req.nextUrl.searchParams.get('company') || ''
+      const contactName = req.nextUrl.searchParams.get('contactName') || ''
+      const permStr = req.nextUrl.searchParams.get('permissions')
+      const permissions = permStr ? JSON.parse(decodeURIComponent(permStr)) : undefined
       if (!email || !password || !company || !contactName) {
         return NextResponse.json({ error: 'All fields required' }, { status: 400 })
       }
