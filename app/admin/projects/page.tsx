@@ -350,13 +350,13 @@ export default function ProjectsPage() {
           <button onClick={() => setMobileSidebarOpen(false)} className="text-gray-400 hover:text-white lg:hidden">X</button>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {([{key:'board' as ViewMode,label:'Board',icon:'\ud83d\udcca'},{key:'list' as ViewMode,label:'List View',icon:'\ud83d\udcc3'},{key:'backlog' as ViewMode,label:'Backlog',icon:'\ud83d\udce5'},{key:'reports' as ViewMode,label:'Reports',icon:'\ud83d\udcc8'},{key:'kb' as ViewMode,label:'Knowledge Base',icon:'\ud83d\udcda'}]).map(item => (
+          {([{key:'board' as ViewMode,label:'Board',icon:'📊'},{key:'list' as ViewMode,label:'List View',icon:'📃'},{key:'backlog' as ViewMode,label:'Backlog',icon:'📥'},{key:'reports' as ViewMode,label:'Reports',icon:'📈'},{key:'kb' as ViewMode,label:'Knowledge Base',icon:'📚'}]).map(item => (
             <button key={item.key} onClick={() => { setActiveView(item.key); setMobileSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeView === item.key ? 'bg-cyan-600/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
               <span>{item.icon}</span>{!sidebarCollapsed && <span>{item.label}</span>}
             </button>
           ))}
           <button onClick={() => setShowActivityLog(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-gray-400 hover:bg-gray-800 hover:text-white mb-2">
-            <span>\ud83d\udcdd</span>{!sidebarCollapsed && <span>Activity Log</span>}{activityLogs.length > 0 && <span className="ml-auto text-xs bg-cyan-500/20 text-cyan-400 px-1.5 rounded">{activityLogs.length}</span>}
+            <span>📝</span>{!sidebarCollapsed && <span>Activity Log</span>}{activityLogs.length > 0 && <span className="ml-auto text-xs bg-cyan-500/20 text-cyan-400 px-1.5 rounded">{activityLogs.length}</span>}
           </button>
         </nav>
         <div className="p-3 border-t border-gray-800">
@@ -372,7 +372,7 @@ export default function ProjectsPage() {
         <header className="sticky top-0 z-30 bg-gray-950/80 backdrop-blur-xl border-b border-gray-800 px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <button onClick={() => setMobileSidebarOpen(true)} className="text-gray-400 hover:text-white lg:hidden text-xl">\u2630</button>
+              <button onClick={() => setMobileSidebarOpen(true)} className="text-gray-400 hover:text-white lg:hidden text-xl">☰</button>
               <div><h2 className="text-lg font-bold">NextGuard DLP - Project Board</h2><p className="text-xs text-gray-500">Sprint 12 - Jan 7, 2025</p></div>
             </div>
             <div className="flex items-center gap-3">
@@ -465,7 +465,7 @@ export default function ProjectsPage() {
                 <p className="text-gray-400 mb-6">Find guides, documentation, and best practices</p>
                 <div className="max-w-2xl mx-auto relative">
                   <input type="text" placeholder="Search articles, topics, or tags..." value={kbSearchQuery} onChange={e => setKbSearchQuery(e.target.value)} className="w-full px-5 py-4 bg-gray-900 border border-gray-700 rounded-2xl text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none text-base pl-12" />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">\ud83d\udd0d</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
                 </div>
               </div>
               <button onClick={() => setShowCreateKB(true)} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-sm transition-colors whitespace-nowrap">+ Create Article</button>{/* Category Pills */}
@@ -480,10 +480,10 @@ export default function ProjectsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                   {kbCategories.map(cat => {
                     const catArticles = kbArticles.filter(a => a.category === cat);
-                    const icons: Record<string,string> = { Configuration: '\u2699\ufe0f', Deployment: '\ud83d\ude80', Process: '\ud83d\udcca', Development: '\ud83d\udcbb', Sales: '\ud83d\udcc8', Support: '\ud83d\udee0\ufe0f' };
+                    const icons: Record<string,string> = { Configuration: '⚙️', Deployment: '🚀', Process: '📊', Development: '💻', Sales: '📈', Support: '🛠️' };
                     return (
                       <button key={cat} onClick={() => setKbSelectedCategory(cat)} className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 text-left hover:border-cyan-500/40 transition-all group">
-                        <div className="text-3xl mb-3">{icons[cat] || '\ud83d\udcc4'}</div>
+                        <div className="text-3xl mb-3">{icons[cat] || '📄'}</div>
                         <h3 className="text-lg font-semibold mb-1 group-hover:text-cyan-400 transition-colors">{cat}</h3>
                         <p className="text-sm text-gray-500">{catArticles.length} article{catArticles.length !== 1 ? 's' : ''}</p>
                       </button>
@@ -513,9 +513,9 @@ export default function ProjectsPage() {
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800/50">
                       <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-[10px]">{getUserAvatar(a.author)}</div>
                       <span className="text-xs text-gray-500">{getUserName(a.author)}</span>
-                      <span className="text-xs text-gray-600">\u00b7</span>
+                      <span className="text-xs text-gray-600">·</span>
                       <span className="text-xs text-gray-500">Updated {a.updated}</span>
-                      {a.sections && <><span className="text-xs text-gray-600">\u00b7</span><span className="text-xs text-gray-500">{a.sections.length} sections</span></>}
+                      {a.sections && <><span className="text-xs text-gray-600">·</span><span className="text-xs text-gray-500">{a.sections.length} sections</span></>}
                     </div>
                   </div>
                 ))}
@@ -559,7 +559,7 @@ export default function ProjectsPage() {
                     <h1 className="text-xl sm:text-2xl font-bold mb-4">{selectedKBArticle.title}</h1><div className="flex gap-2 mb-6"><button onClick={() => openEditKB(selectedKBArticle)} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-xs font-medium transition-colors">Edit</button><button onClick={() => setShowDeleteKBConfirm(true)} className="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-medium transition-colors">Delete</button></div>
                     <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-800">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold">{getUserAvatar(selectedKBArticle.author)}</div>
-                      <div><p className="text-sm font-medium">{getUserName(selectedKBArticle.author)}</p><p className="text-xs text-gray-500">Updated {selectedKBArticle.updated} \u00b7 {selectedKBArticle.views} views</p></div>
+                      <div><p className="text-sm font-medium">{getUserName(selectedKBArticle.author)}</p><p className="text-xs text-gray-500">Updated {selectedKBArticle.updated} · {selectedKBArticle.views} views</p></div>
                     </div>
                     <p className="text-gray-300 leading-relaxed mb-6">{selectedKBArticle.content}</p>
                     {/* Sections */}
@@ -590,8 +590,8 @@ export default function ProjectsPage() {
                             <span className="text-sm text-cyan-400">Thanks for your feedback!</span>
                           ) : (
                             <>
-                              <button onClick={() => { setKbHelpfulVoted(prev => ({...prev, [selectedKBArticle.id]: true})); setKbArticles(prev => prev.map(a => a.id === selectedKBArticle.id ? {...a, helpful: a.helpful + 1} : a)); }} className="px-4 py-2 bg-gray-800 hover:bg-green-500/20 hover:text-green-400 rounded-lg text-sm transition-colors">\ud83d\udc4d Yes</button>
-                              <button onClick={() => setKbHelpfulVoted(prev => ({...prev, [selectedKBArticle.id]: true}))} className="px-4 py-2 bg-gray-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-sm transition-colors">\ud83d\udc4e No</button>
+                              <button onClick={() => { setKbHelpfulVoted(prev => ({...prev, [selectedKBArticle.id]: true})); setKbArticles(prev => prev.map(a => a.id === selectedKBArticle.id ? {...a, helpful: a.helpful + 1} : a)); }} className="px-4 py-2 bg-gray-800 hover:bg-green-500/20 hover:text-green-400 rounded-lg text-sm transition-colors">👍 Yes</button>
+                              <button onClick={() => setKbHelpfulVoted(prev => ({...prev, [selectedKBArticle.id]: true}))} className="px-4 py-2 bg-gray-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-sm transition-colors">👎 No</button>
                             </>
                           )}
                         </div>
@@ -607,14 +607,14 @@ export default function ProjectsPage() {
                             <button key={rid} onClick={() => { setSelectedKBArticle(ra); setKbActiveSection(0); }} className="w-full text-left flex items-center gap-3 p-3 bg-gray-800/50 hover:bg-gray-800 rounded-xl transition-colors">
                               <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded">{ra.category}</span>
                               <span className="text-sm text-gray-300 flex-1 truncate">{ra.title}</span>
-                              <span className="text-xs text-gray-600">\u2192</span>
+                              <span className="text-xs text-gray-600">→</span>
                             </button>
                           ); })}
                         </div>
                       </div>
                     )}
                   </div>
-                  <button onClick={() => setSelectedKBArticle(null)} className="mt-4 text-sm text-gray-500 hover:text-cyan-400 transition-colors">\u2190 Back to all articles</button>
+                  <button onClick={() => setSelectedKBArticle(null)} className="mt-4 text-sm text-gray-500 hover:text-cyan-400 transition-colors">← Back to all articles</button>
                 </div>
               </div>
             </div>
