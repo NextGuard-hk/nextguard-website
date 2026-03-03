@@ -3,11 +3,11 @@ import { getStore } from '@/lib/multi-tenant-store'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  context: { params: Promise<{ tenantId: string }> }
 ) {
-  const { tenantId } = params
+  const { tenantId } = await context.params
   const store = getStore()
-  const tenant = store.tenants.find((t: any) => t.id === tenantId)
+  const tenant = store.tenants.get(tenantId)
 
   if (!tenant) {
     return NextResponse.json(
@@ -21,26 +21,35 @@ export async function GET(
     )
   }
 
-  const agents = (store.agents || []).filter((a: any) => a.tenantId === tenantId).map((a: any) => {
-    const now = Date.now()
+  const allAgents = Array.from(store.agents.values())
+  const tenantAgents = allAgents.filter(a => a.tenantId === tenantId)
+  const now = Date.now()
+
+  const agents = tenantAgents.map(a => {
     const lastHb = a.lastHeartbeat ? new Date(a.lastHeartbeat).getTime() : 0
     const isOnline = (now - lastHb) < 5 * 60 * 1000
     return {
       agentId: a.id,
       hostname: a.hostname || 'Unknown',
-      os: a.os || 'Unknown',
-      status: isOnline ? 'online' : 'offline',
+      os: `${a.os || 'Unknown'} ${a.osVersion || ''}`.trim(),
+      status: a.status === 'warning' ? 'warning' : (isOnline ? 'online' : 'offline'),
       lastHeartbeat: a.lastHeartbeat || new Date().toISOString(),
       version: a.agentVersion || '1.0.0',
-      registeredAt: a.registeredAt || new Date().toISOString()
+      registeredAt: a.registeredAt || new Date().toISOString(),
+      username: a.username || '',
+      ip: a.ip || '',
+      tags: a.tags || []
     }
   })
 
-  const policyCount = (store.policies || []).filter((p: any) => p.tenantId === tenantId).length
+  const allPolicies = Array.from(store.policies.values())
+  const policyCount = allPolicies.filter(p => p.tenantId === tenantId).length
 
   return NextResponse.json({
     id: tenant.id,
     name: tenant.name,
+    domain: tenant.domain,
+    plan: tenant.plan,
     agents,
     policies: policyCount
   })
