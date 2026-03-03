@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { email, password, otp } = body
+        const users = await getUsers()
 
         // Register action
     if (body.action === 'register') {
@@ -63,15 +64,11 @@ export async function POST(req: NextRequest) {
     }
 if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    }
-
-    const users = await getUsers()
     const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase())
 
     // Step 2: OTP verification
     if (otp && !password) {
       if (!user) {
-        return NextResponse.json({ error: 'Invalid verification code' }, { status: 401 })
       }
       if (!user.otp || user.otp !== otp) {
         return NextResponse.json({ error: 'Invalid verification code. Please try again.' }, { status: 401 })
