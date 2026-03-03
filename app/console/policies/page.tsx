@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 interface Policy {
   id: string
@@ -22,6 +23,8 @@ interface Policy {
 const API_BASE = '/api/v1'
 
 export default function PolicyManagement() {
+    const searchParams = useSearchParams()
+    const tenantId = searchParams.get('tenantId') || 'tenant-demo'
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -39,7 +42,7 @@ export default function PolicyManagement() {
 
   const fetchPolicies = async () => {
     try {
-      const res = await fetch(`${API_BASE}/policies/bundle?agentId=console`)
+      const res = await fetch(`${API_BASE}/policies/bundle?agentId=console&tenantId=${tenantId}`)
       if (res.ok) {
         const data = await res.json()
         setPolicies(data.bundle?.policies || data.policies || [])
@@ -52,7 +55,7 @@ export default function PolicyManagement() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchPolicies() }, [])
+  useEffect(() => { fetchPolicies() }, [tenantId])
 
   const handleSubmit = async () => {
     if (!form.name.trim()) { setError('Policy name is required'); return }
@@ -72,7 +75,7 @@ export default function PolicyManagement() {
         category: form.category
       }
       if (editPolicy) payload.id = editPolicy.id
-      const res = await fetch(`${API_BASE}/policies/bundle`, {
+      const res = await fetch(`${API_BASE}/policies/bundle?tenantId=${tenantId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -96,7 +99,7 @@ export default function PolicyManagement() {
     if (!confirm(`Delete policy "${p.name}"?`)) return
     setError(''); setSuccess('')
     try {
-      const res = await fetch(`${API_BASE}/policies/bundle?id=${p.id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE}/policies/bundle?id=${p.id}&tenantId=${tenantId}`, { method: 'DELETE' })
       const data = await res.json()
       if (res.ok && data.success) {
         setSuccess(`Policy "${p.name}" deleted`)
@@ -108,7 +111,7 @@ export default function PolicyManagement() {
 
   const handleToggle = async (p: Policy) => {
     try {
-      const res = await fetch(`${API_BASE}/policies/bundle`, {
+      const res = await fetch(`${API_BASE}/policies/bundle?tenantId=${tenantId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: p.id, name: p.name, enabled: !p.enabled })
@@ -163,7 +166,7 @@ export default function PolicyManagement() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <Link href="/console" className="text-blue-400 hover:text-blue-300 text-sm">&larr; Back to Console</Link>
-            <h1 className="text-2xl font-bold mt-2">Policy Management</h1>
+            <h1 className="text-2xl font-bold mt-2">Policy Management <span className="text-sm font-normal text-blue-400">({tenantId})</span></h1>
             <p className="text-gray-400 text-sm mt-1">Configure DLP detection policies, rules, and compliance frameworks</p>
           </div>
           <button onClick={() => { resetForm(); setEditPolicy(null); setShowForm(true); setError('') }}
