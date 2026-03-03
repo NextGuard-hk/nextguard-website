@@ -1,33 +1,37 @@
-// Shared Policy Bundle Store - Single source of truth
-// Uses /tmp for cross-function persistence on Vercel serverless
+// Shared Policy Bundle Store - Multi-Tenant Architecture
+// Each tenant has isolated policy storage in /tmp/nextguard_policies_{tenantId}.json
+// DEFAULT_POLICIES serve as templates that are cloned per tenant on first access
 import * as fs from 'fs'
 import * as path from 'path'
 
-const CUSTOM_POLICIES_FILE = '/tmp/nextguard_custom_policies.json'
+// --- Tenant-scoped /tmp persistence ---
+function tenantPolicyFile(tenantId: string): string {
+  return `/tmp/nextguard_policies_${tenantId}.json`
+}
 
-// Load custom policies from /tmp (persists within same Vercel instance)
-function loadCustomPoliciesFromDisk(): Map<string, any> {
+function loadTenantPoliciesFromDisk(tenantId: string): Map<string, any> {
   try {
-    if (fs.existsSync(CUSTOM_POLICIES_FILE)) {
-      const data = JSON.parse(fs.readFileSync(CUSTOM_POLICIES_FILE, 'utf8'))
+    const file = tenantPolicyFile(tenantId)
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'))
       return new Map(Object.entries(data))
     }
   } catch (e) {
-    console.error('loadCustomPolicies error:', e)
+    console.error(`loadTenantPolicies(${tenantId}) error:`, e)
   }
   return new Map()
 }
 
-function saveCustomPoliciesToDisk(map: Map<string, any>): void {
+function saveTenantPoliciesToDisk(tenantId: string, map: Map<string, any>): void {
   try {
     const obj: Record<string, any> = {}
     map.forEach((v, k) => { obj[k] = v })
-    fs.writeFileSync(CUSTOM_POLICIES_FILE, JSON.stringify(obj, null, 2))
+    fs.writeFileSync(tenantPolicyFile(tenantId), JSON.stringify(obj, null, 2))
   } catch (e) {
-    console.error('saveCustomPolicies error:', e)
+    console.error(`saveTenantPolicies(${tenantId}) error:`, e)
   }
 }
-
+// --- Default policy templates (cloned per tenant on first access) ---
 export const DEFAULT_POLICIES = [
   { id: 'pii-cc-detect', name: 'Credit Card Number', description: 'Visa/MC/Amex/Discover/JCB/UnionPay credit card patterns (PCI-DSS)', category: 'PII', patterns: ['\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\\b'], keywords: [], severity: 'critical', action: 'block', channels: ['file','clipboard','network','email','usb','cloud','print'], enabled: true, complianceFramework: 'PCI-DSS', detectionMode: 'hybrid', version: 1 },
   { id: 'pii-hkid-detect', name: 'Hong Kong ID', description: 'HKID number pattern (PDPO)', category: 'PII', patterns: ['\\b[A-Z]{1,2}[0-9]{6}\\(?[0-9A]\\)?\\b'], keywords: [], severity: 'critical', action: 'block', channels: ['file','clipboard','network','email','usb','cloud','print'], enabled: true, complianceFramework: 'PDPO', detectionMode: 'hybrid', version: 1 },
@@ -46,48 +50,78 @@ export const DEFAULT_POLICIES = [
   { id: 'ai-prompt-data-leak', name: 'GenAI Prompt Data Leakage', description: 'Sensitive data submitted to AI/LLM services', category: 'AI-Security', patterns: [], keywords: ['ChatGPT','Claude','Gemini','Copilot','prompt','AI assistant'], severity: 'high', action: 'audit', channels: ['browser','network','clipboard'], enabled: true, complianceFramework: 'ISO27001', detectionMode: 'ai', version: 1 },
 ]
 
-export function getCustomPolicies(): Map<string, any> {
-  return loadCustomPoliciesFromDisk()
+// --- Tenant-scoped CRUD operations ---
+
+// Ensure tenant has policies initialized (clone defaults on first access)
+function ensureTenantPolicies(tenantId: string): Map<string, any> {
+  const existing = loadTenantPoliciesFromDisk(tenantId)
+  if (existing.size > 0) return existing
+  // First access: clone DEFAULT_POLICIES for this tenant
+  const map = new Map<string, any>()
+  DEFAULT_POLICIES.forEach(p => map.set(p.id, { ...p, tenantId }))
+  saveTenantPoliciesToDisk(tenantId, map)
+  return map
 }
 
-export function setCustomPolicy(id: string, policy: any): void {
-  const map = loadCustomPoliciesFromDisk()
-  map.set(id, policy)
-  saveCustomPoliciesToDisk(map)
+// Get all policies for a specific tenant (merged: defaults + custom overrides)
+export function getTenantPolicies(tenantId: string): any[] {
+  const map = ensureTenantPolicies(tenantId)
+  return Array.from(map.values())
 }
 
-export function deleteCustomPolicy(id: string): boolean {
-  const map = loadCustomPoliciesFromDisk()
+// Set/update a policy for a specific tenant
+export function setTenantPolicy(tenantId: string, id: string, policy: any): void {
+  const map = ensureTenantPolicies(tenantId)
+  map.set(id, { ...policy, tenantId })
+  saveTenantPoliciesToDisk(tenantId, map)
+}
+
+// Delete a policy for a specific tenant
+export function deleteTenantPolicy(tenantId: string, id: string): boolean {
+  const map = ensureTenantPolicies(tenantId)
+  const isDefault = DEFAULT_POLICIES.some(p => p.id === id)
+  if (isDefault) return false // Cannot delete built-in; disable instead
   const existed = map.delete(id)
-  if (existed) saveCustomPoliciesToDisk(map)
+  if (existed) saveTenantPoliciesToDisk(tenantId, map)
   return existed
 }
 
+// Check if a tenant has a specific policy
+export function hasTenantPolicy(tenantId: string, id: string): boolean {
+  return ensureTenantPolicies(tenantId).has(id)
+}
+
+// --- Backward-compatible wrappers (default to tenant-demo) ---
+// These exist so existing code that doesn't pass tenantId still works
+
+export function getCustomPolicies(): Map<string, any> {
+  return loadTenantPoliciesFromDisk('tenant-demo')
+}
+
+export function setCustomPolicy(id: string, policy: any): void {
+  setTenantPolicy('tenant-demo', id, policy)
+}
+
+export function deleteCustomPolicy(id: string): boolean {
+  return deleteTenantPolicy('tenant-demo', id)
+}
+
 export function hasCustomPolicy(id: string): boolean {
-  return loadCustomPoliciesFromDisk().has(id)
+  return hasTenantPolicy('tenant-demo', id)
 }
 
 export function getMergedPolicies(): any[] {
-  const customPolicies = loadCustomPoliciesFromDisk()
-  const merged = [...DEFAULT_POLICIES]
-  customPolicies.forEach((policy, id) => {
-    const idx = merged.findIndex(p => p.id === id)
-    if (idx >= 0) {
-      merged[idx] = policy
-    } else {
-      merged.push(policy)
-    }
-  })
-  return merged
+  return getTenantPolicies('tenant-demo')
 }
 
-// Convert bundle policy format to agent-compatible format
-function toAgentFormat(bundlePolicy: any): any {
-  const channelMap: Record<string, string> = {
-    'file': 'filesystem', 'usb': 'usb', 'clipboard': 'clipboard',
-    'email': 'email', 'network': 'network', 'browser': 'browser_upload',
-    'cloud': 'cloud_storage', 'print': 'print'
-  }
+// --- Agent policy format conversion ---
+const channelMap: Record<string, string> = {
+  'file': 'filesystem', 'usb': 'usb', 'clipboard': 'clipboard',
+  'email': 'email', 'network': 'network', 'browser': 'browser_upload',
+  'cloud': 'cloud_storage', 'print': 'print'
+}
+
+function toAgentFormat(bundlePolicy: any, tenantId: string): any {
   const conditions: any[] = []
   if (bundlePolicy.patterns) {
     bundlePolicy.patterns.forEach((pat: string) => {
@@ -103,7 +137,7 @@ function toAgentFormat(bundlePolicy: any): any {
     id: bundlePolicy.id,
     name: bundlePolicy.name,
     description: bundlePolicy.description || '',
-    tenantId: 'tenant-demo',
+    tenantId,
     isEnabled: bundlePolicy.enabled !== false,
     priority: bundlePolicy.priority || 99,
     channels: (bundlePolicy.channels || []).map((ch: string) => channelMap[ch] || ch),
@@ -122,12 +156,12 @@ function toAgentFormat(bundlePolicy: any): any {
   }
 }
 
-// Get all policies for agent consumption - reads merged policies from /tmp
-export function getAgentPolicies(tenantId?: string): any[] {
-  const merged = getMergedPolicies()
-  return merged
+// Get all enabled policies for agent consumption, scoped to tenant
+export function getAgentPolicies(tenantId: string = 'tenant-demo'): any[] {
+  const policies = getTenantPolicies(tenantId)
+  return policies
     .filter(p => p.enabled !== false)
-    .map(p => toAgentFormat(p))
+    .map(p => toAgentFormat(p, tenantId))
 }
 
 export function toAgentPolicy(p: any): any {
