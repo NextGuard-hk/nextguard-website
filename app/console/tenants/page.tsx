@@ -193,7 +193,7 @@ export default function TenantsPage() {
       ) : (
         <div>
           {tenants.map(t => (
-            <div key={t.id} style={{ ...card, cursor: 'pointer', border: selectedTenant?.id === t.id ? '1px solid #2563eb' : '1px solid transparent' }} onClick={() => setSelectedTenant(t)}>
+            <div key={t.id} style={{ ...card, cursor: 'pointer', border: selectedTenant?.id === t.id ? '1px solid #2563eb' : '1px solid transparent' }} onClick={() => window.location.href = `/console/tenants/${t.id}`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <h3 style={{ margin: 0, fontSize: 18 }}>{t.name}</h3>
                 <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 4, background: t.status === 'active' ? '#14532d' : '#7f1d1d', color: t.status === 'active' ? '#22c55e' : '#ef4444' }}>{t.status?.toUpperCase()}</span>
