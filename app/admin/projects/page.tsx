@@ -505,8 +505,8 @@ export default function ProjectsPage() {
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-600 group-hover:hidden">{sec.groups.reduce((a, g) => a + g.pages.length, 0)}</span>
                       <div className="hidden group-hover:flex items-center gap-0.5">
-                        <button onClick={e => { e.stopPropagation(); setEditTargetId(sec.id); setFormName(sec.name); setFormColor(sec.color); setFormIcon(sec.icon); setShowEditSection(true); }} className="px-2 py-1 text-gray-400 hover:text-cyan-400 hover:bg-gray-700 rounded text-sm transition-colors" title="Edit">✏</button>
-                        <button onClick={e => { e.stopPropagation(); setEditTargetId(sec.id); setShowDeleteSection(true); }} className="px-2 py-1 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded text-sm transition-colors" title="Delete">✕</button>
+                        <button onClick={e => { e.stopPropagation(); setEditTargetId(sec.id); setFormName(sec.name); setFormColor(sec.color); setFormIcon(sec.icon); setShowEditSection(true); }} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-cyan-400 hover:bg-gray-700 rounded text-xs transition-colors" title="Edit">✏</button>
+                        <button onClick={e => { e.stopPropagation(); setEditTargetId(sec.id); setShowDeleteSection(true); }} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded text-xs transition-colors" title="Delete">✕</button>
                       </div>
                     </div>
                   </div>
@@ -529,11 +529,11 @@ export default function ProjectsPage() {
                       return (
                       <div key={grp.id}>
                         <div className="group flex items-center justify-between px-2 py-1.5 mb-1">
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate">{grp.name} ({grp.pages.length})</span>
-                          <div className="flex items-center gap-0.5">
-                            <button onClick={() => { setTargetGroupId(grp.id); setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowCreatePage(true); }} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-green-400 hover:text-green-300 text-sm font-medium border border-gray-700 hover:border-green-500/50 transition-colors" title="Add Page">+ Page</button>
-                            <button onClick={() => { setEditTargetId(grp.id); setFormName(grp.name); setShowEditGroup(true); }} className="px-2 py-1 text-gray-400 hover:text-cyan-400 hover:bg-gray-700 rounded text-sm transition-colors" title="Edit">✏</button>
-                            <button onClick={() => { setEditTargetId(grp.id); setShowDeleteGroup(true); }} className="px-2 py-1 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded text-sm transition-colors" title="Delete">✕</button>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{grp.name} ({grp.pages.length})</span>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setTargetGroupId(grp.id); setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowCreatePage(true); }} className="w-6 h-6 flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded text-green-400 hover:text-green-300 text-xs border border-gray-700 hover:border-green-500/50 transition-colors" title="Add Page">+</button>
+                            <button onClick={() => { setEditTargetId(grp.id); setFormName(grp.name); setShowEditGroup(true); }} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-cyan-400 hover:bg-gray-700 rounded text-xs transition-colors" title="Edit">✏</button>
+                            <button onClick={() => { setEditTargetId(grp.id); setShowDeleteGroup(true); }} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded text-xs transition-colors" title="Delete">✕</button>
                           </div>
                         </div>
                         <div className="space-y-0.5">
