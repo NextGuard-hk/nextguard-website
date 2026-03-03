@@ -248,7 +248,7 @@ export async function PUT(req: NextRequest) {
   if (secret !== 'nextguard-cron-2024-secure') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!userId) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+  if (!userId && action !== 'admin-create') return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   try {
     let users = await getUsers()
     if (action === 'toggle-active') {
@@ -304,22 +304,6 @@ export async function PUT(req: NextRequest) {
       await saveUsers(users)
       await writeLog({ type: 'download-user', action: 'set-permissions', email: user.email, permissions })
       return NextResponse.json({ success: true, permissions: user.permissions })
-    }
-
-    if (action === 'admin-create') {
-      const email = req.nextUrl.searchParams.get('email')
-      const contactName = req.nextUrl.searchParams.get('contactName')
-      const company = req.nextUrl.searchParams.get('company')
-      const role = req.nextUrl.searchParams.get('role') || 'User'
-      const password = req.nextUrl.searchParams.get('password')
-      if (!email || !contactName || !company || !password) return NextResponse.json({ error: 'Email, name, company, and password are required' }, { status: 400 })
-      const users = await getUsers()
-      if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return NextResponse.json({ error: 'Account with this email already exists' }, { status: 409 })
-      const newUser: DownloadUser = { id: Date.now().toString(), email: email.toLowerCase(), passwordHash: await hashPassword(password), company, contactName, createdAt: new Date().toISOString(), active: true, emailVerified: true, loginCount: 0, permissions: { kb: role === 'Admin', download: true, socReview: role === 'Admin', projectAccess: true } }
-      users.push(newUser)
-      await saveUsers(users)
-      await writeLog({ type: 'download-user', action: 'admin-create', email, company })
-      return NextResponse.json({ success: true, message: 'Account created for ' + email })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
