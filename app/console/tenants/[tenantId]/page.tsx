@@ -73,7 +73,7 @@ export default function TenantDetailPage() {
         </div>
         <div className="bg-gray-800 rounded-lg p-4">
           <div className="text-2xl font-bold text-green-400">{tenant.policies}</div>
-          <div className="text-gray-400">Active Policies</div>
+          <div className="text-gray-400">Active Policies</p>             <Link href={`/console/policies?tenantId=${tenantId}`} className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300">Manage Policies →</Link></div>
         </div>
       </div>
 
