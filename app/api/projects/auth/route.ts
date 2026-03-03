@@ -37,7 +37,31 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { email, password, otp } = body
 
-    if (!email) {
+        // Register action
+    if (body.action === 'register') {
+      const { name, email: regEmail, password: regPwd } = body;
+      if (!regEmail || !name || !regPwd) return NextResponse.json({ error: 'All fields required' }, { status: 400 });
+      if (regPwd.length < 6) return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+      const existing = users.find((u: any) => u.email.toLowerCase() === regEmail.toLowerCase());
+      if (existing) return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
+      const newUser = { id: `user-${Date.now()}`, email: regEmail, contactName: name, company: '', passwordHash: await hashPassword(regPwd), active: true, emailVerified: false, permissions: { projectAccess: false }, department: '', role: 'user', created: new Date().toISOString(), loginCount: 0 };
+      users.push(newUser);
+      await saveUsers(users);
+      return NextResponse.json({ success: true, message: 'Registration successful! Please wait for admin to grant Project Access.' });
+    }
+    // Forgot password action
+    if (body.action === 'forgot-password') {
+      const fpEmail = body.email;
+      if (!fpEmail) return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      const fpUser = users.find((u: any) => u.email.toLowerCase() === fpEmail.toLowerCase());
+      if (!fpUser) return NextResponse.json({ success: true, message: 'If the email exists, a temporary password has been sent.' });
+      const tempPwd = Math.random().toString(36).slice(-8) + 'A1!';
+      fpUser.passwordHash = await hashPassword(tempPwd);
+      await saveUsers(users);
+      try { await sendOTPEmail(fpEmail, fpUser.contactName, tempPwd); } catch {}
+      return NextResponse.json({ success: true, message: 'If the email exists, a temporary password has been sent to your email.' });
+    }
+if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
