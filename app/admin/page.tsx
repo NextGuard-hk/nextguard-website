@@ -99,6 +99,13 @@ export default function AdminPage() {
   const [moveItem, setMoveItem] = useState<{path: string; name: string; type: string} | null>(null)
     const [accounts, setAccounts] = useState<any[]>([])
     const [accountsLoading, setAccountsLoading] = useState(false)
+  const [showCreateAccount, setShowCreateAccount] = useState(false)
+  const [newAccName, setNewAccName] = useState("")
+  const [newAccEmail, setNewAccEmail] = useState("")
+  const [newAccPassword, setNewAccPassword] = useState("")
+  const [newAccCompany, setNewAccCompany] = useState("")
+  const [newAccRole, setNewAccRole] = useState("User")
+  const [createAccLoading, setCreateAccLoading] = useState(false)
     const [renameLoading, setRenameLoading] = useState(false)
   const [moveTarget, setMoveTarget] = useState("")
     const [createFolderLoading, setCreateFolderLoading] = useState(false)
@@ -480,7 +487,19 @@ export default function AdminPage() {
     } catch {}
   }
 
-    async function handleRename() {
+    async function createAccount() {
+    if (!newAccName || !newAccEmail || !newAccPassword || !newAccCompany) { alert('All fields required'); return }
+    setCreateAccLoading(true)
+    try {
+      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=admin-create&email=' + encodeURIComponent(newAccEmail) + '&contactName=' + encodeURIComponent(newAccName) + '&company=' + encodeURIComponent(newAccCompany) + '&role=' + encodeURIComponent(newAccRole) + '&password=' + encodeURIComponent(newAccPassword), { method: 'PUT' })
+      const d = await r.json()
+      if (r.ok) { alert(d.message || 'Account created'); setShowCreateAccount(false); setNewAccName(''); setNewAccEmail(''); setNewAccPassword(''); setNewAccCompany(''); setNewAccRole('User'); fetchAccounts() }
+      else alert(d.error || 'Failed to create account')
+    } catch { alert('Network error') }
+    finally { setCreateAccLoading(false) }
+  }
+
+  async function handleRename() {
     if (!renameItem || !renameValue.trim()) return
     setRenameLoading(true)
     try {
@@ -884,7 +903,7 @@ export default function AdminPage() {
         {tab === "accounts" && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Registered Accounts</h2>
+              <h2 className="text-xl font-bold">Registered Accounts</h2> <button onClick={() => setShowCreateAccount(true)} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm">+ Create Account</button>
               <button onClick={() => fetchAccounts()} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm">Refresh</button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -932,7 +951,26 @@ export default function AdminPage() {
 
           </div>
         )}
-            {tab === "ai" && <AIDashboard key={aiRefreshKey} />}
+            {showCreateAccount && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowCreateAccount(false)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white mb-4">Create New Account</h3>
+            <div className="space-y-3">
+              <div><label className="text-sm text-zinc-400">Contact Name *</label><input type="text" value={newAccName} onChange={e => setNewAccName(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none" placeholder="Full name" /></div>
+              <div><label className="text-sm text-zinc-400">Email *</label><input type="email" value={newAccEmail} onChange={e => setNewAccEmail(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none" placeholder="user@company.com" /></div>
+              <div><label className="text-sm text-zinc-400">Password *</label><input type="text" value={newAccPassword} onChange={e => setNewAccPassword(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none" placeholder="Min 8 characters" /></div>
+              <div><label className="text-sm text-zinc-400">Company *</label><input type="text" value={newAccCompany} onChange={e => setNewAccCompany(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none" placeholder="Company name" /></div>
+              <div><label className="text-sm text-zinc-400">Role</label><select value={newAccRole} onChange={e => setNewAccRole(e.target.value)} className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none"><option value="User">User</option><option value="Admin">Admin</option></select></div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <button onClick={() => setShowCreateAccount(false)} className="text-zinc-400 hover:text-white px-4 py-2 text-sm">Cancel</button>
+              <button onClick={createAccount} disabled={createAccLoading} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">{createAccLoading ? 'Creating...' : 'Create Account'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "ai" && <AIDashboard key={aiRefreshKey} />}
     </div>
   )
 }
