@@ -1,6 +1,7 @@
 // Agent Heartbeat API - NextGuard Management Console
 import { NextRequest, NextResponse } from 'next/server'
 import { getStore } from '@/lib/multi-tenant-store'
+import { syncRealAgentsToStore, saveRealAgent } from '@/lib/agent-persistence'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,11 +13,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing agentId' }, { status: 400 })
     }
     const store = getStore()
+      syncRealAgentsToStore()
     const agent = store.agents.get(agentId)
     if (agent) {
       agent.lastHeartbeat = new Date().toISOString()
       agent.status = 'online'
       if (hostname) agent.hostname = hostname
+          saveRealAgent(agent)
       return NextResponse.json({
         success: true, agentId,
         serverTime: new Date().toISOString(),
