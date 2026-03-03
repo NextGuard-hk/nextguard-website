@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStore, Agent, generateId } from '@/lib/multi-tenant-store'
 import { signAgentToken } from '@/lib/auth'
 import { getAgentPolicies } from '@/lib/policy-bundle-store'
+import { saveRealAgent } from '@/lib/agent-persistence'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       tags: existing?.tags || [],
     }
     store.agents.set(agentId, agent)
+      saveRealAgent(agent)
 
     if (isNew) {
       store.logs.push({
