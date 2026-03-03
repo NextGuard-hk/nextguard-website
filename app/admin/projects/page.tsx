@@ -325,7 +325,7 @@ export default function ProjectsPage() {
   };
   // Layer 2: Section Group CRUD
   const handleCreateKBGroup = () => {
-    if (!formName.trim()) return;
+    if (!formName.trim()) return;formImages
     const newGrp: KBSectionGroup = { id: `grp-${Date.now()}`, name: formName, pages: [] };
     setKbSections(prev => prev.map(s => s.id === targetSectionId ? { ...s, groups: [...s.groups, newGrp] } : s));
     setFormName(''); setShowCreateGroup(false);
@@ -348,7 +348,7 @@ export default function ProjectsPage() {
   };
   const handleEditKBPage = () => {
     if (!formTitle.trim()) return;
-    setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.map(p => p.id === editTargetId ? { ...p, title: formTitle, content: formContent, tags: formTags ? formTags.split(',').map(t => t.trim()) : p.tags, images: formImages.length > 0 ? formImages : p.images, files: formFiles.length > 0 ? formFiles : p.files, updated: now() } : p) })) })));
+    setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.map(p => p.id === editTargetId ? { ...p, title: formTitle, content: formContent, tags: formTags ? formTags.split(',').map(t => t.trim()) : p.tags, images: formImages, files: formFiles, updated: now() } : p) })) })));
     setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowEditPage(false);
   };
   const handleDeleteKBPage = () => {
