@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
   try {
     const store = getStore()
     const { searchParams } = new URL(request.url)
-    const tenantId = searchParams.get('tenantId')     const agentId = searchParams.get('agentId')
+    const tenantId = searchParams.get('tenantId')
+    const agentId = searchParams.get('agentId')
     const severity = searchParams.get('severity')
     const status = searchParams.get('status')
     const channel = searchParams.get('channel')
@@ -50,7 +51,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
 
-    let filtered = [...store.events]     if (tenantId) filtered = filtered.filter(i => i.tenantId === tenantId)
+    let filtered = [...store.events]
+    if (tenantId) filtered = filtered.filter(i => i.tenantId === tenantId)
     if (agentId) filtered = filtered.filter(i => i.agentId === agentId)
     if (severity) filtered = filtered.filter(i => i.severity === severity)
     if (status) filtered = filtered.filter(i => i.status === status)
@@ -64,14 +66,12 @@ export async function GET(request: NextRequest) {
     const start = (page - 1) * limit
     const paginated = filtered.slice(start, start + limit)
 
-    // Map events to incident format expected by console
     const incidents = paginated.map(e => ({
-      id: e.id, agentId: e.agentId, hostname: e.hostname, username: e.username,
-      policyId: e.policyId, policyName: e.policyName, severity: e.severity,
-      action: e.action, channel: e.channel, status: mapStatus(e.status),
-      details: { filePath: e.filePath, fileName: e.fileName, fileSize: e.fileSize,
-        fileHash: e.fileHash, url: e.destination, sourceApp: e.processName,
-        contentSnippet: e.details },
+      id: e.id, agentId: e.agentId, hostname: e.hostname,
+      username: e.username, policyId: e.policyId, policyName: e.policyName,
+      severity: e.severity, action: e.action, channel: e.channel,
+      status: mapStatus(e.status),
+      details: { filePath: e.filePath, fileName: e.fileName, fileSize: e.fileSize, fileHash: e.fileHash, url: e.destination, sourceApp: e.processName, contentSnippet: e.details },
       timestamp: e.timestamp, reportedAt: e.timestamp
     }))
 
@@ -86,7 +86,8 @@ export async function GET(request: NextRequest) {
       },
       byStatus: {
         open: allEvents.filter(i => i.status === 'flagged').length,
-        investigating: 0, escalated: allEvents.filter(i => i.status === 'blocked').length,
+        investigating: 0,
+        escalated: allEvents.filter(i => i.status === 'blocked').length,
         resolved: allEvents.filter(i => i.status === 'allowed').length,
       },
       byChannel: {
@@ -126,9 +127,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
     const store = getStore()
-    const reqTenantId = body.tenantId     const event = store.events.find(e => e.id === incidentId && (!reqTenantId || e.tenantId === reqTenantId))
+    const reqTenantId = body.tenantId
+    const event = store.events.find(e => e.id === incidentId && (!reqTenantId || e.tenantId === reqTenantId))
     if (!event) return NextResponse.json({ error: 'Incident not found' }, { status: 404 })
-    // Map console status back to event status
     if (status === 'resolved') event.status = 'allowed'
     else if (status === 'escalated') event.status = 'blocked'
     else if (status === 'investigating') event.status = 'quarantined'
