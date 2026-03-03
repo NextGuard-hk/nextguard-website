@@ -50,12 +50,14 @@ const statusColumns: Status[] = ['Backlog', 'To Do', 'In Progress', 'In Review',
 const departments: Department[] = ['R&D', 'Presales', 'Support', 'Management'];
 // ==================== MOCK DATA ====================
 const mockUsers: User[] = [
-  { id: 'u1', name: 'Alex Chen', email: 'alex@nextguard.com', department: 'R&D', role: 'Tech Lead', avatar: 'AC' },
-  { id: 'u2', name: 'Sarah Wong', email: 'sarah@nextguard.com', department: 'Presales', role: 'Solutions Architect', avatar: 'SW' },
-  { id: 'u3', name: 'Mike Liu', email: 'mike@nextguard.com', department: 'Support', role: 'Support Engineer', avatar: 'ML' },
-  { id: 'u4', name: 'Jenny Zhao', email: 'jenny@nextguard.com', department: 'R&D', role: 'Senior Developer', avatar: 'JZ' },
-  { id: 'u5', name: 'David Lee', email: 'david@nextguard.com', department: 'Management', role: 'Project Manager', avatar: 'DL' },
-  { id: 'u6', name: 'Karen Tam', email: 'karen@nextguard.com', department: 'Support', role: 'Support Lead', avatar: 'KT' },
+  { id: 'u1', name: 'Harvey', email: 'harvey@nextguard.com', department: 'R&D', role: 'Tech Lead', avatar: 'HV' },
+  { id: 'u2', name: 'CiCi', email: 'cici@nextguard.com', department: 'Presales', role: 'Solutions Architect', avatar: 'CC' },
+  { id: 'u3', name: 'Frank', email: 'frank@nextguard.com', department: 'Support', role: 'Support Engineer', avatar: 'FK' },
+  { id: 'u4', name: 'Leo', email: 'leo@nextguard.com', department: 'R&D', role: 'Senior Developer', avatar: 'LO' },
+  { id: 'u5', name: 'Winnie', email: 'winnie@nextguard.com', department: 'Management', role: 'Project Manager', avatar: 'WN' },
+  { id: 'u6', name: 'Oscar', email: 'oscar@nextguard.com', department: 'Support', role: 'Support Lead', avatar: 'OS' },
+  { id: 'u7', name: 'Sh\u0113ngd\u00e1', email: 'shengda@nextguard.com', department: 'R&D', role: 'Developer', avatar: 'SD' },
+  { id: 'u8', name: 'Roscoe', email: 'roscoe@nextguard.com', department: 'Presales', role: 'Sales Engineer', avatar: 'RC' },
 ];
 const initialIssues: Issue[] = [
   { id: '1', key: 'NG-101', title: 'Implement DLP Policy Engine v2', description: 'Rebuild policy engine with rule chaining support', type: 'Epic', status: 'In Progress', priority: 'Critical', assignee: 'u1', reporter: 'u5', department: 'R&D', sprint: 'Sprint 12', points: 13, labels: ['dlp-core','architecture'], created: '2025-01-10', updated: '2025-01-25', dueDate: '2025-02-15', dueTime: '18:00', comments: 8, attachments: 3 },
