@@ -15,7 +15,7 @@ interface Issue {
   id: string; key: string; title: string; description: string; type: IssueType; status: Status;
   priority: Priority; assignee: string; reporter: string; department: Department; sprint: string;
   points: number; labels: string[]; created: string; updated: string; dueDate?: string; dueTime?: string;
-    comments: number; attachments: number; attachmentFiles?: string[];
+    comments: number; attachments: number; attachmentFiles?: {name: string; url: string; size: number}[];
   
 }
 interface ActivityLog {
@@ -205,7 +205,7 @@ export default function ProjectsPage() {
   const handleCreateIssue = () => {
     if (!createTitle.trim()) return;
     const newIssue: Issue = {
-      id: String(Date.now()), key: `NG-${113 + issues.length - 12}`, title: createTitle, description: createDesc, type: createType, status: 'To Do', priority: createPriority, assignee: createAssignee, reporter: currentUser?.id || 'u5', department: createDept, sprint: 'Sprint 12', points: 3, labels: [], created: now(), updated: now(), comments: 0, attachments: createAttachments.length, attachmentFiles: createAttachments.map(f => f.name), dueDate: createDueDate || undefined, dueTime: createDueTime || undefined
+      id: String(Date.now()), key: `NG-${113 + issues.length - 12}`, title: createTitle, description: createDesc, type: createType, status: 'To Do', priority: createPriority, assignee: createAssignee, reporter: currentUser?.id || 'u5', department: createDept, sprint: 'Sprint 12', points: 3, labels: [], created: now(), updated: now(), comments: 0, attachments: createAttachments.length, attachmentFiles: createAttachments.map(f => ({name: f.name, url: URL.createObjectURL(f), size: f.size})), dueDate: createDueDate || undefined, dueTime: createDueTime || undefined
     };
     setIssues(prev => [...prev, newIssue]);
     addLog('Created', newIssue);
@@ -222,7 +222,7 @@ export default function ProjectsPage() {
         if (i.priority !== editIssue.priority) addLog('Modified', editIssue, 'Priority', i.priority, editIssue.priority);
         if (i.assignee !== editIssue.assignee) addLog('Modified', editIssue, 'Assignee', getUserName(i.assignee), getUserName(editIssue.assignee));
         if (i.type !== editIssue.type) addLog('Modified', editIssue, 'Type', i.type, editIssue.type);
-        return { ...editIssue, updated: now(), attachments: editIssue.attachments + editAttachments.length, attachmentFiles: [...(editIssue.attachmentFiles || []), ...editAttachments.map(f => f.name)] };
+        return { ...editIssue, updated: now(), attachments: editIssue.attachments + editAttachments.length, attachmentFiles: [...(editIssue.attachmentFiles || []), ...editAttachments.map(f => ({name: f.name, url: URL.createObjectURL(f), size: f.size}))] };
       } return i;
     }));
     setShowEditModal(false); setEditIssue(null); setSelectedIssue(null);
@@ -648,7 +648,7 @@ export default function ProjectsPage() {
               <div><span className="text-gray-500">Reporter: </span><span>{getUserName(selectedIssue.reporter)}</span></div>
               <div><span className="text-gray-500">Department: </span><span>{selectedIssue.department}</span></div>
               <div><span className="text-gray-500">Sprint: </span><span>{selectedIssue.sprint}</span></div>
-              <div><span className="text-gray-500">Points: </span><span>{selectedIssue.points}</span></div><div><span className="text-gray-500">Attachments: </span><span>{selectedIssue.attachments} file(s){selectedIssue.attachmentFiles && selectedIssue.attachmentFiles.length > 0 && <span className="ml-2 text-cyan-400">({selectedIssue.attachmentFiles.join(', ')})</span>}</span></div>
+              <div><span className="text-gray-500">Points: </span><span>{selectedIssue.points}</span></div><div><span className="text-gray-500">Attachments: </span><span>{selectedIssue.attachments} file(s)</span>{selectedIssue.attachmentFiles && selectedIssue.attachmentFiles.length > 0 && <div className="col-span-2 mt-1 space-y-1">{selectedIssue.attachmentFiles.map((f,i) => <a key={i} href={f.url} download={f.name} className="flex items-center gap-2 text-xs bg-gray-800 p-2 rounded hover:bg-gray-700 cursor-pointer"><span className="text-cyan-400">📎</span><span className="text-cyan-300 hover:underline">{f.name}</span><span className="text-gray-500 ml-auto">{(f.size/1024).toFixed(1)}KB</span></a>)}</div>}</span></div>
               <div><span className="text-gray-500">Due: </span><span>{selectedIssue.dueDate || 'Not set'}{selectedIssue.dueTime ? ` ${selectedIssue.dueTime}` : ''}</span></div>
             </div>
             <div className="flex flex-wrap gap-1 mb-3">{selectedIssue.labels.map(l => <span key={l} className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">{l}</span>)}</div>
