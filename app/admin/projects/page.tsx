@@ -23,7 +23,7 @@ interface ActivityLog {
 interface KBPage {
   id: string; title: string; content: string; author: string; views: number; helpful: number; updated: string;
   sections?: { title: string; content: string }[];
-  tags?: string[];
+  tags?: string[]; images?: {id: string; name: string; dataUrl: string}[]; files?: {id: string; name: string; dataUrl: string; size: number; type: string}[];
 }
 interface KBSectionGroup {
   id: string; name: string; pages: KBPage[];
@@ -246,7 +246,7 @@ export default function ProjectsPage() {
   const [formIcon, setFormIcon] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
-  const [formTags, setFormTags] = useState('');
+  const [formTags, setFormTags] = useState(''); const [formImages, setFormImages] = useState<{id: string; name: string; dataUrl: string}[]>([]); const [formFiles, setFormFiles] = useState<{id: string; name: string; dataUrl: string; size: number; type: string}[]>([]);
   const [targetSectionId, setTargetSectionId] = useState('');
   const [targetGroupId, setTargetGroupId] = useState('');
   useEffect(() => {
@@ -342,14 +342,14 @@ export default function ProjectsPage() {
   // Layer 3: Page CRUD
   const handleCreateKBPage = () => {
     if (!formTitle.trim()) return;
-    const newPage: KBPage = { id: `page-${Date.now()}`, title: formTitle, content: formContent, author: currentUser?.id || 'u1', views: 0, helpful: 0, updated: now(), tags: formTags ? formTags.split(',').map(t => t.trim()) : [] };
+    const newPage: KBPage = { id: `page-${Date.now()}`, title: formTitle, content: formContent, author: currentUser?.id || 'u1', views: 0, helpful: 0, updated: now(), tags: formTags ? formTags.split(',').map(t => t.trim()) : [], images: formImages.length > 0 ? formImages : undefined, files: formFiles.length > 0 ? formFiles : undefined };
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => g.id === targetGroupId ? { ...g, pages: [...g.pages, newPage] } : g) })));
-    setFormTitle(''); setFormContent(''); setFormTags(''); setShowCreatePage(false);
+    setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowCreatePage(false);
   };
   const handleEditKBPage = () => {
     if (!formTitle.trim()) return;
-    setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.map(p => p.id === editTargetId ? { ...p, title: formTitle, content: formContent, tags: formTags ? formTags.split(',').map(t => t.trim()) : p.tags, updated: now() } : p) })) })));
-    setFormTitle(''); setFormContent(''); setFormTags(''); setShowEditPage(false);
+    setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.map(p => p.id === editTargetId ? { ...p, title: formTitle, content: formContent, tags: formTags ? formTags.split(',').map(t => t.trim()) : p.tags, images: formImages.length > 0 ? formImages : p.images, files: formFiles.length > 0 ? formFiles : p.files, updated: now() } : p) })) })));
+    setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowEditPage(false);
   };
   const handleDeleteKBPage = () => {
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.filter(p => p.id !== editTargetId) })) })));
@@ -531,7 +531,7 @@ export default function ProjectsPage() {
                         <div className="group flex items-center justify-between px-2 py-1.5 mb-1">
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider truncate">{grp.name} ({grp.pages.length})</span>
                           <div className="hidden group-hover:flex items-center gap-0.5">
-                            <button onClick={() => { setTargetGroupId(grp.id); setFormTitle(''); setFormContent(''); setFormTags(''); setShowCreatePage(true); }} className="p-0.5 text-gray-500 hover:text-green-400 text-xs" title="Add Page">+</button>
+                            <button onClick={() => { setTargetGroupId(grp.id); setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowCreatePage(true); }} className="p-0.5 text-gray-500 hover:text-green-400 text-xs" title="Add Page">+</button>
                             <button onClick={() => { setEditTargetId(grp.id); setFormName(grp.name); setShowEditGroup(true); }} className="p-0.5 text-gray-500 hover:text-cyan-400 text-xs" title="Edit">✏</button>
                             <button onClick={() => { setEditTargetId(grp.id); setShowDeleteGroup(true); }} className="p-0.5 text-gray-500 hover:text-red-400 text-xs" title="Delete">✕</button>
                           </div>
@@ -541,7 +541,7 @@ export default function ProjectsPage() {
                             <div key={page.id} onClick={() => { setKbActivePageId(page.id); setKbActiveContentSection(0); }} className={`group/page flex items-center justify-between px-3 py-2 rounded cursor-pointer text-sm transition-colors ${kbActivePageId === page.id ? 'bg-cyan-600/15 text-cyan-400' : 'text-gray-400 hover:bg-gray-800/60 hover:text-white'}`}>
                               <span className="truncate pr-2">{page.title}</span>
                               <div className="hidden group-hover/page:flex items-center gap-0.5 shrink-0">
-                                <button onClick={e => { e.stopPropagation(); setEditTargetId(page.id); setFormTitle(page.title); setFormContent(page.content); setFormTags(page.tags?.join(', ') || ''); setShowEditPage(true); }} className="p-0.5 text-gray-500 hover:text-cyan-400 text-xs">✏</button>
+                                <button onClick={e => { e.stopPropagation(); setEditTargetId(page.id); setFormTitle(page.title); setFormContent(page.content); setFormTags(page.tags?.join(', ') || ''); setFormImages(page.images || []); setFormFiles(page.files || []); setShowEditPage(true); }} className="p-0.5 text-gray-500 hover:text-cyan-400 text-xs">✏</button>
                                 <button onClick={e => { e.stopPropagation(); setEditTargetId(page.id); setShowDeletePage(true); }} className="p-0.5 text-gray-500 hover:text-red-400 text-xs">✕</button>
                               </div>
                             </div>
@@ -563,11 +563,11 @@ export default function ProjectsPage() {
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold">{getUserAvatar(activePage.author)}</div>
                     <div><p className="text-sm font-medium">{getUserName(activePage.author)}</p><p className="text-xs text-gray-500">Updated {activePage.updated} · {activePage.views} views</p></div>
                     <div className="ml-auto flex gap-2">
-                      <button onClick={() => { setEditTargetId(activePage.id); setFormTitle(activePage.title); setFormContent(activePage.content); setFormTags(activePage.tags?.join(', ') || ''); setShowEditPage(true); }} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-xs font-medium">Edit</button>
+                      <button onClick={() => { setEditTargetId(activePage.id); setFormTitle(activePage.title); setFormContent(activePage.content); setFormTags(activePage.tags?.join(', ') || ''); setFormImages(activePage.images || []); setFormFiles(activePage.files || []); setShowEditPage(true); }} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-xs font-medium">Edit</button>
                       <button onClick={() => { setEditTargetId(activePage.id); setShowDeletePage(true); }} className="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded text-xs font-medium">Delete</button>
                     </div>
                   </div>
-                  <p className="text-gray-300 leading-relaxed mb-6">{activePage.content}</p>
+                  <p className="text-gray-300 leading-relaxed mb-6">{activePage.content}</p> {activePage.images && activePage.images.length > 0 && <div className="mb-6"><h3 className="text-sm font-semibold text-gray-400 mb-3">Images ({activePage.images.length})</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{activePage.images.map(img => <div key={img.id} className="group relative"><img src={img.dataUrl} alt={img.name} className="w-full rounded-lg border border-gray-700 cursor-pointer hover:border-cyan-500 transition-colors" onClick={() => window.open(img.dataUrl, '_blank')} /><div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><a href={img.dataUrl} download={img.name} className="px-2 py-1 bg-gray-900/90 hover:bg-cyan-600 rounded text-xs text-white">Download</a></div><p className="text-xs text-gray-500 mt-1 truncate">{img.name}</p></div>)}</div></div>} {activePage.files && activePage.files.length > 0 && <div className="mb-6"><h3 className="text-sm font-semibold text-gray-400 mb-3">Attachments ({activePage.files.length})</h3><div className="space-y-2">{activePage.files.map(f => <div key={f.id} className="flex items-center justify-between px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg hover:border-gray-600 transition-colors"><div className="flex items-center gap-3 truncate"><span className="text-lg">{f.type.startsWith('image/') ? '🖼' : f.type.includes('pdf') ? '📄' : '📎'}</span><div className="truncate"><p className="text-sm font-medium truncate">{f.name}</p><p className="text-xs text-gray-500">{(f.size/1024).toFixed(1)} KB</p></div></div><div className="flex gap-2 shrink-0"><button onClick={() => window.open(f.dataUrl, '_blank')} className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors">View</button><a href={f.dataUrl} download={f.name} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-xs font-medium transition-colors">Download</a></div></div>)}</div></div>}
                   {activePage.sections && activePage.sections.map((sec, idx) => (
                     <div key={idx} className="mb-6"><h2 className="text-lg font-semibold mb-2 flex items-center gap-2"><span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold">{idx+1}</span>{sec.title}</h2><p className="text-gray-400 leading-relaxed pl-8">{sec.content}</p></div>
                   ))}
@@ -714,7 +714,7 @@ export default function ProjectsPage() {
           <h3 className="text-lg font-semibold mb-4">{showEditPage ? 'Edit Page' : 'Create Page'}</h3>
           <div className="space-y-3">
             <div><label className="block text-sm text-gray-400 mb-1">Title</label><input type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="Page title" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none" /></div>
-            <div><label className="block text-sm text-gray-400 mb-1">Content</label><textarea value={formContent} onChange={e => setFormContent(e.target.value)} placeholder="Page content..." rows={8} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none resize-none" /></div>
+            <div><label className="block text-sm text-gray-400 mb-1">Content <span className="text-gray-600">(paste images with Ctrl+V)</span></label><textarea value={formContent} onChange={e => setFormContent(e.target.value)} onPaste={e => { const items = e.clipboardData?.items; if (items) { for (let i = 0; i < items.length; i++) { if (items[i].type.startsWith('image/')) { e.preventDefault(); const file = items[i].getAsFile(); if (file) { const reader = new FileReader(); reader.onload = ev => { setFormImages(prev => [...prev, {id: `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, name: file.name || `pasted-image-${Date.now()}.png`, dataUrl: ev.target?.result as string}]); }; reader.readAsDataURL(file); } break; } } } }} placeholder="Page content... (you can paste images here)" rows={8} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none resize-none" /></div> {formImages.length > 0 && <div className="mt-2"><label className="block text-sm text-gray-400 mb-1">Pasted Images ({formImages.length})</label><div className="grid grid-cols-2 gap-2">{formImages.map(img => <div key={img.id} className="relative group"><img src={img.dataUrl} alt={img.name} className="w-full h-24 object-cover rounded-lg border border-gray-700" /><button onClick={() => setFormImages(prev => prev.filter(i => i.id !== img.id))} className="absolute top-1 right-1 w-5 h-5 bg-red-600 rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button></div>)}</div></div>} <div><label className="block text-sm text-gray-400 mb-1">Upload Files</label><input type="file" multiple onChange={e => { const files = e.target.files; if (files) { Array.from(files).forEach(file => { const reader = new FileReader(); reader.onload = ev => { setFormFiles(prev => [...prev, {id: `file-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, name: file.name, dataUrl: ev.target?.result as string, size: file.size, type: file.type}]); }; reader.readAsDataURL(file); }); } e.target.value = ''; }} className="w-full text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-300 hover:file:bg-gray-600 cursor-pointer" /></div> {formFiles.length > 0 && <div><label className="block text-sm text-gray-400 mb-1">Attached Files ({formFiles.length})</label><div className="space-y-1">{formFiles.map(f => <div key={f.id} className="flex items-center justify-between px-3 py-2 bg-gray-800 rounded-lg text-sm"><div className="flex items-center gap-2 truncate"><span>{f.type.startsWith('image/') ? '🖼' : f.type.includes('pdf') ? '📄' : '📎'}</span><span className="truncate">{f.name}</span><span className="text-xs text-gray-500">({(f.size/1024).toFixed(1)}KB)</span></div><button onClick={() => setFormFiles(prev => prev.filter(x => x.id !== f.id))} className="text-red-400 hover:text-red-300 text-xs ml-2">✕</button></div>)}</div></div>}
             <div><label className="block text-sm text-gray-400 mb-1">Tags (comma separated)</label><input type="text" value={formTags} onChange={e => setFormTags(e.target.value)} placeholder="tag1, tag2, tag3" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none" /></div>
             <button onClick={showEditPage ? handleEditKBPage : handleCreateKBPage} className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-sm">{showEditPage ? 'Save Changes' : 'Create Page'}</button>
           </div>
