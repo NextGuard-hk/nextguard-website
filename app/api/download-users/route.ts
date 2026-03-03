@@ -248,7 +248,7 @@ export async function PUT(req: NextRequest) {
   if (secret !== 'nextguard-cron-2024-secure') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!userId && action !== 'admin-create') return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+  if (!userId) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   try {
     let users = await getUsers()
     if (action === 'toggle-active') {
@@ -306,6 +306,32 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: true, permissions: user.permissions })
     }
 
+    if (action === 'admin-create') {
+      const body = await req.json()
+      const { email, password, company, contactName, permissions } = body
+      if (!email || !password || !company || !contactName) {
+        return NextResponse.json({ error: 'All fields required' }, { status: 400 })
+      }
+      if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+        return NextResponse.json({ error: 'Email already exists' }, { status: 409 })
+      }
+      const newUser: DownloadUser = {
+        id: Date.now().toString(),
+        email: email.toLowerCase(),
+        passwordHash: await hashPassword(password),
+        company,
+        contactName,
+        createdAt: new Date().toISOString(),
+        active: true,
+        emailVerified: true,
+        loginCount: 0,
+        permissions: permissions || { kb: false, download: true, socReview: false, projectAccess: false },
+      }
+      users.push(newUser)
+      await saveUsers(users)
+      await writeLog({ type: 'download-user', action: 'admin-create', email, company })
+      return NextResponse.json({ success: true, message: 'Account created successfully' })
+    }
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch {
     return NextResponse.json({ error: 'Operation failed' }, { status: 500 })
