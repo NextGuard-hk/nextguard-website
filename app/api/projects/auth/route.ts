@@ -64,11 +64,14 @@ export async function POST(req: NextRequest) {
     }
 if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+
     const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase())
 
     // Step 2: OTP verification
     if (otp && !password) {
       if (!user) {
+        return NextResponse.json({ error: 'Invalid verification code' }, { status: 401 })
       }
       if (!user.otp || user.otp !== otp) {
         return NextResponse.json({ error: 'Invalid verification code. Please try again.' }, { status: 401 })
