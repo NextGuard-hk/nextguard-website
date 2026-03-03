@@ -376,7 +376,7 @@ export default function ProjectsPage() {
     return (
     <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8"><h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">NextGuard DLP</h1><p className="text-gray-400 mt-2">Project Management Platform</p></div>
+        <div className="flex items-center justify-center gap-3 mb-4"><img src="/nextguard-logo.svg" alt="NextGuard" className="w-10 h-10" onError={(e) => { (e.target as HTMLImageElement).style.display='none' }} /><span className="text-xl font-bold text-white">NextGuard DLP</span></div><h2 className="text-2xl font-bold text-center mb-2">Project Management Platform</h2><p className="text-gray-400 text-center text-sm mb-6">Sign in with your account</p>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h3 className="text-lg font-semibold mb-4">Sign In</h3>
           {loginError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{loginError}</div>}
