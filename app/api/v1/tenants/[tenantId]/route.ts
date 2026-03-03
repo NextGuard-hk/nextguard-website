@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStore } from '@/lib/multi-tenant-store'
+import { syncRealAgentsToStore } from '@/lib/agent-persistence'
 
 export async function GET(
   request: NextRequest,
@@ -7,6 +8,7 @@ export async function GET(
 ) {
   const { tenantId } = await context.params
   const store = getStore()
+    syncRealAgentsToStore()
   const tenant = store.tenants.get(tenantId)
 
   if (!tenant) {
