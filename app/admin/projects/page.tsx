@@ -15,7 +15,8 @@ interface Issue {
   id: string; key: string; title: string; description: string; type: IssueType; status: Status;
   priority: Priority; assignee: string; reporter: string; department: Department; sprint: string;
   points: number; labels: string[]; created: string; updated: string; dueDate?: string; dueTime?: string;
-  comments: number; attachments: number;
+    comments: number; attachments: number; attachmentFiles?: string[];
+  
 }
 interface ActivityLog {
   id: string; issueKey: string; issueTitle: string;
@@ -204,7 +205,7 @@ export default function ProjectsPage() {
   const handleCreateIssue = () => {
     if (!createTitle.trim()) return;
     const newIssue: Issue = {
-      id: String(Date.now()), key: `NG-${113 + issues.length - 12}`, title: createTitle, description: createDesc, type: createType, status: 'To Do', priority: createPriority, assignee: createAssignee, reporter: currentUser?.id || 'u5', department: createDept, sprint: 'Sprint 12', points: 3, labels: [], created: now(), updated: now(), comments: 0, attachments: createAttachments.length, dueDate: createDueDate || undefined, dueTime: createDueTime || undefined
+      id: String(Date.now()), key: `NG-${113 + issues.length - 12}`, title: createTitle, description: createDesc, type: createType, status: 'To Do', priority: createPriority, assignee: createAssignee, reporter: currentUser?.id || 'u5', department: createDept, sprint: 'Sprint 12', points: 3, labels: [], created: now(), updated: now(), comments: 0, attachments: createAttachments.length, attachmentFiles: createAttachments.map(f => f.name), dueDate: createDueDate || undefined, dueTime: createDueTime || undefined
     };
     setIssues(prev => [...prev, newIssue]);
     addLog('Created', newIssue);
@@ -221,7 +222,7 @@ export default function ProjectsPage() {
         if (i.priority !== editIssue.priority) addLog('Modified', editIssue, 'Priority', i.priority, editIssue.priority);
         if (i.assignee !== editIssue.assignee) addLog('Modified', editIssue, 'Assignee', getUserName(i.assignee), getUserName(editIssue.assignee));
         if (i.type !== editIssue.type) addLog('Modified', editIssue, 'Type', i.type, editIssue.type);
-        return { ...editIssue, updated: now(), attachments: editIssue.attachments + editAttachments.length };
+        return { ...editIssue, updated: now(), attachments: editIssue.attachments + editAttachments.length, attachmentFiles: [...(editIssue.attachmentFiles || []), ...editAttachments.map(f => f.name)] };
       } return i;
     }));
     setShowEditModal(false); setEditIssue(null); setSelectedIssue(null);
@@ -647,7 +648,7 @@ export default function ProjectsPage() {
               <div><span className="text-gray-500">Reporter: </span><span>{getUserName(selectedIssue.reporter)}</span></div>
               <div><span className="text-gray-500">Department: </span><span>{selectedIssue.department}</span></div>
               <div><span className="text-gray-500">Sprint: </span><span>{selectedIssue.sprint}</span></div>
-              <div><span className="text-gray-500">Points: </span><span>{selectedIssue.points}</span></div>
+              <div><span className="text-gray-500">Points: </span><span>{selectedIssue.points}</span></div><div><span className="text-gray-500">Attachments: </span><span>{selectedIssue.attachments} file(s){selectedIssue.attachmentFiles && selectedIssue.attachmentFiles.length > 0 && <span className="ml-2 text-cyan-400">({selectedIssue.attachmentFiles.join(', ')})</span>}</span></div>
               <div><span className="text-gray-500">Due: </span><span>{selectedIssue.dueDate || 'Not set'}{selectedIssue.dueTime ? ` ${selectedIssue.dueTime}` : ''}</span></div>
             </div>
             <div className="flex flex-wrap gap-1 mb-3">{selectedIssue.labels.map(l => <span key={l} className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">{l}</span>)}</div>
