@@ -5,6 +5,11 @@ import Link from 'next/link'
 const SEV_COLOR: Record<string,string> = { critical:'#ef4444', high:'#f97316', medium:'#eab308', low:'#22c55e' }
 const STA_COLOR: Record<string,string> = { open:'#ef4444', escalated:'#a855f7', investigating:'#f97316', resolved:'#22c55e' }
 
+function getTenantId(): string {
+  try { const u = JSON.parse(localStorage.getItem('ng_user')||'{}'); return u.tenantId||'tenant-demo' }
+  catch { return 'tenant-demo' }
+}
+
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<any[]>([])
   const [stats, setStats] = useState<any>({})
@@ -19,7 +24,8 @@ export default function IncidentsPage() {
 
   const fetchIncidents = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ limit: '100' })
+      const tid = getTenantId()
+      const params = new URLSearchParams({ limit: '100', tenantId: tid })
       if (sevFilter !== 'all') params.set('severity', sevFilter)
       if (staFilter !== 'all') params.set('status', staFilter)
       if (chanFilter !== 'all') params.set('channel', chanFilter)
@@ -35,19 +41,14 @@ export default function IncidentsPage() {
   }, [sevFilter, staFilter, chanFilter])
 
   useEffect(() => { fetchIncidents() }, [fetchIncidents])
-
-  // Auto-refresh every 15 seconds
-  useEffect(() => {
-    const t = setInterval(fetchIncidents, 15000)
-    return () => clearInterval(t)
-  }, [fetchIncidents])
+  useEffect(() => { const t = setInterval(fetchIncidents, 15000); return () => clearInterval(t) }, [fetchIncidents])
 
   const updateStatus = async (id: string, status: string) => {
     setUpdating(true)
     await fetch('/api/v1/incidents', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ incidentId: id, status })
+      body: JSON.stringify({ incidentId: id, status, tenantId: getTenantId() })
     })
     await fetchIncidents()
     if (selected?.id === id) setSelected((prev: any) => ({ ...prev, status }))
@@ -57,9 +58,7 @@ export default function IncidentsPage() {
   const filtered = incidents.filter(i => {
     if (search) {
       const q = search.toLowerCase()
-      if (!i.policyName?.toLowerCase().includes(q) &&
-          !i.hostname?.toLowerCase().includes(q) &&
-          !i.username?.toLowerCase().includes(q)) return false
+      if (!i.policyName?.toLowerCase().includes(q) && !i.hostname?.toLowerCase().includes(q) && !i.username?.toLowerCase().includes(q)) return false
     }
     return true
   })
@@ -82,23 +81,21 @@ export default function IncidentsPage() {
               <span style={{ background:STA_COLOR[selected.status]+'33', color:STA_COLOR[selected.status], padding:'4px 10px', borderRadius:20, fontSize:12, textTransform:'uppercase' }}>{selected.status?.replace('_',' ')}</span>
             </div>
           </div>
-
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
-            {[['Channel', selected.channel],['Action', selected.action],['Host', selected.hostname],['User', selected.username],['Time', new Date(selected.timestamp||selected.reportedAt).toLocaleString()],['Policy ID', selected.policyId]].map(([k,v]) => (
+            {[['Channel',selected.channel],['Action',selected.action],['Host',selected.hostname],['User',selected.username],['Time',new Date(selected.timestamp||selected.reportedAt).toLocaleString()],['Policy ID',selected.policyId]].map(([k,v]) => (
               <div key={k} style={{ background:'#0f172a', borderRadius:8, padding:'12px 16px' }}>
                 <div style={{ color:'#64748b', fontSize:11, textTransform:'uppercase', marginBottom:4 }}>{k}</div>
                 <div style={{ fontSize:14, wordBreak:'break-all' }}>{v as string}</div>
               </div>
             ))}
           </div>
-
           {selected.details && (
             <div style={{ background:'#0f172a', borderRadius:8, padding:16, marginBottom:20 }}>
               <div style={{ color:'#64748b', fontSize:11, textTransform:'uppercase', marginBottom:12 }}>Forensic Details</div>
-              {selected.details.fileName && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>File: </span><span style={{ fontSize:13 }}>{selected.details.fileName}</span></div>}
+              {selected.details.fileName && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>File: </span><span>{selected.details.fileName}</span></div>}
               {selected.details.filePath && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>Path: </span><code style={{ fontSize:12, color:'#94a3b8' }}>{selected.details.filePath}</code></div>}
-              {selected.details.url && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>Destination: </span><span style={{ fontSize:13, color:'#f97316' }}>{selected.details.url}</span></div>}
-              {selected.details.sourceApp && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>Process: </span><span style={{ fontSize:13 }}>{selected.details.sourceApp}</span></div>}
+              {selected.details.url && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>Destination: </span><span style={{ color:'#f97316' }}>{selected.details.url}</span></div>}
+              {selected.details.sourceApp && <div style={{ marginBottom:8 }}><span style={{ color:'#64748b', fontSize:12 }}>Process: </span><span>{selected.details.sourceApp}</span></div>}
               {selected.details.contentSnippet && (
                 <div style={{ marginTop:8 }}>
                   <div style={{ color:'#64748b', fontSize:12, marginBottom:4 }}>Details:</div>
@@ -107,14 +104,13 @@ export default function IncidentsPage() {
               )}
             </div>
           )}
-
           <div>
             <div style={{ color:'#64748b', fontSize:11, textTransform:'uppercase', marginBottom:10 }}>Update Status</div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {['open','investigating','escalated','resolved'].map(s => (
                 <button key={s} onClick={() => updateStatus(selected.id, s)} disabled={updating || selected.status===s}
                   style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:selected.status===s?'default':'pointer', fontSize:13, fontWeight:600,
-                    background:selected.status===s ? STA_COLOR[s]+'33' : '#334155', color:selected.status===s ? STA_COLOR[s] : '#94a3b8', opacity:updating?0.5:1 }}>
+                    background:selected.status===s?STA_COLOR[s]+'33':'#334155', color:selected.status===s?STA_COLOR[s]:'#94a3b8', opacity:updating?0.5:1 }}>
                   {s.charAt(0).toUpperCase()+s.slice(1)}
                 </button>
               ))}
@@ -130,16 +126,14 @@ export default function IncidentsPage() {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
         <div>
           <h1 style={{ margin:0, fontSize:24, fontWeight:700 }}>DLP Incidents</h1>
-          <p style={{ color:'#64748b', margin:'4px 0 0', fontSize:13 }}>Real-time security incidents from endpoint agents</p>
+          <p style={{ color:'#64748b', margin:'4px 0 0', fontSize:13 }}>Real-time security incidents • Tenant: <span style={{ color:'#00ffc8' }}>{getTenantId()}</span></p>
         </div>
         <Link href="/console" style={{ color:'#60a5fa', fontSize:13, textDecoration:'none' }}>← Console</Link>
       </div>
-
       <div style={{ color:'#475569', fontSize:11, marginBottom:20 }}>Last refresh: {lastRefresh.toLocaleTimeString()} • Auto-refreshes every 15s</div>
 
-      {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
-        {[['Total', stats.total||incidents.length, '#f1f5f9'],['Open', stats.byStatus?.open||0, '#ef4444'],['Critical', stats.bySeverity?.critical||0, '#f97316'],['Resolved', stats.byStatus?.resolved||0, '#22c55e']].map(([l,v,c]) => (
+        {[['Total',stats.total||incidents.length,'#f1f5f9'],['Open',stats.byStatus?.open||0,'#ef4444'],['Critical',stats.bySeverity?.critical||0,'#f97316'],['Resolved',stats.byStatus?.resolved||0,'#22c55e']].map(([l,v,c]) => (
           <div key={l as string} style={{ background:'#1e293b', borderRadius:12, padding:16 }}>
             <div style={{ color:'#64748b', fontSize:12 }}>{l as string}</div>
             <div style={{ fontSize:28, fontWeight:700, color:c as string }}>{v as number}</div>
@@ -147,10 +141,8 @@ export default function IncidentsPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-        <input placeholder="Search policy, host, user..." value={search} onChange={e=>setSearch(e.target.value)}
-          style={{ ...inp, flex:1, minWidth:180 }} />
+        <input placeholder="Search policy, host, user..." value={search} onChange={e=>setSearch(e.target.value)} style={{ ...inp, flex:1, minWidth:180 }} />
         <select value={sevFilter} onChange={e=>setSevFilter(e.target.value)} style={inp}>
           <option value="all">All Severities</option>
           {['critical','high','medium','low'].map(s=><option key={s} value={s}>{s}</option>)}
@@ -166,7 +158,6 @@ export default function IncidentsPage() {
         <button onClick={fetchIncidents} style={{ ...inp, background:'#1d4ed8', color:'#fff', border:'none', cursor:'pointer' }}>Refresh</button>
       </div>
 
-      {/* Incidents List */}
       {loading ? (
         <div style={{ textAlign:'center', color:'#64748b', padding:60 }}>Loading incidents...</div>
       ) : filtered.length === 0 ? (
@@ -178,8 +169,7 @@ export default function IncidentsPage() {
       ) : (
         <div>
           {filtered.map(inc => (
-            <div key={inc.id} onClick={()=>setSelected(inc)}
-              style={{ ...card, borderLeft:`4px solid ${SEV_COLOR[inc.severity]||'#334155'}` }}>
+            <div key={inc.id} onClick={()=>setSelected(inc)} style={{ ...card, borderLeft:`4px solid ${SEV_COLOR[inc.severity]||'#334155'}` }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                 <div style={{ fontWeight:600, fontSize:15 }}>{inc.policyName}</div>
                 <div style={{ display:'flex', gap:6 }}>
@@ -188,7 +178,7 @@ export default function IncidentsPage() {
                 </div>
               </div>
               <div style={{ color:'#64748b', fontSize:13, marginBottom:4 }}>{inc.channel} • {inc.hostname} • {inc.username}</div>
-              <div style={{ color:'#475569', fontSize:12 }}>{new Date(inc.timestamp||inc.reportedAt).toLocaleString()} • Action: <span style={{ color: inc.action==='block'?'#ef4444':inc.action==='audit'?'#eab308':'#22c55e' }}>{inc.action}</span></div>
+              <div style={{ color:'#475569', fontSize:12 }}>{new Date(inc.timestamp||inc.reportedAt).toLocaleString()} • Action: <span style={{ color:inc.action==='block'?'#ef4444':inc.action==='audit'?'#eab308':'#22c55e' }}>{inc.action}</span></div>
             </div>
           ))}
           <div style={{ color:'#475569', fontSize:12, textAlign:'center', padding:'12px 0' }}>Showing {filtered.length} of {incidents.length} incidents</div>
