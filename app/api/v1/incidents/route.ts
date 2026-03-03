@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   try {
     const store = getStore()
     const { searchParams } = new URL(request.url)
-    const agentId = searchParams.get('agentId')
+    const tenantId = searchParams.get('tenantId')     const agentId = searchParams.get('agentId')
     const severity = searchParams.get('severity')
     const status = searchParams.get('status')
     const channel = searchParams.get('channel')
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
 
-    let filtered = [...store.events]
+    let filtered = [...store.events]     if (tenantId) filtered = filtered.filter(i => i.tenantId === tenantId)
     if (agentId) filtered = filtered.filter(i => i.agentId === agentId)
     if (severity) filtered = filtered.filter(i => i.severity === severity)
     if (status) filtered = filtered.filter(i => i.status === status)
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       timestamp: e.timestamp, reportedAt: e.timestamp
     }))
 
-    const allEvents = store.events
+    const allEvents = tenantId ? store.events.filter(e => e.tenantId === tenantId) : store.events
     const stats = {
       total: allEvents.length,
       bySeverity: {
@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
     const store = getStore()
-    const event = store.events.find(e => e.id === incidentId)
+    const reqTenantId = body.tenantId     const event = store.events.find(e => e.id === incidentId && (!reqTenantId || e.tenantId === reqTenantId))
     if (!event) return NextResponse.json({ error: 'Incident not found' }, { status: 404 })
     // Map console status back to event status
     if (status === 'resolved') event.status = 'allowed'
