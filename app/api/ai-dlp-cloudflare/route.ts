@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logScanToNPoint } from '@/lib/scan-logger'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -51,7 +52,6 @@ Respond in this exact JSON format:
   "summary": "brief explanation",
   "evasion_detected": true/false
 }
-
 Respond with ONLY valid JSON, no other text.`
 
   const startTime = Date.now()
@@ -67,14 +67,8 @@ Respond with ONLY valid JSON, no other text.`
         },
         body: JSON.stringify({
           messages: [
-            {
-              role: 'system',
-              content: 'You are a DLP security AI. Detect ALL PII and sensitive classification keywords including obfuscated data. Respond only with valid JSON.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
+            { role: 'system', content: 'You are a DLP security AI. Detect ALL PII and sensitive classification keywords including obfuscated data. Respond only with valid JSON.' },
+            { role: 'user', content: prompt }
           ],
           max_tokens: 2000,
           temperature: 0.1,
@@ -126,7 +120,20 @@ export async function POST(req: NextRequest) {
   try {
     const { content } = await req.json()
     if (!content) return NextResponse.json({ error: 'No content provided' }, { status: 400 })
+
     const result = await cloudflareAIDLPScan(content)
+
+    // Log scan to nPoint for dashboard tracking
+    logScanToNPoint({
+      engine: 'cloudflare',
+      detected: result.detected,
+      latencyMs: result.latency_ms || 0,
+      contentLength: content.length,
+      source: 'compare',
+      neurons: 150,
+      model: CF_MODEL,
+    }).catch(() => {})
+
     return NextResponse.json(result)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
