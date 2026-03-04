@@ -39,11 +39,10 @@ export interface DownloadUser {
   otpExpires?: string
   lastLogin?: string
   loginCount: number
-    mustResetPassword?: boolean
-  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean  }
+  mustResetPassword?: boolean
+  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean }
 }
-
-async function writeLog(entry: Record<string, string>) {
+async function writeLog(entry: Record<string, any>) {
   try {
     const logEntry = { id: Date.now().toString(), timestamp: new Date().toISOString(), ...entry }
     const getRes = await fetch(LOG_NPOINT_URL, { cache: 'no-store' })
@@ -55,7 +54,9 @@ async function writeLog(entry: Record<string, string>) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ logs: logs.slice(-500) }),
     })
-  } catch (e) { console.error('Log write error:', e) }
+  } catch (e) {
+    console.error('Log write error:', e)
+  }
 }
 
 export async function getUsers(): Promise<DownloadUser[]> {
@@ -64,7 +65,9 @@ export async function getUsers(): Promise<DownloadUser[]> {
     const res = await fetch(USERS_NPOINT_URL, { cache: 'no-store' })
     const data = await res.json()
     return data.users || []
-  } catch { return [] }
+  } catch {
+    return []
+  }
 }
 
 export async function saveUsers(users: DownloadUser[]) {
@@ -102,9 +105,36 @@ async function sendEmail(to: string, subject: string, html: string) {
   if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured')
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'NextGuard Downloads <noreply@next-guard.com>', to: [to], subject, html }),
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ from: 'NextGuard Downloads <downloads@next-guard.com>', to: [to], subject, html }),
   })
+}
+
+async function notifyAdminNewUser(contactName: string, email: string, company: string, source: string, ip?: string) {
+  try {
+    await sendEmail(
+      'oscar@next-guard.com',
+      `New Account Registered - ${company}`,
+      `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2 style="color:#1a1a2e">New Account Registration</h2>
+        <p>A new account has been registered on NextGuard Downloads.</p>
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Name</td><td style="padding:8px;border:1px solid #ddd">${contactName}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd">${email}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Company</td><td style="padding:8px;border:1px solid #ddd">${company}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Source</td><td style="padding:8px;border:1px solid #ddd">${source}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Time</td><td style="padding:8px;border:1px solid #ddd">${new Date().toISOString()}</td></tr>
+          ${ip ? `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">IP</td><td style="padding:8px;border:1px solid #ddd">${ip}</td></tr>` : ''}
+        </table>
+        <p style="margin-top:16px"><a href="https://www.next-guard.com/admin" style="color:#007bff">View Admin Dashboard</a></p>
+      </div>`
+    )
+  } catch (e) {
+    console.error('Admin notification error:', e)
+  }
 }
 
 // Rate limiting
@@ -169,17 +199,17 @@ export async function POST(req: NextRequest) {
     await saveUsers(users)
     // Send verification email
     await sendEmail(email, 'NextGuard Downloads - Verify Your Email', `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#111;color:#fff;border-radius:12px">
-        <h2 style="color:#22d3ee">NextGuard Downloads</h2>
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2>NextGuard Downloads</h2>
         <p>Hello ${contactName},</p>
         <p>Your verification code is:</p>
-        <div style="background:#1e293b;padding:16px;border-radius:8px;text-align:center;margin:16px 0">
-          <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#22d3ee">${verifyCode}</span>
-        </div>
-        <p style="color:#94a3b8;font-size:14px">This code expires in 30 minutes.</p>
-        <p style="color:#94a3b8;font-size:12px">If you did not register, please ignore this email.</p>
+        <div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f4f4f4;border-radius:8px">${verifyCode}</div>
+        <p>This code expires in 30 minutes.</p>
+        <p>If you did not register, please ignore this email.</p>
       </div>
     `)
+    // Notify admin of new registration
+    await notifyAdminNewUser(contactName, email, company, 'self-registration', ip)
     await writeLog({ type: 'download-user', action: 'register', email, company, ip })
     return NextResponse.json({ success: true, message: 'Registration successful. Please check your email for the verification code.' })
   } catch (e: any) {
@@ -211,12 +241,12 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
   }
-  }
+}
 
-  // GET - Admin list all users
+// GET - Admin list all users
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret')
-    if (secret !== 'nextguard-cron-2024-secure') {
+  if (secret !== 'nextguard-cron-2024-secure') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
@@ -231,7 +261,7 @@ export async function GET(req: NextRequest) {
       emailVerified: u.emailVerified,
       lastLogin: u.lastLogin || null,
       loginCount: u.loginCount || 0,
-              mustResetPassword: u.mustResetPassword || false,
+      mustResetPassword: u.mustResetPassword || false,
       permissions: u.permissions || { kb: false, download: true, socReview: false, projectAccess: false },
     }))
     return NextResponse.json({ users: safeUsers })
@@ -240,7 +270,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-  // PUT - Admin manage user (toggle active, delete)
+// PUT - Admin manage user (toggle active, delete)
 export async function PUT(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret')
   const action = req.nextUrl.searchParams.get('action')
@@ -248,7 +278,7 @@ export async function PUT(req: NextRequest) {
   if (secret !== 'nextguard-cron-2024-secure') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-    if (!userId && action !== 'admin-create') return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+  if (!userId && action !== 'admin-create') return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   try {
     let users = await getUsers()
     if (action === 'toggle-active') {
@@ -267,7 +297,7 @@ export async function PUT(req: NextRequest) {
       await writeLog({ type: 'download-user', action: 'admin-delete', email: user.email })
       return NextResponse.json({ success: true })
     }
-        if (action === 'reset-password') {
+    if (action === 'reset-password') {
       const user = users.find(u => u.id === userId)
       if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
       const tempPassword = Math.random().toString(36).slice(-10) + Math.floor(Math.random() * 90 + 10)
@@ -278,19 +308,20 @@ export async function PUT(req: NextRequest) {
       user.passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
       user.mustResetPassword = true
       await saveUsers(users)
-      await sendEmail(user.email, 'NextGuard Downloads - Password Reset by Admin', `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:20px">
-        <h2 style="color:#06b6d4">NextGuard Downloads</h2>
-        <p>Hello ${user.contactName},</p>
-        <p>Your password has been reset by an administrator.</p>
-        <p>Your temporary password is:</p>
-        <p style="font-size:24px;font-weight:bold;letter-spacing:4px;text-align:center;background:#18181b;padding:16px;border-radius:8px;color:#06b6d4">${tempPassword}</p>
-        <p><strong>You must change your password on your next login.</strong></p>
-        <p>If you did not expect this, please contact support.</p>
-      </div>`)
+      await sendEmail(user.email, 'NextGuard Downloads - Password Reset by Admin', `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2>NextGuard Downloads</h2>
+          <p>Hello ${user.contactName},</p>
+          <p>Your password has been reset by an administrator.</p>
+          <p>Your temporary password is:</p>
+          <div style="font-size:24px;font-weight:bold;text-align:center;padding:20px;background:#f4f4f4;border-radius:8px">${tempPassword}</div>
+          <p><strong>You must change your password on your next login.</strong></p>
+          <p>If you did not expect this, please contact support.</p>
+        </div>
+      `)
       await writeLog({ type: 'download-user', action: 'admin-reset-password', email: user.email })
       return NextResponse.json({ success: true, message: 'Password reset. Temporary password sent to ' + user.email })
     }
-
     if (action === 'set-permissions') {
       const user = users.find(u => u.id === userId)
       if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -305,7 +336,6 @@ export async function PUT(req: NextRequest) {
       await writeLog({ type: 'download-user', action: 'set-permissions', email: user.email, permissions })
       return NextResponse.json({ success: true, permissions: user.permissions })
     }
-
     if (action === 'admin-create') {
       const email = req.nextUrl.searchParams.get('email') || ''
       const password = req.nextUrl.searchParams.get('password') || ''
@@ -333,6 +363,8 @@ export async function PUT(req: NextRequest) {
       }
       users.push(newUser)
       await saveUsers(users)
+      // Notify admin of new account created by admin
+      await notifyAdminNewUser(contactName, email, company, 'admin-create')
       await writeLog({ type: 'download-user', action: 'admin-create', email, company })
       return NextResponse.json({ success: true, message: 'Account created successfully' })
     }
