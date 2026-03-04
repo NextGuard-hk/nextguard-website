@@ -103,7 +103,7 @@ function scanContent(content: string, enabledRules: string[]) {
 }
 
 // Simulate SSL/TLS inspection
-function inspectTLS(url: string) {
+function analyzeUrlReputation(url: string): string {   const DDNS = ['linkpc.net','ddns.net','no-ip.com','dyndns.org','duckdns.org','freedns.afraid.org','hopto.org','zapto.org','sytes.net','serveblog.net','servehttp.com','myftp.org','myftp.biz','redirectme.net','serveftp.com','ignorelist.com','servegame.com','serveminecraft.net','servemp3.com','gotdns.ch','gotdns.com','changeip.com','bounceme.net','dnsdynamic.org','now-dns.com','now-dns.net','now-dns.org','trickip.net','trickip.org'];   const SUSPICIOUS_TLDS = ['.xyz','.top','.club','.click','.loan','.win','.gq','.ml','.cf','.ga','.tk','.pw','.work','.date','.download','.stream','.racing','.party','.trade','.review','.science','.faith','.bid','.men','.space'];   const MALICIOUS_KEYWORDS = ['malware','phish','exploit','botnet','ransomware','cryptominer','webshell','c99','r57'];   try {     const hostname = new URL(url).hostname.toLowerCase();     if (DDNS.some(d => hostname === d || hostname.endsWith('.' + d))) return 'suspicious';     if (MALICIOUS_KEYWORDS.some(k => hostname.includes(k))) return 'malicious';     if (SUSPICIOUS_TLDS.some(t => hostname.endsWith(t))) return 'suspicious';     if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return 'suspicious';     return 'clean';   } catch { return 'unknown'; } }  function inspectTLS(url: string) {
   try {
     const u = new URL(url);
     return {
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
         threatPrevention: {
           malwareDetected: false,
           phishingScore: 0,
-          reputation: 'clean',
+          reputation: analyzeUrlReputation(targetUrl || ''),
         },
         performance: {
           latency: Date.now() - startTime,
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         url: targetUrl,
         categories,
-        reputation: 'clean',
+        reputation: analyzeUrlReputation(targetUrl || ''),
         tlsInspection: inspectTLS(targetUrl || ''),
         timestamp: new Date().toISOString(),
       });
