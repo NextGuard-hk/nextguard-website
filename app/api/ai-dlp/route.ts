@@ -2,10 +2,12 @@ export const runtime = 'nodejs'
 export const maxDuration = 300
 
 import { NextRequest, NextResponse } from 'next/server'
+import { logScanToNPoint } from '@/lib/scan-logger'
 
 const LLM_API_KEY = process.env.PERPLEXITY_API_KEY || process.env.OPENAI_API_KEY || ''
 const LLM_ENDPOINT = process.env.PERPLEXITY_API_KEY ?
-  'https://api.perplexity.ai/chat/completions' : 'https://api.openai.com/v1/chat/completions'
+  'https://api.perplexity.ai/chat/completions' :
+  'https://api.openai.com/v1/chat/completions'
 const LLM_MODEL = process.env.PERPLEXITY_API_KEY ? 'sonar' : 'gpt-4o-mini'
 
 // Traditional DLP patterns with severity
@@ -56,7 +58,7 @@ const DLP_RULES: Record<string, any> = {
   },
   sensitive_keywords: {
     name: 'Sensitive Keywords',
-    dictionary: ['confidential', 'secret', 'classified', 'internal only', 'do not distribute', 'password', 'ssn', 'social security', '機密', '秘密', '絕密', '內部', '限閱', '禁止分發', '密碼', '個人資料', '敏感', '保密', '不得外傳', '僅供內部'],
+    dictionary: ['confidential', 'secret', 'classified', 'internal only', 'do not distribute', 'password', 'ssn', 'social security', '\u6a5f\u5bc6', '\u79d8\u5bc6', '\u7d55\u5bc6', '\u5167\u90e8', '\u9650\u95b1', '\u7981\u6b62\u5206\u767c', '\u5bc6\u78bc', '\u500b\u4eba\u8cc7\u6599', '\u654f\u611f', '\u4fdd\u5bc6', '\u4e0d\u5f97\u5916\u50b3', '\u50c5\u4f9b\u5167\u90e8'],
     type: 'dictionary',
     severity: 'high',
     action: 'QUARANTINE',
@@ -67,9 +69,7 @@ function traditionalDLPScan(content: string, policy?: any) {
   const findings: Array<{rule: string; type: string; matches: string[]; action: string; severity: string}> = []
   let totalMatches = 0
   for (const [key, rule] of Object.entries(DLP_RULES)) {
-    // Check if this rule is disabled by policy
     if (policy && policy[key] && policy[key].enabled === false) continue
-    // Use policy overrides for action and severity if provided
     const effectiveAction = (policy && policy[key]?.action) || rule.action
     const effectiveSeverity = (policy && policy[key]?.severity) || rule.severity
     const matches: string[] = []
@@ -90,13 +90,7 @@ function traditionalDLPScan(content: string, policy?: any) {
       }
     }
     if (matches.length > 0) {
-      findings.push({
-        rule: rule.name,
-        type: rule.type,
-        matches,
-        action: effectiveAction,
-        severity: effectiveSeverity
-      })
+      findings.push({ rule: rule.name, type: rule.type, matches, action: effectiveAction, severity: effectiveSeverity })
       totalMatches += matches.length
     }
   }
@@ -126,7 +120,7 @@ Analyze the following content for:
 
 IMPORTANT:
 - Users may try to bypass DLP by inserting random characters (like &&@, ##, **, etc.) into sensitive data. You MUST detect these evasion attempts.
-- Also detect sensitive classification keywords like "confidential", "secret", "classified", "internal only", "do not distribute", "restricted", "password" etc. These indicate policy violations even without PII.
+- Also detect sensitive classification keywords like "confidential", "secret", "classified", "internal only", "do not distribute", "restricted", "password" etc.
 
 Content to analyze:
 """${content}"""
@@ -149,10 +143,14 @@ Respond in this exact JSON format:
   "evasion_detected": true/false
 }
 Respond with ONLY valid JSON.`
+
   try {
     const res = await fetch(LLM_ENDPOINT, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${LLM_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${LLM_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         model: LLM_MODEL,
         messages: [
@@ -185,7 +183,6 @@ Respond with ONLY valid JSON.`
   }
 }
 
-// Hybrid DLP: Union of Traditional + AI, takes strictest action
 async function hybridDLPScan(content: string, policy?: any) {
   const [traditional, ai] = await Promise.all([
     Promise.resolve(traditionalDLPScan(content, policy)),
@@ -225,17 +222,23 @@ async function hybridDLPScan(content: string, policy?: any) {
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now()
   try {
     const { content, mode, policy } = await req.json()
     if (!content) return NextResponse.json({ error: 'No content provided' }, { status: 400 })
+
     if (mode === 'traditional') {
       const result = traditionalDLPScan(content, policy)
       return NextResponse.json(result)
     } else if (mode === 'ai') {
       const result = await aiDLPScan(content)
+      const latency = Date.now() - startTime
+      logScanToNPoint({ engine: 'perplexity', detected: result.detected, latencyMs: latency, contentLength: content.length, source: 'compare' }).catch(() => {})
       return NextResponse.json(result)
     } else if (mode === 'hybrid') {
       const result = await hybridDLPScan(content, policy)
+      const latency = Date.now() - startTime
+      logScanToNPoint({ engine: 'perplexity', detected: result.detected, latencyMs: latency, contentLength: content.length, source: 'compare' }).catch(() => {})
       return NextResponse.json(result)
     } else {
       const [traditional, ai, hybrid] = await Promise.all([
@@ -243,6 +246,8 @@ export async function POST(req: NextRequest) {
         aiDLPScan(content),
         hybridDLPScan(content, policy),
       ])
+      const latency = Date.now() - startTime
+      logScanToNPoint({ engine: 'perplexity', detected: ai.detected, latencyMs: latency, contentLength: content.length, source: 'compare' }).catch(() => {})
       return NextResponse.json({ traditional, ai, hybrid })
     }
   } catch (e: any) {
