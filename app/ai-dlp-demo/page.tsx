@@ -124,7 +124,7 @@ const ACTIONS = ['BLOCK', 'QUARANTINE', 'AUDIT']
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ResultPanel({ title, result, loading, error, color, latency }: { title: string; result: any; loading: boolean; error: string; color: string; latency: number | null; tradLatency?: number | null; aiLatency?: number | null }) {
+function ResultPanel({ title, result, loading, error, color, latency, tradLatency, aiLatency }: { title: string; result: any; loading: boolean; error: string; color: string; latency: number | null; tradLatency?: number | null; aiLatency?: number | null }) {
   if (loading) return (
     <div>
       <h3 className="text-lg font-bold mb-3" style={{color}}>{title}</h3>
