@@ -341,7 +341,7 @@ export default function ProjectsPage() {
   const handleDeleteIssue = () => { if (!selectedIssue) return; addLog('Deleted', selectedIssue); setIssues(prev => prev.filter(i => i.id !== selectedIssue.id)); setShowDeleteConfirm(false); setSelectedIssue(null); };
   const handleCloseIssue = () => { if (!selectedIssue) return; const f = { ...selectedIssue, status: 'Closed' as Status, updated: now() }; addLog('Closed', f, 'Status', selectedIssue.status, 'Closed'); setIssues(prev => prev.map(i => i.id === selectedIssue.id ? f : i)); setSelectedIssue(f); };
   const handleReopenIssue = () => { if (!selectedIssue) return; const f = { ...selectedIssue, status: 'To Do' as Status, updated: now() }; addLog('Reopened', f, 'Status', selectedIssue.status, 'To Do'); setIssues(prev => prev.map(i => i.id === selectedIssue.id ? f : i)); setSelectedIssue(f); };
-  // ==================== KB 3-LAYER CRUD ====================
+  const NL = String.fromCharCode(10); const BOM = String.fromCharCode(0xFEFF); const handleExportExcel = () => { const h = ['Key','Title','Type','Status','Priority','Assignee','Reporter','Department','Sprint','Points','Labels','Due Date','Due Time','Created','Updated']; const esc = (v: string) => { const s = String(v); return (s.includes(',') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const rows = filteredIssues.map(i => [i.key,i.title,i.type,i.status,i.priority,getUserName(i.assignee),getUserName(i.reporter),i.department,i.sprint,String(i.points),i.labels.join('; '),i.dueDate||'',i.dueTime||'',i.created,i.updated].map(esc).join(',')); const csv = BOM + h.join(',') + NL + rows.join(NL); const blob = new Blob([csv], { type: 'application/vnd.ms-excel;charset=utf-8' }); const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'NextGuard_Tasks_' + new Date().toISOString().split('T')[0] + '.xls'; a.click(); URL.revokeObjectURL(u); }; // ==================== KB 3-LAYER CRUD ====================
   // Layer 1: Section CRUD
   const handleCreateKBSection = () => {
     if (!formName.trim()) return;
@@ -464,7 +464,7 @@ export default function ProjectsPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2"><span className="text-xs text-gray-400">Sprint Progress</span><div className="w-24 h-1.5 bg-gray-800 rounded-full overflow-hidden"><div className="h-full bg-cyan-500 rounded-full transition-all" style={{width:`${totalPoints>0?(completedPoints/totalPoints)*100:0}%`}} /></div><span className="text-xs text-gray-400">{completedPoints}/{totalPoints} pts</span></div>
-            <button onClick={() => setShowCreateModal(true)} className="px-3 sm:px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-xs sm:text-sm transition-colors whitespace-nowrap">+ Create</button>
+            <button onClick={() => handleExportExcel()} className="px-3 sm:px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-xs sm:text-sm transition-colors whitespace-nowrap">📥 Export</button><button onClick={() => setShowCreateModal(true)} className="px-3 sm:px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-xs sm:text-sm transition-colors whitespace-nowrap">+ Create</button>
           </div>
         </div>
         {activeView !== 'kb' && (
