@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       const newUser = { id: `user-${Date.now()}`, email: regEmail, contactName: name, company: '', passwordHash: await hashPassword(regPwd), active: true, emailVerified: false, permissions: { projectAccess: false }, department: '', role: 'user', created: new Date().toISOString(), loginCount: 0 };
       users.push(newUser);
       await saveUsers(users);
-      return NextResponse.json({ success: true, message: 'Registration successful! Please wait for admin to grant Project Access.' });
+      try { if (RESEND_API_KEY) { await fetch('https://api.resend.com/emails', { method: 'POST', headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'NextGuard Projects <noreply@next-guard.com>', to: ['oscar@next-guard.com'], subject: `New User Registration: ${name} (${regEmail})`, html: `<div style="font-family:Arial,sans-serif;padding:24px;background:#0d1117;color:#e6edf3;border-radius:12px;"><h2 style="color:#22d3ee;">New User Registration</h2><p>A new user registered on <strong>NextGuard Project Management Platform</strong>.</p><p><b>Name:</b> ${name}<br/><b>Email:</b> ${regEmail}<br/><b>Time:</b> ${new Date().toLocaleString('en-HK',{timeZone:'Asia/Hong_Kong'})} HKT</p><p style="color:#f59e0b;">⚠️ Grant Project Access permission in Admin → User Management before they can log in.</p></div>` }) }); } } catch {} return NextResponse.json({ success: true, message: 'Registration successful! Please wait for admin to grant Project Access.' });
     }
     // Forgot password action
     if (body.action === 'forgot-password') {
