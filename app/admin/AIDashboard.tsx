@@ -71,7 +71,7 @@ export default function AIDashboard() {
     return true
   })
 
-  const exportCSV = () => {
+  const exportExcel = () => {
     if (!filteredRecords.length) return
     const h = ["Timestamp","Engine","Action","Result","Latency_ms","Policy","Content"]
     const rows = filteredRecords.map((r) => [
@@ -79,8 +79,8 @@ export default function AIDashboard() {
     ])
     const csv = [h,...rows].map((row) => row.map((c) => JSON.stringify(c)).join(",")).join("\n")
     const a = document.createElement("a")
-    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv)
-    a.download = "ai-usage-" + new Date().toISOString().slice(0,10) + ".csv"
+    const blob = new Blob(["\uFEFF" + csv], { type: "application/vnd.ms-excel;charset=utf-8" }); a.href = URL.createObjectURL(blob)
+    a.download = "AI_Usage_Report_" + new Date().toISOString().slice(0,10) + ".xls"
     a.click()
   }
 
@@ -174,7 +174,7 @@ export default function AIDashboard() {
               <option value="detected">Detected</option>
             </select>
             <span className="text-gray-400 text-xs self-center">{filteredRecords.length} records</span>
-            <button onClick={exportCSV} className="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1 rounded">Export CSV</button>
+            <button onClick={exportExcel} className="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1 rounded">📥 Export Excel</button>
             <button onClick={exportJSON} className="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1 rounded">Export JSON</button>
           </div>
           <div className="overflow-x-auto">
