@@ -1,4 +1,4 @@
-e'use client';
+'use client';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 // ==================== TYPES ====================
 type Department = 'R&D' | 'Presales' | 'Support' | 'Management';
