@@ -284,7 +284,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetch('/api/projects/auth').then(r => r.json()).then(d => {
       if (d.authenticated && d.user) {
-        setCurrentUser({ id: d.user.id, name: d.user.name, email: d.user.email, department: 'R&D', role: 'User', avatar: d.user.name.split(' ').map((n: string) => n[0]).join('') });
+        setCurrentUser({ id: d.user.id, name: d.user.name || 'User', email: d.user.email, department: 'R&D', role: 'User', avatar: (d.user.name || '').split(' ').map((n: string) => n[0]).join('') });
         setIsLoggedIn(true);
       }
     }).catch(() => {}).finally(() => setChecking(false));
@@ -295,12 +295,12 @@ export default function ProjectsPage() {
       const r = await fetch('/api/projects/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailInput, password: passwordInput }) });
       const d = await r.json();
       if (r.ok && d.requires2FA) { setOtpRequired(true); setOtpSessionId(d.sessionId || ''); } else if (r.ok && d.success) {
-        setCurrentUser({ id: d.user.id, name: d.user.name, email: d.user.email, department: 'R&D', role: 'User', avatar: d.user.name.split(' ').map((n: string) => n[0]).join('') });
+        setCurrentUser({ id: d.user.id, name: d.user.name || 'User', email: d.user.email, department: 'R&D', role: 'User', avatar: (d.user.name || '').split(' ').map((n: string) => n[0]).join('') });
         setIsLoggedIn(true);
       } else { setLoginError(d.error || 'Login failed'); }
     } catch { setLoginError('Network error'); } finally { setLoginLoading(false); }
   };
-  const handleVerifyOTP = async () => { setLoginLoading(true); setLoginError(''); try { const r = await fetch('/api/projects/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailInput, otp: otpInput }) }); const d = await r.json(); if (r.ok && d.success) { setCurrentUser({ id: d.user.id, name: d.user.name, email: d.user.email, department: 'R&D' as Department, role: 'User', avatar: d.user.name.split(' ').map((n: string) => n[0]).join('') }); setIsLoggedIn(true); setOtpRequired(false); setOtpInput(''); } else { setLoginError(d.error || 'Invalid OTP'); } } catch { setLoginError('Network error'); } finally { setLoginLoading(false); } }; const handleRegister = async () => {
+  const handleVerifyOTP = async () => { setLoginLoading(true); setLoginError(''); try { const r = await fetch('/api/projects/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailInput, otp: otpInput }) }); const d = await r.json(); if (r.ok && d.success) { setCurrentUser({ id: d.user.id, name: d.user.name || 'User', email: d.user.email, department: 'R&D' as Department, role: 'User', avatar: (d.user.name || '').split(' ').map((n: string) => n[0]).join('') }); setIsLoggedIn(true); setOtpRequired(false); setOtpInput(''); } else { setLoginError(d.error || 'Invalid OTP'); } } catch { setLoginError('Network error'); } finally { setLoginLoading(false); } }; const handleRegister = async () => {
     setRegLoading(true); setRegError(''); setRegSuccess('');
     if (regPassword !== regConfirm) { setRegError('Passwords do not match'); setRegLoading(false); return; }
     if (regPassword.length < 6) { setRegError('Password must be at least 6 characters'); setRegLoading(false); return; }
