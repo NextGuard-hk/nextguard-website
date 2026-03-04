@@ -124,7 +124,7 @@ const ACTIONS = ['BLOCK', 'QUARANTINE', 'AUDIT']
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ResultPanel({ title, result, loading, error, color, latency }: { title: string; result: any; loading: boolean; error: string; color: string; latency: number | null }) {
+function ResultPanel({ title, result, loading, error, color, latency }: { title: string; result: any; loading: boolean; error: string; color: string; latency: number | null; tradLatency?: number | null; aiLatency?: number | null }) {
   if (loading) return (
     <div>
       <h3 className="text-lg font-bold mb-3" style={{color}}>{title}</h3>
@@ -151,7 +151,7 @@ function ResultPanel({ title, result, loading, error, color, latency }: { title:
       <div className={`text-lg font-bold mb-2 ${result.detected ? 'text-red-400' : 'text-green-400'}`}>
         {result.detected ? '⚠️' : '✅'}&nbsp;&nbsp;{result.verdict || (result.detected ? 'DETECTED' : 'CLEAN')}
       </div>
-      {latency !== null && <div className="text-2xl font-mono font-bold text-green-400 mb-2">{latency < 1000 ? latency + 'ms' : (latency / 1000).toFixed(2) + 's'}</div>}{result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
+      {latency !== null && <div className="text-2xl font-mono font-bold text-green-400 mb-2">{isHybrid && tradLatency !== null && aiLatency !== null ? (tradLatency < 1000 ? tradLatency + 'ms' : (tradLatency / 1000).toFixed(2) + 's') + ' + ' + (aiLatency < 1000 ? aiLatency + 'ms' : (aiLatency / 1000).toFixed(2) + 's') : latency < 1000 ? latency + 'ms' : (latency / 1000).toFixed(2) + 's'}</div>}{result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
       {result.recommended_action && result.detected && (
         <p className="text-sm mb-1">Action: <span className="font-bold text-yellow-400">{result.recommended_action}</span></p>
       )}
@@ -468,7 +468,7 @@ export default function AIDLPDemo() {
             <ResultPanel title="AI Detection" result={aiResult} loading={aiLoading} error={aiError} latency={aiLatency} color="#22d3ee" />
           </div>
           <div className="bg-zinc-900 border border-green-700 rounded-xl p-6 ring-2 ring-green-600/30">
-            <ResultPanel title="Hybrid DLP" result={hybridResult} loading={hybridLoading} error={hybridError} latency={hybridLatency} color="#4ade80" />
+            <ResultPanel title="Hybrid DLP" result={hybridResult} loading={hybridLoading} error={hybridError} latency={hybridLatency} tradLatency={tradLatency} aiLatency={aiLatency} color="#4ade80" />
           </div>
         </div>
 
