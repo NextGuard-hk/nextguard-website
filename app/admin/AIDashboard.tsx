@@ -35,6 +35,7 @@ function Card({ label, value, sub }: { label: string; value: string | number; su
 export default function AIDashboard() {
   const [data, setData] = useState<UsageData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState("")
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -43,21 +44,26 @@ export default function AIDashboard() {
   const [reportView, setReportView] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(30)
 
-  const fetchUsage = useCallback(async () => {
+  const fetchUsage = useCallback(async (isManual = false) => {
+    if (isManual) setRefreshing(true)
     try {
-      const r = await fetch("/api/ai-usage?t=" + Date.now(), { cache: "no-store" })
+      const r = await fetch("/api/ai-usage?t=" + Date.now(), {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
+      })
       if (r.ok) {
         const d = await r.json()
         setData(d)
         setLastUpdated(new Date())
         setError("")
       } else {
-        setError("Failed to load AI usage data")
+        setError("Failed to load AI usage data (HTTP " + r.status + ")")
       }
-    } catch {
-      setError("Network error")
+    } catch (e: unknown) {
+      setError("Network error: " + (e instanceof Error ? e.message : "unknown"))
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
@@ -67,9 +73,13 @@ export default function AIDashboard() {
 
   useEffect(() => {
     if (!autoRefresh) return
-    const id = setInterval(fetchUsage, refreshInterval * 1000)
+    const id = setInterval(() => fetchUsage(), refreshInterval * 1000)
     return () => clearInterval(id)
   }, [autoRefresh, refreshInterval, fetchUsage])
+
+  const handleManualRefresh = () => {
+    fetchUsage(true)
+  }
 
   const filteredRecords = (data?.scan_history || []).filter((r) => {
     if (filterEngine !== "all" && r.engine !== filterEngine) return false
@@ -105,7 +115,7 @@ export default function AIDashboard() {
   }
 
   if (loading) return <div className="text-white p-8">Loading AI usage data...</div>
-  if (error) return <div className="text-red-400 p-8">{error} <button onClick={fetchUsage} className="ml-2 underline">Retry</button></div>
+  if (error) return <div className="text-red-400 p-8">{error} <button onClick={handleManualRefresh} className="ml-2 underline">Retry</button></div>
   if (!data) return null
 
   return (
@@ -126,7 +136,9 @@ export default function AIDashboard() {
             <option value={30}>30s</option>
             <option value={60}>60s</option>
           </select>
-          <button onClick={fetchUsage} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded">Refresh Now</button>
+          <button onClick={handleManualRefresh} disabled={refreshing} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white text-sm px-3 py-1 rounded transition-all">
+            {refreshing ? "Refreshing..." : "Refresh Now"}
+          </button>
           <button onClick={() => setReportView(!reportView)} className="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">
             {reportView ? "Dashboard" : "Report"}
           </button>
@@ -163,68 +175,59 @@ export default function AIDashboard() {
       {/* Engine Breakdown */}
       <div className="bg-gray-800 rounded-xl p-4">
         <h4 className="text-sm text-gray-400 mb-3">Engine Breakdown</h4>
-        <div className="space-y-2">
-          {(data.engines || []).map((e) => (
-            <div key={e.name} className="flex items-center justify-between text-sm">
-              <span className="text-white">{e.name}</span>
-              <div className="flex gap-4">
-                <span className="text-gray-400">{e.scans} scans</span>
-                <span className="text-red-400">{e.detections} detections</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {(data.engines || []).map((e) => (
+          <div key={e.name} className="flex justify-between items-center py-2 border-b border-gray-700 last:border-0">
+            <span className="text-white capitalize">{e.name}</span>
+            <span className="text-gray-400 text-sm">{e.scans} scans &middot; {e.detections} detections</span>
+          </div>
+        ))}
       </div>
 
       {/* Report View */}
       {reportView && (
         <div className="bg-gray-800 rounded-xl p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h4 className="text-sm text-gray-400">Detailed Scan Report</h4>
-            <div className="flex items-center gap-2">
-              <select value={filterEngine} onChange={(e) => setFilterEngine(e.target.value)} className="bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
-                <option value="all">All Engines</option>
-                <option value="sonar">Sonar</option>
-                <option value="cloudflare">Cloudflare</option>
-                <option value="openai">OpenAI</option>
-              </select>
-              <select value={filterResult} onChange={(e) => setFilterResult(e.target.value)} className="bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
-                <option value="all">All Results</option>
-                <option value="clean">Clean</option>
-                <option value="detected">Detected</option>
-              </select>
-              <button onClick={exportCSV} className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded">Export CSV</button>
-              <button onClick={exportJSON} className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded">Export JSON</button>
-            </div>
+          <h4 className="text-sm text-gray-400 mb-3">Detailed Scan Report</h4>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <select value={filterEngine} onChange={(e) => setFilterEngine(e.target.value)} className="bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
+              <option value="all">All Engines</option>
+              <option value="sonar">Sonar</option>
+              <option value="cloudflare">Cloudflare</option>
+              <option value="openai">OpenAI</option>
+            </select>
+            <select value={filterResult} onChange={(e) => setFilterResult(e.target.value)} className="bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
+              <option value="all">All Results</option>
+              <option value="clean">Clean</option>
+              <option value="detected">Detected</option>
+            </select>
+            <button onClick={exportCSV} className="bg-green-700 hover:bg-green-600 text-white text-xs px-2 py-1 rounded">Export CSV</button>
+            <button onClick={exportJSON} className="bg-green-700 hover:bg-green-600 text-white text-xs px-2 py-1 rounded">Export JSON</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="text-gray-400 border-b border-gray-700">
-                  <th className="py-2 px-2">Time</th>
-                  <th className="py-2 px-2">Engine</th>
-                  <th className="py-2 px-2">Action</th>
-                  <th className="py-2 px-2">Result</th>
-                  <th className="py-2 px-2">Latency</th>
-                  <th className="py-2 px-2">Policy</th>
-                  <th className="py-2 px-2">Content</th>
+                  <th className="py-2 px-1">Time</th>
+                  <th className="py-2 px-1">Engine</th>
+                  <th className="py-2 px-1">Action</th>
+                  <th className="py-2 px-1">Result</th>
+                  <th className="py-2 px-1">Latency</th>
+                  <th className="py-2 px-1">Policy</th>
+                  <th className="py-2 px-1">Content</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRecords.length === 0 && (
-                  <tr><td colSpan={7} className="text-gray-500 py-4 text-center">No records found</td></tr>
+                  <tr><td colSpan={7} className="text-center text-gray-500 py-4">No records found</td></tr>
                 )}
                 {filteredRecords.slice(0, 100).map((r) => (
-                  <tr key={r.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
-                    <td className="py-1.5 px-2 text-gray-300 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
-                    <td className="py-1.5 px-2 text-gray-300">{r.engine}</td>
-                    <td className="py-1.5 px-2 text-gray-300">{r.action}</td>
-                    <td className="py-1.5 px-2">
-                      <span className={r.result === "detected" ? "text-red-400" : "text-green-400"}>{r.result}</span>
-                    </td>
-                    <td className="py-1.5 px-2 text-gray-300">{r.latency_ms}ms</td>
-                    <td className="py-1.5 px-2 text-gray-300">{r.policy || "-"}</td>
-                    <td className="py-1.5 px-2 text-gray-400 max-w-[200px] truncate">{r.content_snippet}</td>
+                  <tr key={r.id} className="border-b border-gray-700 text-gray-300">
+                    <td className="py-2 px-1">{new Date(r.timestamp).toLocaleString()}</td>
+                    <td className="py-2 px-1">{r.engine}</td>
+                    <td className="py-2 px-1">{r.action}</td>
+                    <td className="py-2 px-1"><span className={r.result === "detected" ? "text-red-400" : "text-green-400"}>{r.result}</span></td>
+                    <td className="py-2 px-1">{r.latency_ms}ms</td>
+                    <td className="py-2 px-1">{r.policy || "-"}</td>
+                    <td className="py-2 px-1 max-w-[200px] truncate">{r.content_snippet}</td>
                   </tr>
                 ))}
               </tbody>
