@@ -152,7 +152,7 @@ function ResultPanel({ title, result, loading, error, color, latency, tradLatenc
         {result.detected ? '⚠️' : '✅'}&nbsp;&nbsp;{result.verdict || (result.detected ? 'DETECTED' : 'CLEAN')}
       </div>
       {latency !== null && <div className="text-2xl font-mono font-bold text-green-400 mb-2">{isHybrid && tradLatency !== null && aiLatency !== null ? (tradLatency < 1000 ? tradLatency + 'ms' : (tradLatency
- / 1000).toFixed(2) + 's') + '  /  AI DLP : ' + (aiLatency < 1000 ? aiLatency + 'ms' : (aiLatency / 1000).toFixed(2) + 's') : latency < 1000 ? latency + 'ms' : (latency / 1000).toFixed(2) + 's'}</div>}{result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
+ / 1000).toFixed(2) + 's') + '  / ' + (aiLatency < 1000 ? aiLatency + 'ms' : (aiLatency / 1000).toFixed(2) + 's') : latency < 1000 ? latency + 'ms' : (latency / 1000).toFixed(2) + 's'}</div>}{result.method && <p className="text-xs text-zinc-500 mb-2">Method: {result.method}</p>}
       {result.recommended_action && result.detected && (
         <p className="text-sm mb-1">Action: <span className="font-bold text-yellow-400">{result.recommended_action}</span></p>
       )}
