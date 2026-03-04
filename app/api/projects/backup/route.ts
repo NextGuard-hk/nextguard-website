@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { getUsers } from '../../../download-users/route'
+import { getUsers } from '../../download-users/route'
 
 const BUCKET = 'nextguard-downloads'
 const BACKUP_PREFIX = 'project-backups/'
@@ -47,46 +47,39 @@ export async function POST(req: NextRequest) {
         issues: issues || [],
         kbSections: kbSections || [],
         activityLogs: activityLogs || [],
-        accounts,
+        accounts
       }
       const key = `${BACKUP_PREFIX}backup-${timestamp}.json`
       await S3.send(new PutObjectCommand({
         Bucket: BUCKET,
         Key: key,
-        Body: JSON.stringify(backupData, null, 2),
-        ContentType: 'application/json',
+        Body: JSON.stringify(backupData),
+        ContentType: 'application/json'
       }))
-
-      // Cleanup old backups beyond MAX_BACKUPS
-      const listRes = await S3.send(new ListObjectsV2Command({
-        Bucket: BUCKET,
-        Prefix: BACKUP_PREFIX,
-      }))
-      const backups = (listRes.Contents || []).filter(o => o.Key?.endsWith('.json')).sort((a, b) => (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0))
+      // Cleanup old backups
+      const list = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: BACKUP_PREFIX }))
+      const backups = (list.Contents || []).filter(o => o.Key?.endsWith('.json')).sort((a, b) => (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0))
       if (backups.length > MAX_BACKUPS) {
-        const toDelete = backups.slice(MAX_BACKUPS)
-        for (const obj of toDelete) {
-          if (obj.Key) {
-            await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
-          }
+        for (const old of backups.slice(MAX_BACKUPS)) {
+          if (old.Key) await S3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: old.Key }))
         }
       }
-      return NextResponse.json({ success: true, key, backupCount: Math.min(backups.length, MAX_BACKUPS) })
+      return NextResponse.json({ success: true, key, timestamp: backupData.timestamp })
     }
 
     if (action === 'restore') {
-      const { backupKey } = body
-      if (!backupKey) return NextResponse.json({ error: 'backupKey required' }, { status: 400 })
-      const res = await S3.send(new GetObjectCommand({ Bucket: BUCKET, Key: backupKey }))
-      const text = await res.Body?.transformToString()
-      if (!text) return NextResponse.json({ error: 'Empty backup' }, { status: 404 })
+      const { key } = body
+      if (!key) return NextResponse.json({ error: 'Missing backup key' }, { status: 400 })
+      const obj = await S3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }))
+      const text = await obj.Body?.transformToString()
+      if (!text) return NextResponse.json({ error: 'Empty backup' }, { status: 400 })
       const data = JSON.parse(text)
       return NextResponse.json({ success: true, data })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'Backup failed' }, { status: 500 })
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
@@ -96,14 +89,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    const listRes = await S3.send(new ListObjectsV2Command({
-      Bucket: BUCKET,
-      Prefix: BACKUP_PREFIX,
-    }))
-    const backups = (listRes.Contents || [])
+    const list = await S3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: BACKUP_PREFIX }))
+    const backups = (list.Contents || [])
       .filter(o => o.Key?.endsWith('.json'))
       .sort((a, b) => (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0))
-      .slice(0, MAX_BACKUPS)
       .map(o => ({
         key: o.Key,
         date: o.LastModified?.toISOString(),
