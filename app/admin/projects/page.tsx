@@ -15,7 +15,7 @@ interface Issue {
 }
 interface ActivityLog {
   id: string; issueKey: string; issueTitle: string;
-  action: 'Created' | 'Modified' | 'Deleted' | 'Closed' | 'Reopened' | 'Status Changed';
+  action: string;
   field?: string; oldValue?: string; newValue?: string;
   user: string; timestamp: string;
 }
@@ -264,8 +264,8 @@ export default function ProjectsPage() {
   const logId = () => `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const getUserName = (id: string) => mockUsers.find(u => u.id === id)?.name || 'Unassigned';
   const getUserAvatar = (id: string) => mockUsers.find(u => u.id === id)?.avatar || '??';
-  const addLog = useCallback((action: ActivityLog['action'], issue: Issue, field?: string, oldVal?: string, newVal?: string) => {
-    setActivityLogs(prev => [{ id: logId(), issueKey: issue.key, issueTitle: issue.title, action, field, oldValue: oldVal, newValue: newVal, user: currentUser?.name || 'System', timestamp: new Date().toLocaleString() }, ...prev]);
+  const addLog = useCallback((action: string, issue?: Issue | null, field?: string, oldVal?: string, newVal?: string, detail?: string) => {
+    setActivityLogs(prev => [{ id: logId(), issueKey: issue?.key || '-', issueTitle: issue?.title || detail || action, action, field, oldValue: oldVal, newValue: newVal, user: currentUser?.name || 'System', timestamp: new Date().toLocaleString() }, ...prev]);
   }, [currentUser]);
   const [loginLoading, setLoginLoading] = useState(false); const [otpRequired, setOtpRequired] = useState(false); const [otpInput, setOtpInput] = useState(''); const [otpSessionId, setOtpSessionId] = useState(''); const [accounts, setAccounts] = useState([] as any[]); const [showCreateAccount, setShowCreateAccount] = useState(false); const [newAccName, setNewAccName] = useState(''); const [newAccEmail, setNewAccEmail] = useState(''); const [newAccPassword, setNewAccPassword] = useState(''); const [newAccRole, setNewAccRole] = useState('user');
   const [checking, setChecking] = useState(true);
@@ -322,7 +322,7 @@ export default function ProjectsPage() {
     } catch { setForgotError('Network error'); }
     finally { setForgotLoading(false); }
   };
-  const loadAccounts = async () => { try { const r = await fetch('/api/projects/accounts'); const d = await r.json(); if (d.accounts) setAccounts(d.accounts); } catch {} }; const handleCreateAccount = async () => { if (!newAccName.trim() || !newAccEmail.trim() || !newAccPassword.trim()) return; try { const r = await fetch('/api/projects/accounts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:newAccName,email:newAccEmail,password:newAccPassword,role:newAccRole})}); if (r.ok) { setShowCreateAccount(false); setNewAccName(''); setNewAccEmail(''); setNewAccPassword(''); loadAccounts(); } } catch {} }; const handleDeleteAccount = async (id: string) => { try { await fetch('/api/projects/accounts', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id})}); loadAccounts(); } catch {} }; const handleCreateIssue = () => {
+  const loadAccounts = async () => { try { const r = await fetch('/api/projects/accounts'); const d = await r.json(); if (d.accounts) setAccounts(d.accounts); } catch {} }; const handleCreateAccount = async () => { addLog('Account Created', null, undefined, undefined, undefined, 'Created account: ' + newAccEmail); if (!newAccName.trim() || !newAccEmail.trim() || !newAccPassword.trim()) return; try { const r = await fetch('/api/projects/accounts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:newAccName,email:newAccEmail,password:newAccPassword,role:newAccRole})}); if (r.ok) { setShowCreateAccount(false); setNewAccName(''); setNewAccEmail(''); setNewAccPassword(''); loadAccounts(); } } catch {} }; const handleDeleteAccount = async (id: string) => { try { await fetch('/api/projects/accounts', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id})}); loadAccounts(); } catch {} }; const handleCreateIssue = () => {
     if (!createTitle.trim()) return;
     const newIssue: Issue = { id: String(Date.now()), key: `NG-${113 + issues.length - 12}`, title: createTitle, description: createDesc, type: createType, status: 'To Do', priority: createPriority, assignee: createAssignee, reporter: currentUser?.id || 'u5', department: createDept, sprint: 'Sprint 12', points: 3, labels: [], created: now(), updated: now(), comments: 0, attachments: createAttachments.length, attachmentFiles: createAttachments.map(f => ({name: f.name, url: URL.createObjectURL(f), size: f.size})), dueDate: createDueDate || undefined, dueTime: createDueTime || undefined };
     setIssues(prev => [...prev, newIssue]); addLog('Created', newIssue);
@@ -343,53 +343,53 @@ export default function ProjectsPage() {
   const handleDeleteIssue = () => { if (!selectedIssue) return; addLog('Deleted', selectedIssue); setIssues(prev => prev.filter(i => i.id !== selectedIssue.id)); setShowDeleteConfirm(false); setSelectedIssue(null); };
   const handleCloseIssue = () => { if (!selectedIssue) return; const f = { ...selectedIssue, status: 'Closed' as Status, updated: now() }; addLog('Closed', f, 'Status', selectedIssue.status, 'Closed'); setIssues(prev => prev.map(i => i.id === selectedIssue.id ? f : i)); setSelectedIssue(f); };
   const handleReopenIssue = () => { if (!selectedIssue) return; const f = { ...selectedIssue, status: 'To Do' as Status, updated: now() }; addLog('Reopened', f, 'Status', selectedIssue.status, 'To Do'); setIssues(prev => prev.map(i => i.id === selectedIssue.id ? f : i)); setSelectedIssue(f); };
-  const NL = String.fromCharCode(10); const BOM = String.fromCharCode(0xFEFF); const handleExportExcel = () => { const h = ['Key','Title','Type','Status','Priority','Assignee','Department','Sprint','Points','Labels','Due Date','Due Time','Created','Updated']; const esc = (v: string) => { const s = String(v); return (s.includes(',') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const rows = filteredIssues.map(i => [i.key,i.title,i.type,i.status,i.priority,getUserName(i.assignee),i.department,i.sprint,String(i.points),i.labels.join('; '),i.dueDate||'',i.dueTime||'',i.created,i.updated].map(esc).join(',')); const csv = BOM + h.join(',') + NL + rows.join(NL); const blob = new Blob([csv], { type: 'application/vnd.ms-excel;charset=utf-8' }); const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'NextGuard_Tasks_' + new Date().toISOString().split('T')[0] + '.xls'; a.click(); URL.revokeObjectURL(u); }; // ==================== KB 3-LAYER CRUD ====================
+  const NL = String.fromCharCode(10); const BOM = String.fromCharCode(0xFEFF); const handleExportExcel = () => { addLog('Export Tasks', null, undefined, undefined, undefined, 'Exported tasks to Excel'); const h = ['Key','Title','Type','Status','Priority','Assignee','Department','Sprint','Points','Labels','Due Date','Due Time','Created','Updated']; const esc = (v: string) => { const s = String(v); return (s.includes(',') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const rows = filteredIssues.map(i => [i.key,i.title,i.type,i.status,i.priority,getUserName(i.assignee),i.department,i.sprint,String(i.points),i.labels.join('; '),i.dueDate||'',i.dueTime||'',i.created,i.updated].map(esc).join(',')); const csv = BOM + h.join(',') + NL + rows.join(NL); const blob = new Blob([csv], { type: 'application/vnd.ms-excel;charset=utf-8' }); const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'NextGuard_Tasks_' + new Date().toISOString().split('T')[0] + '.xls'; a.click(); URL.revokeObjectURL(u); }; // ==================== KB 3-LAYER CRUD ====================
   // Layer 1: Section CRUD
-  const handleCreateKBSection = () => {
+  const handleCreateKBSection = () => { addLog('KB Section Created', null, undefined, undefined, undefined, 'Created KB section: ' + formName);
     if (!formName.trim()) return;
     const newSec: KBSection = { id: `sec-${Date.now()}`, name: formName, color: formColor, icon: formIcon || '📁', groups: [] };
     setKbSections(prev => [...prev, newSec]);
     setFormName(''); setFormColor('#3b82f6'); setFormIcon(''); setShowCreateSection(false);
   };
-  const handleEditKBSection = () => {
+  const handleEditKBSection = () => { addLog('KB Section Edited', null, undefined, undefined, undefined, 'Edited KB section: ' + formName);
     if (!formName.trim()) return;
     setKbSections(prev => prev.map(s => s.id === editTargetId ? { ...s, name: formName, color: formColor, icon: formIcon || s.icon } : s));
     setFormName(''); setShowEditSection(false);
   };
-  const handleDeleteKBSection = () => {
+  const handleDeleteKBSection = () => { addLog('KB Section Deleted', null, undefined, undefined, undefined, 'Deleted KB section');
     setKbSections(prev => prev.filter(s => s.id !== editTargetId));
     if (kbActiveSectionId === editTargetId) { setKbActiveSectionId(kbSections[0]?.id || ''); setKbActivePageId(null); }
     setShowDeleteSection(false);
   };
   // Layer 2: Section Group CRUD
-  const handleCreateKBGroup = () => {
+  const handleCreateKBGroup = () => { addLog('KB Group Created', null, undefined, undefined, undefined, 'Created KB group: ' + formName);
     if (!formName.trim()) return;
     const newGrp: KBSectionGroup = { id: `grp-${Date.now()}`, name: formName, pages: [] };
     setKbSections(prev => prev.map(s => s.id === targetSectionId ? { ...s, groups: [...s.groups, newGrp] } : s));
     setFormName(''); setShowCreateGroup(false);
   };
-  const handleEditKBGroup = () => {
+  const handleEditKBGroup = () => { addLog('KB Group Edited', null, undefined, undefined, undefined, 'Edited KB group: ' + formName);
     if (!formName.trim()) return;
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => g.id === editTargetId ? { ...g, name: formName } : g) })));
     setFormName(''); setShowEditGroup(false);
   };
-  const handleDeleteKBGroup = () => {
+  const handleDeleteKBGroup = () => { addLog('KB Group Deleted', null, undefined, undefined, undefined, 'Deleted KB group');
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.filter(g => g.id !== editTargetId) })));
     setShowDeleteGroup(false);
   };
   // Layer 3: Page CRUD
-  const handleCreateKBPage = () => {
+  const handleCreateKBPage = () => { addLog('KB Page Created', null, undefined, undefined, undefined, 'Created KB page: ' + formTitle);
     if (!formTitle.trim()) return;
     const newPage: KBPage = { id: `page-${Date.now()}`, title: formTitle, content: formContent, author: currentUser?.id || 'u1', views: 0, helpful: 0, updated: now(), tags: formTags ? formTags.split(',').map(t => t.trim()) : [], images: formImages.length > 0 ? formImages : undefined, files: formFiles.length > 0 ? formFiles : undefined };
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => g.id === targetGroupId ? { ...g, pages: [...g.pages, newPage] } : g) })));
     setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowCreatePage(false);
   };
-  const handleEditKBPage = () => {
+  const handleEditKBPage = () => { addLog('KB Page Edited', null, undefined, undefined, undefined, 'Edited KB page: ' + formTitle);
     if (!formTitle.trim()) return;
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.map(p => p.id === editTargetId ? { ...p, title: formTitle, content: formContent, tags: formTags ? formTags.split(',').map(t => t.trim()) : p.tags, images: formImages, files: formFiles, updated: now() } : p) })) })));
     setFormTitle(''); setFormContent(''); setFormTags(''); setFormImages([]); setFormFiles([]); setShowEditPage(false);
   };
-  const handleDeleteKBPage = () => {
+  const handleDeleteKBPage = () => { addLog('KB Page Deleted', null, undefined, undefined, undefined, 'Deleted KB page');
     setKbSections(prev => prev.map(s => ({ ...s, groups: s.groups.map(g => ({ ...g, pages: g.pages.filter(p => p.id !== editTargetId) })) })));
     if (kbActivePageId === editTargetId) setKbActivePageId(null);
     setShowDeletePage(false);
@@ -441,7 +441,7 @@ export default function ProjectsPage() {
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {([{key:'board' as ViewMode,label:'Board',icon:'📊'},{key:'list' as ViewMode,label:'List View',icon:'📃'},{key:'backlog' as ViewMode,label:'Backlog',icon:'📥'},{key:'reports' as ViewMode,label:'Reports',icon:'📈'},{key:'kb' as ViewMode,label:'Knowledge Base',icon:'📚'}]).map(item => (
-          <button key={item.key} onClick={() => { setActiveView(item.key); setMobileSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeView === item.key ? 'bg-cyan-600/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+          <button key={item.key} onClick={() => { addLog('View Changed', null, 'View', activeView, item.key, 'Switched to ' + item.label); setActiveView(item.key); setMobileSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeView === item.key ? 'bg-cyan-600/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
             <span>{item.icon}</span>{!sidebarCollapsed && <span>{item.label}</span>}
           </button>
         ))}
@@ -454,7 +454,7 @@ export default function ProjectsPage() {
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold">{currentUser?.avatar}</div>
           {!sidebarCollapsed && (<div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{currentUser?.name}</p><p className="text-xs text-gray-500 truncate">{currentUser?.department} - {currentUser?.role}</p></div>)}
         </div>
-        {!sidebarCollapsed && <button onClick={() => { fetch('/api/projects/auth', { method: 'DELETE' }); setIsLoggedIn(false); setCurrentUser(null); }} className="w-full mt-3 px-3 py-1.5 text-xs text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded transition-colors">Sign Out</button>}
+        {!sidebarCollapsed && <button onClick={() => { addLog('Logout', null, undefined, undefined, undefined, 'User logged out'); fetch('/api/projects/auth', { method: 'DELETE' }); setIsLoggedIn(false); setCurrentUser(null); }} className="w-full mt-3 px-3 py-1.5 text-xs text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded transition-colors">Sign Out</button>}
       </div>
     </aside>
     <main className="flex-1 min-w-0">
@@ -676,7 +676,7 @@ export default function ProjectsPage() {
     {showActivityLog && (
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={() => setShowActivityLog(false)}><div className="absolute inset-0 bg-black/60" />
         <div className="relative bg-gray-900 rounded-xl border border-gray-800 w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-          <div className="flex-1 overflow-y-auto p-4">{activityLogs.length === 0 ? (<p className="text-gray-500 text-center py-8">No activity yet.</p>) : (<div className="space-y-2">{activityLogs.map(log => (<div key={log.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-3 bg-gray-800/50 rounded-lg text-sm"><span className={`inline-block w-fit px-2 py-0.5 rounded text-xs font-medium ${log.action==='Created'?'bg-green-500/20 text-green-400':log.action==='Deleted'?'bg-red-500/20 text-red-400':'bg-blue-500/20 text-blue-400'}`}>{log.action}</span><span className="text-cyan-400 font-mono text-xs">{log.issueKey}</span><span className="text-white text-xs truncate flex-1">{log.issueTitle}</span>{log.field && <span className="text-gray-500 text-xs">{log.field}: {log.oldValue} -&gt; {log.newValue}</span>}<span className="text-gray-600 text-xs whitespace-nowrap">{log.user} - {log.timestamp}</span></div>))}</div>)}</div>
+          <div className="flex items-center justify-between p-4 border-b border-gray-800"><h3 className="text-lg font-semibold">Activity Log</h3><div className="flex gap-2"><button onClick={() => { addLog('Export Activity Log', null, undefined, undefined, undefined, 'Exported activity log'); const h = ['Action','Issue Key','Detail','Field','Old Value','New Value','User','Timestamp']; const esc = (v: string) => { const s = String(v || ''); return (s.includes(',') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const rows = activityLogs.map(l => [l.action,l.issueKey,l.issueTitle,l.field||'',l.oldValue||'',l.newValue||'',l.user,l.timestamp].map(esc).join(',')); const csv = BOM + h.join(',') + NL + rows.join(NL); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'Activity_Log_' + new Date().toISOString().split('T')[0] + '.csv'; a.click(); URL.revokeObjectURL(u); }} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium transition-colors">Export Activity Log</button><button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-white text-xl">X</button></div></div><div className="flex-1 overflow-y-auto p-4">{activityLogs.length === 0 ? (<p className="text-gray-500 text-center py-8">No activity yet.</p>) : (<div className="space-y-2">{activityLogs.map(log => (<div key={log.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-3 bg-gray-800/50 rounded-lg text-sm"><span className={`inline-block w-fit px-2 py-0.5 rounded text-xs font-medium ${log.action==='Created'?'bg-green-500/20 text-green-400':log.action==='Deleted'?'bg-red-500/20 text-red-400':'bg-blue-500/20 text-blue-400'}`}>{log.action}</span><span className="text-cyan-400 font-mono text-xs">{log.issueKey}</span><span className="text-white text-xs truncate flex-1">{log.issueTitle}</span>{log.field && <span className="text-gray-500 text-xs">{log.field}: {log.oldValue} -&gt; {log.newValue}</span>}<span className="text-gray-600 text-xs whitespace-nowrap">{log.user} - {log.timestamp}</span></div>))}</div>)}</div>
         </div>
       </div>
     )}
