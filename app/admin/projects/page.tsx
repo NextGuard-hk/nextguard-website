@@ -60,9 +60,9 @@ const mockUsers: User[] = [
   { id: 'u8', name: 'Roscoe', email: 'roscoe@nextguard.com', department: 'Presales', role: 'Sales Engineer', avatar: 'RC' },
 ];
 const initialIssues: Issue[] = [
-  { id: '1', key: 'NG-101', title: 'Implement DLP Policy Engine v2', description: 'Rebuild policy engine with rule chaining support', type: 'Epic', status: 'In Progress', 677
+  { id: '1', key: 'NG-101', title: 'Implement DLP Policy Engine v2', description: 'Rebuild policy engine with rule chaining support', type: 'Epic', status: 'In Progress', priority
 : 'Critical', assignee: 'u1', reporter: 'u5', department: 'R&D', sprint: 'Sprint 12', points: 13, labels: ['dlp-core','architecture'], created: '2025-01-10', updated: '2025-01-25', dueDate: '2025-02-15', dueTime: '18:00', comments: 8, attachments: 3 },
-  { id: '2', key: 'NG-102', title: 'Email DLP Content Inspection Module', description: 'Deep content inspection for email attachments', type: 'Feature', status: 'In Progress', 677
+  { id: '2', key: 'NG-102', title: 'Email DLP Content Inspection Module', description: 'Deep content inspection for email attachments', type: 'Feature', status: 'In Progress', priority
 : 'High', assignee: 'u4', reporter: 'u1', department: 'R&D', sprint: 'Sprint 12', points: 8, labels: ['email-dlp','inspection'], created: '2025-01-12', updated: '2025-01-24', dueDate: '2025-02-10', dueTime: '17:00', comments: 5, attachments: 2 },
   { id: '3', key: 'NG-103', title: 'Web DLP Browser Extension', description: 'Chrome/Edge extension for web content monitoring', type: 'Feature', status: 'To Do', priority: 'High', assignee: 'u1', reporter: 'u5', department: 'R&D', sprint: 'Sprint 12', points: 8, labels: ['web-dlp','browser'], created: '2025-01-14', updated: '2025-01-20', comments: 3, attachments: 1 },
   { id: '4', key: 'NG-104', title: 'Customer onboarding automation', description: 'Automate enterprise customer deployment workflow', type: 'Task', status: 'In Review', priority: 'Medium', assignee: 'u2', reporter: 'u5', department: 'Presales', sprint: 'Sprint 12', points: 5, labels: ['automation','onboarding'], created: '2025-01-15', updated: '2025-01-23', comments: 4, attachments: 2 },
