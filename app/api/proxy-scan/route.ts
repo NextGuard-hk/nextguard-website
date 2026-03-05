@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
       if (!Array.isArray(urls) || urls.length === 0) {
         return NextResponse.json({ error: 'Please provide urls array' }, { status: 400 });
       }
-      if (urls.length > 50) {
+      if (urls.length > 500) {
         return NextResponse.json({ error: 'Max 50 URLs per batch' }, { status: 400 });
       }
       const results = await Promise.all(
