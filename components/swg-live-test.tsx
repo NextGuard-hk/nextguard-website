@@ -204,7 +204,7 @@ export default function SWGLiveTest() {
 
         <hr className="border-gray-700 my-4" />
         <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
-        <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 50). All URLs will be checked simultaneously.</p>
+        <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 500). All URLs will be checked simultaneously.</p>
         <textarea
           value={batchUrls}
           onChange={e => setBatchUrls(e.target.value)}
