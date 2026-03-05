@@ -76,6 +76,71 @@ export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: stri
   'github.com':               { risk_level: 'low_risk',        categories: ['development'] },
   'malware.testing.google.test': { risk_level: 'known_malicious', categories: ['malware'] },
   // Add more from your test list here
+    // — News & Media —
+  'cnn.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
+  'bbc.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
+  'reuters.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
+  'nytimes.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
+  'scmp.com': { risk_level: 'low_risk', categories: ['news', 'media', 'hong_kong'] },
+  'hk01.com': { risk_level: 'low_risk', categories: ['news', 'media', 'hong_kong'] },
+  // — Streaming & Entertainment —
+  'youtube.com': { risk_level: 'low_risk', categories: ['streaming', 'video', 'entertainment'] },
+  'netflix.com': { risk_level: 'low_risk', categories: ['streaming', 'entertainment'] },
+  'spotify.com': { risk_level: 'low_risk', categories: ['streaming', 'music'] },
+  'twitch.tv': { risk_level: 'low_risk', categories: ['streaming', 'gaming', 'entertainment'] },
+  'disneyplus.com': { risk_level: 'low_risk', categories: ['streaming', 'entertainment'] },
+  // — Shopping & E-commerce —
+  'amazon.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
+  'ebay.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'auction'] },
+  'alibaba.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'b2b'] },
+  'taobao.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
+  'shopee.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
+  // — Finance & Banking —
+  'hsbc.com': { risk_level: 'low_risk', categories: ['finance', 'banking'] },
+  'chase.com': { risk_level: 'low_risk', categories: ['finance', 'banking'] },
+  'paypal.com': { risk_level: 'low_risk', categories: ['finance', 'payment'] },
+  'stripe.com': { risk_level: 'low_risk', categories: ['finance', 'payment', 'developer_tools'] },
+  'binance.com': { risk_level: 'low_risk', categories: ['finance', 'cryptocurrency', 'exchange'] },
+  'coinbase.com': { risk_level: 'low_risk', categories: ['finance', 'cryptocurrency', 'exchange'] },
+  // — Cloud Storage & Productivity —
+  'dropbox.com': { risk_level: 'low_risk', categories: ['cloud_storage', 'productivity'] },
+  'drive.google.com': { risk_level: 'low_risk', categories: ['cloud_storage', 'productivity'] },
+  'onedrive.live.com': { risk_level: 'low_risk', categories: ['cloud_storage', 'productivity'] },
+  'notion.so': { risk_level: 'low_risk', categories: ['productivity', 'collaboration'] },
+  'slack.com': { risk_level: 'low_risk', categories: ['communication', 'collaboration', 'business'] },
+  'zoom.us': { risk_level: 'low_risk', categories: ['communication', 'video_conferencing'] },
+  'teams.microsoft.com': { risk_level: 'low_risk', categories: ['communication', 'collaboration', 'business'] },
+  // — Education —
+  'coursera.org': { risk_level: 'low_risk', categories: ['education', 'online_learning'] },
+  'udemy.com': { risk_level: 'low_risk', categories: ['education', 'online_learning'] },
+  'wikipedia.org': { risk_level: 'low_risk', categories: ['education', 'reference', 'encyclopedia'] },
+  // — Developer Tools —
+  'stackoverflow.com': { risk_level: 'low_risk', categories: ['development', 'forum', 'technical'] },
+  'npmjs.com': { risk_level: 'low_risk', categories: ['development', 'package_registry'] },
+  'vercel.com': { risk_level: 'low_risk', categories: ['development', 'cloud_hosting'] },
+  'netlify.com': { risk_level: 'low_risk', categories: ['development', 'cloud_hosting'] },
+  'aws.amazon.com': { risk_level: 'low_risk', categories: ['cloud_infrastructure', 'business'] },
+  // — VPN & Proxy —
+  'nordvpn.com': { risk_level: 'medium_risk', categories: ['vpn', 'privacy_tools'] },
+  'expressvpn.com': { risk_level: 'medium_risk', categories: ['vpn', 'privacy_tools'] },
+  'protonvpn.com': { risk_level: 'medium_risk', categories: ['vpn', 'privacy_tools'] },
+  // — Gambling —
+  'bet365.com': { risk_level: 'medium_risk', categories: ['gambling', 'betting'] },
+  'pokerstars.com': { risk_level: 'medium_risk', categories: ['gambling', 'gaming'] },
+  // — Adult Content —
+  'pornhub.com': { risk_level: 'medium_risk', categories: ['adult', 'nsfw'] },
+  'xvideos.com': { risk_level: 'medium_risk', categories: ['adult', 'nsfw'] },
+  // — File Sharing —
+  'wetransfer.com': { risk_level: 'low_risk', categories: ['file_sharing', 'productivity'] },
+  'mega.nz': { risk_level: 'medium_risk', categories: ['file_sharing', 'cloud_storage', 'encrypted'] },
+  'mediafire.com': { risk_level: 'medium_risk', categories: ['file_sharing'] },
+  // — Email Services —
+  'gmail.com': { risk_level: 'low_risk', categories: ['email', 'communication'] },
+  'outlook.com': { risk_level: 'low_risk', categories: ['email', 'communication'] },
+  'protonmail.com': { risk_level: 'low_risk', categories: ['email', 'encrypted_communication', 'privacy_tools'] },
+  // — Government —
+  'gov.hk': { risk_level: 'low_risk', categories: ['government', 'hong_kong'] },
+  'irs.gov': { risk_level: 'low_risk', categories: ['government', 'finance', 'tax'] },
 };
 
 // ── Suspicious TLD list ──
