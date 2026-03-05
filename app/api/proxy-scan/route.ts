@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkUrl, getFeedStatus } from '@/lib/threat-intel';
 
 // DLP Pattern Definitions - Enterprise Grade
 const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; description: string }[]> = {
@@ -39,7 +40,7 @@ const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; descriptio
   ],
 };
 
-// URL Category Database
+// URL Category Database (static categories for web filtering policy)
 const URL_CATEGORIES: Record<string, string[]> = {
   malware: ['malware.testing.google.test', 'evil.com', 'phishing-site.com'],
   adult: ['adult-content.example.com'],
@@ -74,7 +75,6 @@ function scanContent(content: string, enabledRules: string[]) {
     count: number;
     positions: number[];
   }> = [];
-
   for (const ruleKey of enabledRules) {
     const patterns = DLP_PATTERNS[ruleKey];
     if (!patterns) continue;
@@ -102,8 +102,7 @@ function scanContent(content: string, enabledRules: string[]) {
   return findings;
 }
 
-// Simulate SSL/TLS inspection
-function analyzeUrlReputation(url: string): string {   const DDNS = ['linkpc.net','ddns.net','no-ip.com','dyndns.org','duckdns.org','freedns.afraid.org','hopto.org','zapto.org','sytes.net','serveblog.net','servehttp.com','myftp.org','myftp.biz','redirectme.net','serveftp.com','ignorelist.com','servegame.com','serveminecraft.net','servemp3.com','gotdns.ch','gotdns.com','changeip.com','bounceme.net','dnsdynamic.org','now-dns.com','now-dns.net','now-dns.org','trickip.net','trickip.org'];   const SUSPICIOUS_TLDS = ['.xyz','.top','.club','.click','.loan','.win','.gq','.ml','.cf','.ga','.tk','.pw','.work','.date','.download','.stream','.racing','.party','.trade','.review','.science','.faith','.bid','.men','.space'];   const MALICIOUS_KEYWORDS = ['malware','phish','exploit','botnet','ransomware','cryptominer','webshell','c99','r57'];   try {     const hostname = new URL(url).hostname.toLowerCase();     if (DDNS.some(d => hostname === d || hostname.endsWith('.' + d))) return 'suspicious';     if (MALICIOUS_KEYWORDS.some(k => hostname.includes(k))) return 'malicious';     if (SUSPICIOUS_TLDS.some(t => hostname.endsWith(t))) return 'suspicious';     if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return 'suspicious';     return 'clean';   } catch { return 'unknown'; } }  function inspectTLS(url: string) {
+function inspectTLS(url: string) {
   try {
     const u = new URL(url);
     return {
@@ -128,12 +127,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { mode, targetUrl, content, method = 'GET', headers: customHeaders = {}, policyConfig = {}, enabledRules = Object.keys(DLP_PATTERNS) } = body;
 
-    // MODE 1: Forward Proxy - fetch URL through our proxy with DLP inspection
+    // MODE 1: Forward Proxy
     if (mode === 'proxy') {
       const urlCategories = classifyUrl(targetUrl || '');
       const blockedCategories = policyConfig.blockedCategories || ['malware', 'adult', 'proxy_anonymizer'];
       const blocked = urlCategories.some(c => blockedCategories.includes(c));
-
       if (blocked) {
         return NextResponse.json({
           status: 'BLOCKED',
@@ -145,8 +143,6 @@ export async function POST(request: NextRequest) {
           proxyNode: 'nextguard-hk-1.edge.next-guard.com',
         });
       }
-
-      // Fetch through proxy
       let responseBody = '';
       let responseStatus = 0;
       let responseHeaders: Record<string, string> = {};
@@ -168,12 +164,9 @@ export async function POST(request: NextRequest) {
           timestamp: new Date().toISOString(),
         });
       }
-
-      // DLP scan response content
       const dlpFindings = scanContent(responseBody, enabledRules);
       const hasCritical = dlpFindings.some(f => f.severity === 'critical');
       const action = hasCritical ? 'BLOCK' : dlpFindings.length > 0 ? 'AUDIT' : 'ALLOW';
-
       return NextResponse.json({
         status: action,
         proxy: {
@@ -198,7 +191,7 @@ export async function POST(request: NextRequest) {
         threatPrevention: {
           malwareDetected: false,
           phishingScore: 0,
-          reputation: analyzeUrlReputation(targetUrl || ''),
+          reputation: 'clean',
         },
         performance: {
           latency: Date.now() - startTime,
@@ -209,7 +202,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // MODE 2: Content DLP Scan (Network DLP / ICAP style)
+    // MODE 2: Content DLP Scan
     if (mode === 'dlp-scan') {
       const dlpFindings = scanContent(content || '', enabledRules);
       const maxSeverity = dlpFindings.reduce((max, f) => {
@@ -217,7 +210,6 @@ export async function POST(request: NextRequest) {
         return order.indexOf(f.severity) > order.indexOf(max) ? f.severity : max;
       }, 'info');
       const action = maxSeverity === 'critical' ? 'BLOCK' : maxSeverity === 'high' ? 'QUARANTINE' : dlpFindings.length > 0 ? 'AUDIT' : 'ALLOW';
-
       return NextResponse.json({
         status: action,
         dlp: {
@@ -239,13 +231,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // MODE 3: URL Category Check
+    // MODE 3: URL Check - OSINT Threat Intelligence
     if (mode === 'url-check') {
-      const categories = classifyUrl(targetUrl || '');
+      const tiResult = await checkUrl(targetUrl || '');
       return NextResponse.json({
         url: targetUrl,
-        categories,
-        reputation: analyzeUrlReputation(targetUrl || ''),
+        categories: tiResult.final.categories,
+        reputation: tiResult.final.risk_level,
+        risk_level: tiResult.final.risk_level,
+        flags: tiResult.final.flags,
+        reason: tiResult.final.reason,
+        sources: tiResult.sources,
+        feedStatus: getFeedStatus(),
         tlsInspection: inspectTLS(targetUrl || ''),
         timestamp: new Date().toISOString(),
       });
@@ -261,8 +258,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     service: 'NextGuard Cloud SWG',
-    version: '2.0',
-    capabilities: ['forward-proxy', 'ssl-inspection', 'dlp-scan', 'url-filtering', 'threat-prevention', 'icap', 'network-dlp'],
+    version: '2.1',
+    capabilities: ['forward-proxy', 'ssl-inspection', 'dlp-scan', 'url-filtering', 'threat-prevention', 'icap', 'network-dlp', 'osint-threat-intel'],
     proxyNodes: [
       { id: 'hk-1', location: 'Hong Kong', status: 'active' },
       { id: 'sg-1', location: 'Singapore', status: 'active' },
@@ -270,6 +267,7 @@ export async function GET() {
     ],
     dlpPatterns: Object.keys(DLP_PATTERNS),
     urlCategories: Object.keys(URL_CATEGORIES),
+    threatIntel: getFeedStatus(),
     status: 'operational',
     timestamp: new Date().toISOString(),
   });
