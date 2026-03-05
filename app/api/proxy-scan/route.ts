@@ -4,13 +4,13 @@ import { checkUrl, getFeedStatus } from '@/lib/threat-intel';
 // DLP Pattern Definitions - Enterprise Grade
 const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; description: string }[]> = {
   credit_card: [
-    { regex: /\b4[0-9]{12}(?:[0-9]{3})?\b/g, severity: 'critical', description: 'Visa Card' },
+    { regex: /\b4[0-9]{3}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b/g, severity: 'critical', description: 'Visa Card' },
     { regex: /\b5[1-5][0-9]{14}\b/g, severity: 'critical', description: 'Mastercard' },
     { regex: /\b3[47][0-9]{13}\b/g, severity: 'critical', description: 'Amex' },
     { regex: /\b6(?:011|5[0-9]{2})[0-9]{12}\b/g, severity: 'critical', description: 'Discover' },
   ],
   hkid: [
-    { regex: /\b[A-Z]{1,2}[0-9]{6}\([0-9A]\)\b/g, severity: 'critical', description: 'Hong Kong ID' },
+    { regex: /\b[A-Z]{1,2}[0-9]{6}\([0-9A]\)/g, severity: 'critical', description: 'Hong Kong ID' },
   ],
   phone_hk: [
     { regex: /\+852[\s-]?[0-9]{4}[\s-]?[0-9]{4}/g, severity: 'medium', description: 'HK Phone' },
@@ -26,7 +26,7 @@ const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; descriptio
     { regex: /\b[A-Z][0-9]{8}\b/g, severity: 'high', description: 'Passport Number' },
   ],
   api_key: [
-    { regex: /\b(sk-[a-zA-Z0-9]{20,})\b/g, severity: 'critical', description: 'OpenAI API Key' },
+    { regex: /\b(sk-[a-zA-Z0-9_-]{20,})\b/g, severity: 'critical', description: 'OpenAI API Key' },
     { regex: /\bAKIA[0-9A-Z]{16}\b/g, severity: 'critical', description: 'AWS Access Key' },
     { regex: /\bghp_[a-zA-Z0-9]{36}\b/g, severity: 'critical', description: 'GitHub Token' },
     { regex: /\b(AIza[0-9A-Za-z_-]{35})\b/g, severity: 'critical', description: 'Google API Key' },
