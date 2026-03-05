@@ -29,6 +29,7 @@ export default function SWGLiveTest() {
   const [batchUrls, setBatchUrls] = useState('');
   const [batchResult, setBatchResult] = useState<any>(null);
   const [batchLoading, setBatchLoading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState('');
   const [pacVisible, setPacVisible] = useState(false);
   const [pacContent, setPacContent] = useState('');
   const [swgStatus, setSwgStatus] = useState<any>(null);
@@ -51,66 +52,91 @@ export default function SWGLiveTest() {
   };
 
   const runAllTests = async () => {
-    setRunning(true);
-    setResults([]);
-    for (const sc of TEST_SCENARIOS) {
-      setActiveTest(sc.id);
-      const r = await runSingleTest(sc);
-      setResults(prev => [...prev, r]);
-    }
-    setActiveTest('');
-    setRunning(false);
+    setRunning(true); setResults([]);
+    for (const sc of TEST_SCENARIOS) { setActiveTest(sc.id); const r = await runSingleTest(sc); setResults(prev => [...prev, r]); }
+    setActiveTest(''); setRunning(false);
   };
 
   const runCustomTest = async () => {
     setCustomResult(null);
     try {
-      const resp = await fetch('/api/proxy-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: customMode, targetUrl: customUrl, content: customContent }),
-      });
+      const resp = await fetch('/api/proxy-scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: customMode, targetUrl: customUrl, content: customContent }) });
       setCustomResult(await resp.json());
-    } catch (e: any) {
-      setCustomResult({ error: e.message });
-    }
+    } catch (e: any) { setCustomResult({ error: e.message }); }
   };
 
   const fetchPac = async () => {
-    try {
-      const resp = await fetch('/api/pac');
-      setPacContent(await resp.text());
-      setPacVisible(true);
-    } catch (e: any) {
-      setPacContent('Error: ' + e.message);
-      setPacVisible(true);
-    }
+    try { const resp = await fetch('/api/pac'); setPacContent(await resp.text()); setPacVisible(true); }
+    catch (e: any) { setPacContent('Error: ' + e.message); setPacVisible(true); }
   };
 
   const fetchStatus = async () => {
-    try {
-      const resp = await fetch('/api/proxy-scan');
-      setSwgStatus(await resp.json());
-    } catch (e: any) {
-      setSwgStatus({ error: e.message });
-    }
+    try { const resp = await fetch('/api/proxy-scan'); setSwgStatus(await resp.json()); }
+    catch (e: any) { setSwgStatus({ error: e.message }); }
   };
 
   const runBatchCheck = async () => {
     setBatchLoading(true);
     setBatchResult(null);
+    setBatchProgress('');
     try {
       const urls = batchUrls.split('\n').map((u: string) => u.trim()).filter((u: string) => u.length > 0);
-      const resp = await fetch('/api/proxy-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'batch-url-check', urls }),
+      if (urls.length === 0) return;
+      const CHUNK = 100;
+      const allResults: any[] = [];
+      for (let i = 0; i < urls.length; i += CHUNK) {
+        const chunk = urls.slice(i, i + CHUNK);
+        setBatchProgress(`Processing ${i + 1}-${Math.min(i + CHUNK, urls.length)} of ${urls.length} URLs...`);
+        const resp = await fetch('/api/proxy-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'batch-url-check', urls: chunk }),
+        });
+        const data = await resp.json();
+        if (data.results) allResults.push(...data.results);
+      }
+      const summary = { total: allResults.length, known_malicious: 0, high_risk: 0, medium_risk: 0, low_risk: 0, unknown: 0 };
+      allResults.forEach((r: any) => {
+        if (r.risk_level === 'known_malicious') summary.known_malicious++;
+        else if (r.risk_level === 'high_risk') summary.high_risk++;
+        else if (r.risk_level === 'medium_risk') summary.medium_risk++;
+        else if (r.risk_level === 'low_risk') summary.low_risk++;
+        else summary.unknown++;
       });
-      setBatchResult(await resp.json());
+      setBatchResult({ mode: 'batch-url-check', summary, results: allResults });
+      setBatchProgress(`Done. ${allResults.length} URLs checked.`);
     } catch (e: any) {
       setBatchResult({ error: e.message });
     }
     setBatchLoading(false);
+  };
+
+  const exportCSV = () => {
+    if (!batchResult?.results) return;
+    const header = 'URL,Risk Level,Categories,Flags,Reason,Sources';
+    const rows = batchResult.results.map((r: any) =>
+      `"${r.url}","${r.risk_level}","${(r.categories || []).join('; ')}","${(r.flags || []).join('; ')}","${(r.reason || '').replace(/"/g, '""')}","${(r.sources || []).join('; ')}"`
+    );
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `nextguard-url-check-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+  };
+
+  const exportExcel = () => {
+    if (!batchResult?.results) return;
+    const header = '<tr><th>URL</th><th>Risk Level</th><th>Categories</th><th>Flags</th><th>Reason</th><th>Sources</th></tr>';
+    const rows = batchResult.results.map((r: any) =>
+      `<tr><td>${r.url}</td><td>${r.risk_level}</td><td>${(r.categories || []).join(', ')}</td><td>${(r.flags || []).join(', ')}</td><td>${r.reason || ''}</td><td>${(r.sources || []).join(', ')}</td></tr>`
+    ).join('');
+    const html = `<html><head><meta charset="utf-8"></head><body><table border="1">${header}${rows}</table></body></html>`;
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `nextguard-url-check-${new Date().toISOString().slice(0, 10)}.xls`;
+    link.click();
   };
 
   const passed = results.filter(r => r.pass).length;
@@ -127,15 +153,12 @@ export default function SWGLiveTest() {
           </div>
         </div>
         <p className="text-gray-400 text-sm mb-4">Real API-based testing: Web Proxy + Web DLP + Network DLP + URL Filtering + SSL Inspection</p>
-
         {swgStatus && (
           <div className="bg-gray-800 rounded-lg p-3 mb-4 text-sm">
             <span className="text-emerald-400 font-bold">{swgStatus.service} v{swgStatus.version}</span>
             <p className="text-gray-400 mt-1">Capabilities: {swgStatus.capabilities?.join(', ')}</p>
-            <p className="text-gray-400">Proxy Nodes: {swgStatus.proxyNodes?.map((n: any) => `${n.location} (${n.status})`).join(' | ')}</p>
           </div>
         )}
-
         {pacVisible && (
           <div className="bg-gray-800 rounded-lg p-3 mb-4">
             <div className="flex justify-between items-center mb-2">
@@ -145,11 +168,9 @@ export default function SWGLiveTest() {
             <pre className="text-xs text-gray-300 overflow-auto max-h-48">{pacContent}</pre>
           </div>
         )}
-
         <button onClick={runAllTests} disabled={running} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 mb-4">
           {running ? `Running... (${results.length}/${TEST_SCENARIOS.length})` : 'Run All Tests'}
         </button>
-
         {results.length > 0 && (
           <div className="mb-4 text-sm">
             <span className="text-green-400">Pass: {passed}</span>&nbsp;&nbsp;
@@ -157,7 +178,6 @@ export default function SWGLiveTest() {
             <span className="text-gray-400">Total: {results.length}</span>
           </div>
         )}
-
         {results.length > 0 && (
           <div className="space-y-1 mb-4">
             {TEST_SCENARIOS.map(sc => {
@@ -168,13 +188,11 @@ export default function SWGLiveTest() {
                   <span>{isActive ? '\u23F3' : r ? (r.pass ? '\u2705' : '\u274C') : '\u2B1C'}</span>
                   <span className="text-white">{sc.name}</span>
                   <span className="text-gray-500">{r ? `${r.status} (${r.latency}ms)` : 'pending'}</span>
-                  <span className="text-gray-600 text-xs">expect: {sc.expect}</span>
                 </div>
               );
             })}
           </div>
         )}
-
         <hr className="border-gray-700 my-4" />
         <h3 className="text-lg font-semibold text-white mb-3">Custom Test</h3>
         <div className="flex gap-2 mb-3">
@@ -184,46 +202,44 @@ export default function SWGLiveTest() {
             </button>
           ))}
         </div>
-
         {(customMode === 'proxy' || customMode === 'url-check') && (
           <input value={customUrl} onChange={e => setCustomUrl(e.target.value)} placeholder="https://target-url.com" className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
         )}
         {customMode === 'dlp-scan' && (
           <textarea value={customContent} onChange={e => setCustomContent(e.target.value)} placeholder="Paste content to scan for sensitive data..." rows={3} className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
         )}
-        <button onClick={runCustomTest} className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500">
-          Run Custom Test
-        </button>
+        <button onClick={runCustomTest} className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500">Run Custom Test</button>
         {customResult && (
-          <div className="mt-3">
-            <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">
-              {JSON.stringify(customResult, null, 2)}
-            </pre>
-          </div>
+          <pre className="mt-3 bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">{JSON.stringify(customResult, null, 2)}</pre>
         )}
 
         <hr className="border-gray-700 my-4" />
         <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
-        <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 500). All URLs will be checked simultaneously.</p>
+        <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 5,000). URLs are processed in batches of 100. Results can be exported as CSV or Excel.</p>
         <textarea
           value={batchUrls}
           onChange={e => setBatchUrls(e.target.value)}
           placeholder={"https://example.com\nhttps://evil-phishing.com\nhttps://facebook.com"}
-          rows={6}
+          rows={8}
           className="w-full mb-3 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm font-mono"
         />
-        <button
-          onClick={runBatchCheck}
-          disabled={batchLoading || !batchUrls.trim()}
-          className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500 disabled:opacity-50"
-        >
-          {batchLoading ? 'Checking...' : 'Run Batch Check'}
-        </button>
+        <div className="flex gap-2 items-center flex-wrap mb-3">
+          <button onClick={runBatchCheck} disabled={batchLoading || !batchUrls.trim()} className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500 disabled:opacity-50">
+            {batchLoading ? 'Checking...' : 'Run Batch Check'}
+          </button>
+          {batchResult?.results && (
+            <>
+              <button onClick={exportCSV} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-600">Export CSV</button>
+              <button onClick={exportExcel} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-600">Export Excel</button>
+            </>
+          )}
+          {batchProgress && <span className="text-yellow-400 text-sm">{batchProgress}</span>}
+        </div>
         {batchResult && (
-          <div className="mt-4">
+          <div className="mt-2">
             {batchResult.summary && (
               <div className="flex flex-wrap gap-3 mb-3 text-sm">
-                <span className="text-white">Total: {batchResult.summary.total}</span>
+                <span className="text-white font-bold">Total: {batchResult.summary.total}</span>
                 <span className="text-red-400">Malicious: {batchResult.summary.known_malicious}</span>
                 <span className="text-orange-400">High: {batchResult.summary.high_risk}</span>
                 <span className="text-yellow-400">Medium: {batchResult.summary.medium_risk}</span>
@@ -231,9 +247,7 @@ export default function SWGLiveTest() {
                 <span className="text-gray-400">Unknown: {batchResult.summary.unknown}</span>
               </div>
             )}
-            <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-96 whitespace-pre-wrap">
-              {JSON.stringify(batchResult, null, 2)}
-            </pre>
+            <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-96 whitespace-pre-wrap">{JSON.stringify(batchResult, null, 2)}</pre>
           </div>
         )}
       </div>
