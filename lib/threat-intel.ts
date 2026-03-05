@@ -59,6 +59,20 @@ export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: stri
   // ── Known benign (whitelist examples) ──
   'google.com':               { risk_level: 'low_risk',        categories: ['search_engine'] },
   'microsoft.com':            { risk_level: 'low_risk',        categories: ['business'] },
+    // ── URL Category Classification ──
+  'facebook.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'instagram.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'twitter.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'x.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'linkedin.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'tiktok.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'chat.openai.com': { risk_level: 'low_risk', categories: ['genai'] },
+  'openai.com': { risk_level: 'low_risk', categories: ['genai'] },
+  'claude.ai': { risk_level: 'low_risk', categories: ['genai'] },
+  'gemini.google.com': { risk_level: 'low_risk', categories: ['genai'] },
+  'perplexity.ai': { risk_level: 'low_risk', categories: ['genai'] },
+  'copilot.microsoft.com': { risk_level: 'low_risk', categories: ['genai'] },
+  'bard.google.com': { risk_level: 'low_risk', categories: ['genai'] },
   'github.com':               { risk_level: 'low_risk',        categories: ['development'] },
   'malware.testing.google.test': { risk_level: 'known_malicious', categories: ['malware'] },
   // Add more from your test list here
