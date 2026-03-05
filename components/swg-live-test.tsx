@@ -26,8 +26,7 @@ export default function SWGLiveTest() {
   const [customContent, setCustomContent] = useState('');
   const [customMode, setCustomMode] = useState('dlp-scan');
   const [customResult, setCustomResult] = useState<any>(null);
-
-    const [batchUrls, setBatchUrls] = useState('');
+  const [batchUrls, setBatchUrls] = useState('');
   const [batchResult, setBatchResult] = useState<any>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [pacVisible, setPacVisible] = useState(false);
@@ -44,8 +43,7 @@ export default function SWGLiveTest() {
       });
       const data = await resp.json();
       const status = data.status || data.categories?.[0] || 'unknown';
-      const pass = status.toLowerCase().includes(scenario.expect.toLowerCase()) ||
-        JSON.stringify(data).toLowerCase().includes(scenario.expect.toLowerCase());
+      const pass = status.toLowerCase().includes(scenario.expect.toLowerCase()) || JSON.stringify(data).toLowerCase().includes(scenario.expect.toLowerCase());
       return { id: scenario.id, status, pass, latency: Date.now() - start, details: data };
     } catch (e: any) {
       return { id: scenario.id, status: 'ERROR', pass: false, latency: Date.now() - start, details: { error: e.message } };
@@ -96,12 +94,13 @@ export default function SWGLiveTest() {
     } catch (e: any) {
       setSwgStatus({ error: e.message });
     }
+  };
 
-      const runBatchCheck = async () => {
+  const runBatchCheck = async () => {
     setBatchLoading(true);
     setBatchResult(null);
     try {
-      const urls = batchUrls.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+      const urls = batchUrls.split('\n').map((u: string) => u.trim()).filter((u: string) => u.length > 0);
       const resp = await fetch('/api/proxy-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,103 +112,88 @@ export default function SWGLiveTest() {
     }
     setBatchLoading(false);
   };
-  };
 
   const passed = results.filter(r => r.pass).length;
   const failed = results.filter(r => !r.pass).length;
 
   return (
-    <div className="mt-8 border border-emerald-700 rounded-xl p-6 bg-gray-900/80">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-2xl font-bold text-white">Cloud SWG Live Testing Console</h2>
-        <div className="flex gap-2">
-          <button onClick={fetchStatus} className="px-3 py-1.5 bg-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-600">Service Status</button>
-          <button onClick={fetchPac} className="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-600">View PAC File</button>
-        </div>
-      </div>
-      <p className="text-gray-400 text-sm mb-4">Real API-based testing: Web Proxy + Web DLP + Network DLP + URL Filtering + SSL Inspection</p>
-
-      {swgStatus && (
-        <div className="mb-4 bg-gray-800 rounded-lg p-3 text-xs">
-          <div className="flex items-center gap-2 mb-1">
-            <div className={`w-2 h-2 rounded-full ${swgStatus.status === 'operational' ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-white font-medium">{swgStatus.service} v{swgStatus.version}</span>
+    <div className="space-y-6">
+      <div className="border border-emerald-700 rounded-xl p-6 bg-gray-900/50">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-white">Cloud SWG Live Testing Console</h2>
+          <div className="flex gap-2">
+            <button onClick={fetchStatus} className="px-3 py-1 bg-gray-700 text-gray-300 rounded text-sm">Service Status</button>
+            <button onClick={fetchPac} className="px-3 py-1 bg-blue-700 text-white rounded text-sm">View PAC File</button>
           </div>
-          <div className="text-gray-400">Capabilities: {swgStatus.capabilities?.join(', ')}</div>
-          <div className="text-gray-400">Proxy Nodes: {swgStatus.proxyNodes?.map((n: any) => `${n.location} (${n.status})`).join(' | ')}</div>
         </div>
-      )}
+        <p className="text-gray-400 text-sm mb-4">Real API-based testing: Web Proxy + Web DLP + Network DLP + URL Filtering + SSL Inspection</p>
 
-      {pacVisible && (
-        <div className="mb-4 bg-gray-800 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-cyan-400 font-medium text-sm">PAC File</span>
-            <button onClick={() => setPacVisible(false)} className="text-gray-500 text-xs">Close</button>
+        {swgStatus && (
+          <div className="bg-gray-800 rounded-lg p-3 mb-4 text-sm">
+            <span className="text-emerald-400 font-bold">{swgStatus.service} v{swgStatus.version}</span>
+            <p className="text-gray-400 mt-1">Capabilities: {swgStatus.capabilities?.join(', ')}</p>
+            <p className="text-gray-400">Proxy Nodes: {swgStatus.proxyNodes?.map((n: any) => `${n.location} (${n.status})`).join(' | ')}</p>
           </div>
-          <pre className="text-green-400 text-xs overflow-auto max-h-48 whitespace-pre-wrap">{pacContent}</pre>
-        </div>
-      )}
+        )}
 
-      <div className="flex gap-2 mb-4">
-        <button onClick={runAllTests} disabled={running}
-          className={`px-4 py-2 rounded-lg font-medium text-sm ${running ? 'bg-gray-600 text-gray-400' : 'bg-emerald-600 text-white hover:bg-emerald-500'}`}>
+        {pacVisible && (
+          <div className="bg-gray-800 rounded-lg p-3 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-white font-bold">PAC File</span>
+              <button onClick={() => setPacVisible(false)} className="text-gray-500 text-xs">Close</button>
+            </div>
+            <pre className="text-xs text-gray-300 overflow-auto max-h-48">{pacContent}</pre>
+          </div>
+        )}
+
+        <button onClick={runAllTests} disabled={running} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 mb-4">
           {running ? `Running... (${results.length}/${TEST_SCENARIOS.length})` : 'Run All Tests'}
         </button>
+
         {results.length > 0 && (
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-green-400">Pass: {passed}</span>
-            <span className="text-red-400">Fail: {failed}</span>
+          <div className="mb-4 text-sm">
+            <span className="text-green-400">Pass: {passed}</span>&nbsp;&nbsp;
+            <span className="text-red-400">Fail: {failed}</span>&nbsp;&nbsp;
             <span className="text-gray-400">Total: {results.length}</span>
           </div>
         )}
-      </div>
 
-      {results.length > 0 && (
-        <div className="mb-6 space-y-1">
-          {TEST_SCENARIOS.map(sc => {
-            const r = results.find(x => x.id === sc.id);
-            const isActive = activeTest === sc.id;
-            return (
-              <div key={sc.id} className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${isActive ? 'bg-yellow-900/30' : r ? (r.pass ? 'bg-green-900/20' : 'bg-red-900/20') : 'bg-gray-800/50'}`}>
-                <span className="w-5 text-center">
-                  {isActive ? '\u23F3' : r ? (r.pass ? '\u2705' : '\u274C') : '\u2B1C'}
-                </span>
-                <span className="text-gray-300 flex-1">{sc.name}</span>
-                <span className={`text-xs font-mono ${r?.pass ? 'text-green-400' : r ? 'text-red-400' : 'text-gray-600'}`}>
-                  {r ? `${r.status} (${r.latency}ms)` : 'pending'}
-                </span>
-                <span className="text-gray-500 text-xs">expect: {sc.expect}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {results.length > 0 && (
+          <div className="space-y-1 mb-4">
+            {TEST_SCENARIOS.map(sc => {
+              const r = results.find(x => x.id === sc.id);
+              const isActive = activeTest === sc.id;
+              return (
+                <div key={sc.id} className="flex items-center gap-2 text-sm py-1">
+                  <span>{isActive ? '\u23F3' : r ? (r.pass ? '\u2705' : '\u274C') : '\u2B1C'}</span>
+                  <span className="text-white">{sc.name}</span>
+                  <span className="text-gray-500">{r ? `${r.status} (${r.latency}ms)` : 'pending'}</span>
+                  <span className="text-gray-600 text-xs">expect: {sc.expect}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      <div className="border-t border-gray-700 pt-4">
+        <hr className="border-gray-700 my-4" />
         <h3 className="text-lg font-semibold text-white mb-3">Custom Test</h3>
         <div className="flex gap-2 mb-3">
           {['dlp-scan', 'proxy', 'url-check'].map(m => (
-            <button key={m} onClick={() => setCustomMode(m)}
-              className={`px-3 py-1 rounded text-sm ${customMode === m ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
+            <button key={m} onClick={() => setCustomMode(m)} className={`px-3 py-1 rounded text-sm ${customMode === m ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
               {m === 'dlp-scan' ? 'Network DLP Scan' : m === 'proxy' ? 'Web Proxy' : 'URL Check'}
             </button>
           ))}
         </div>
 
         {(customMode === 'proxy' || customMode === 'url-check') && (
-          <input value={customUrl} onChange={e => setCustomUrl(e.target.value)}
-            placeholder="https://target-url.com" className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
+          <input value={customUrl} onChange={e => setCustomUrl(e.target.value)} placeholder="https://target-url.com" className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
         )}
         {customMode === 'dlp-scan' && (
-          <textarea value={customContent} onChange={e => setCustomContent(e.target.value)}
-            placeholder="Paste content to scan for sensitive data..." rows={3}
-            className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
+          <textarea value={customContent} onChange={e => setCustomContent(e.target.value)} placeholder="Paste content to scan for sensitive data..." rows={3} className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
         )}
-
         <button onClick={runCustomTest} className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500">
           Run Custom Test
         </button>
-
         {customResult && (
           <div className="mt-3">
             <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">
@@ -218,42 +202,40 @@ export default function SWGLiveTest() {
           </div>
         )}
 
-                {/* Batch URL Check */}
-        <div className="mt-8 border border-cyan-700 rounded-xl p-6 bg-gray-900/50">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
-          <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 50). All URLs will be checked simultaneously.</p>
-          <textarea
-            value={batchUrls}
-            onChange={e => setBatchUrls(e.target.value)}
-            placeholder={"https://example.com\nhttps://evil-phishing.com\nhttps://facebook.com"}
-            rows={6}
-            className="w-full mb-3 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm font-mono"
-          />
-          <button
-            onClick={runBatchCheck}
-            disabled={batchLoading || !batchUrls.trim()}
-            className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500 disabled:opacity-50"
-          >
-            {batchLoading ? 'Checking...' : 'Run Batch Check'}
-          </button>
-          {batchResult && (
-            <div className="mt-4">
-              {batchResult.summary && (
-                <div className="flex gap-3 mb-3 text-sm">
-                  <span className="text-white">Total: {batchResult.summary.total}</span>
-                  <span className="text-red-400">Known Malicious: {batchResult.summary.known_malicious}</span>
-                  <span className="text-orange-400">High Risk: {batchResult.summary.high_risk}</span>
-                  <span className="text-yellow-400">Medium: {batchResult.summary.medium_risk}</span>
-                  <span className="text-green-400">Low: {batchResult.summary.low_risk}</span>
-                  <span className="text-gray-400">Unknown: {batchResult.summary.unknown}</span>
-                </div>
-              )}
-              <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-96 whitespace-pre-wrap">
-                {JSON.stringify(batchResult, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
+        <hr className="border-gray-700 my-4" />
+        <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
+        <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 50). All URLs will be checked simultaneously.</p>
+        <textarea
+          value={batchUrls}
+          onChange={e => setBatchUrls(e.target.value)}
+          placeholder={"https://example.com\nhttps://evil-phishing.com\nhttps://facebook.com"}
+          rows={6}
+          className="w-full mb-3 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm font-mono"
+        />
+        <button
+          onClick={runBatchCheck}
+          disabled={batchLoading || !batchUrls.trim()}
+          className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500 disabled:opacity-50"
+        >
+          {batchLoading ? 'Checking...' : 'Run Batch Check'}
+        </button>
+        {batchResult && (
+          <div className="mt-4">
+            {batchResult.summary && (
+              <div className="flex flex-wrap gap-3 mb-3 text-sm">
+                <span className="text-white">Total: {batchResult.summary.total}</span>
+                <span className="text-red-400">Malicious: {batchResult.summary.known_malicious}</span>
+                <span className="text-orange-400">High: {batchResult.summary.high_risk}</span>
+                <span className="text-yellow-400">Medium: {batchResult.summary.medium_risk}</span>
+                <span className="text-green-400">Low: {batchResult.summary.low_risk}</span>
+                <span className="text-gray-400">Unknown: {batchResult.summary.unknown}</span>
+              </div>
+            )}
+            <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-96 whitespace-pre-wrap">
+              {JSON.stringify(batchResult, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );
