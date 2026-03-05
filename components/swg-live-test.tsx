@@ -26,6 +26,10 @@ export default function SWGLiveTest() {
   const [customContent, setCustomContent] = useState('');
   const [customMode, setCustomMode] = useState('dlp-scan');
   const [customResult, setCustomResult] = useState<any>(null);
+
+    const [batchUrls, setBatchUrls] = useState('');
+  const [batchResult, setBatchResult] = useState<any>(null);
+  const [batchLoading, setBatchLoading] = useState(false);
   const [pacVisible, setPacVisible] = useState(false);
   const [pacContent, setPacContent] = useState('');
   const [swgStatus, setSwgStatus] = useState<any>(null);
@@ -92,6 +96,23 @@ export default function SWGLiveTest() {
     } catch (e: any) {
       setSwgStatus({ error: e.message });
     }
+
+      const runBatchCheck = async () => {
+    setBatchLoading(true);
+    setBatchResult(null);
+    try {
+      const urls = batchUrls.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+      const resp = await fetch('/api/proxy-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'batch-url-check', urls }),
+      });
+      setBatchResult(await resp.json());
+    } catch (e: any) {
+      setBatchResult({ error: e.message });
+    }
+    setBatchLoading(false);
+  };
   };
 
   const passed = results.filter(r => r.pass).length;
@@ -196,6 +217,43 @@ export default function SWGLiveTest() {
             </pre>
           </div>
         )}
+
+                {/* Batch URL Check */}
+        <div className="mt-8 border border-cyan-700 rounded-xl p-6 bg-gray-900/50">
+          <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
+          <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 50). All URLs will be checked simultaneously.</p>
+          <textarea
+            value={batchUrls}
+            onChange={e => setBatchUrls(e.target.value)}
+            placeholder={"https://example.com\nhttps://evil-phishing.com\nhttps://facebook.com"}
+            rows={6}
+            className="w-full mb-3 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm font-mono"
+          />
+          <button
+            onClick={runBatchCheck}
+            disabled={batchLoading || !batchUrls.trim()}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500 disabled:opacity-50"
+          >
+            {batchLoading ? 'Checking...' : 'Run Batch Check'}
+          </button>
+          {batchResult && (
+            <div className="mt-4">
+              {batchResult.summary && (
+                <div className="flex gap-3 mb-3 text-sm">
+                  <span className="text-white">Total: {batchResult.summary.total}</span>
+                  <span className="text-red-400">Known Malicious: {batchResult.summary.known_malicious}</span>
+                  <span className="text-orange-400">High Risk: {batchResult.summary.high_risk}</span>
+                  <span className="text-yellow-400">Medium: {batchResult.summary.medium_risk}</span>
+                  <span className="text-green-400">Low: {batchResult.summary.low_risk}</span>
+                  <span className="text-gray-400">Unknown: {batchResult.summary.unknown}</span>
+                </div>
+              )}
+              <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-96 whitespace-pre-wrap">
+                {JSON.stringify(batchResult, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
