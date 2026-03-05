@@ -49,6 +49,17 @@ export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: stri
   'crimsondew.com':       { risk_level: 'known_malicious', categories: ['malware'] },
   'evil.com':             { risk_level: 'known_malicious', categories: ['malware'] },
   'phishing-site.com':    { risk_level: 'known_malicious', categories: ['phishing'] },
+    // ── Greylist / Suspicious Content (from test Excel) ──
+  'fakebank-login.xyz':       { risk_level: 'high_risk',       categories: ['phishing'] },
+  'secure-verify-account.top': { risk_level: 'high_risk',     categories: ['phishing'] },
+  'crypto-airdrop-free.club': { risk_level: 'high_risk',      categories: ['crypto_scam'] },
+  'download-crack-now.top':   { risk_level: 'high_risk',      categories: ['malware'] },
+  'login-paypal-secure.xyz':  { risk_level: 'known_malicious', categories: ['phishing'] },
+  'update-flash-player.club': { risk_level: 'known_malicious', categories: ['malware'] },
+  // ── Known benign (whitelist examples) ──
+  'google.com':               { risk_level: 'low_risk',        categories: ['search_engine'] },
+  'microsoft.com':            { risk_level: 'low_risk',        categories: ['business'] },
+  'github.com':               { risk_level: 'low_risk',        categories: ['development'] },
   'malware.testing.google.test': { risk_level: 'known_malicious', categories: ['malware'] },
   // Add more from your test list here
 };
