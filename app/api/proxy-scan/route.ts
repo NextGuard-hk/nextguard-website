@@ -248,6 +248,46 @@ export async function POST(request: NextRequest) {
       });
     }
 
+        // MODE 4: Batch URL Check
+    if (mode === 'batch-url-check') {
+      const urls: string[] = body.urls || [];
+      if (!Array.isArray(urls) || urls.length === 0) {
+        return NextResponse.json({ error: 'Please provide urls array' }, { status: 400 });
+      }
+      if (urls.length > 50) {
+        return NextResponse.json({ error: 'Max 50 URLs per batch' }, { status: 400 });
+      }
+      const results = await Promise.all(
+        urls.map(async (url: string) => {
+          const tiResult = await checkUrl(url);
+          return {
+            url,
+            risk_level: tiResult.final.risk_level,
+            categories: tiResult.final.categories,
+            flags: tiResult.final.flags,
+            reason: tiResult.final.reason,
+            sources: tiResult.sources.filter(s => s.hit).map(s => s.name),
+          };
+        })
+      );
+      const summary = {
+        total: results.length,
+        known_malicious: results.filter(r => r.risk_level === 'known_malicious').length,
+        high_risk: results.filter(r => r.risk_level === 'high_risk').length,
+        medium_risk: results.filter(r => r.risk_level === 'medium_risk').length,
+        low_risk: results.filter(r => r.risk_level === 'low_risk').length,
+        unknown: results.filter(r => r.risk_level === 'unknown').length,
+      };
+      return NextResponse.json({
+        mode: 'batch-url-check',
+        summary,
+        results,
+        feedStatus: getFeedStatus(),
+        timestamp: new Date().toISOString(),
+        latency: Date.now() - startTime,
+      });
+    }
+
     return NextResponse.json({ error: 'Invalid mode. Use: proxy, dlp-scan, or url-check' }, { status: 400 });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
