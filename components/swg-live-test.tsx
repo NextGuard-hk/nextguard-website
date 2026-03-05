@@ -122,7 +122,7 @@ export default function SWGLiveTest() {
       {pacVisible && (
         <div className="mb-4 bg-gray-800 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-cyan-400 font-medium text-sm">PAC File (https://next-guard.com/api/pac)</span>
+            <span className="text-cyan-400 font-medium text-sm">PAC File</span>
             <button onClick={() => setPacVisible(false)} className="text-gray-500 text-xs">Close</button>
           </div>
           <pre className="text-green-400 text-xs overflow-auto max-h-48 whitespace-pre-wrap">{pacContent}</pre>
@@ -174,6 +174,7 @@ export default function SWGLiveTest() {
             </button>
           ))}
         </div>
+
         {(customMode === 'proxy' || customMode === 'url-check') && (
           <input value={customUrl} onChange={e => setCustomUrl(e.target.value)}
             placeholder="https://target-url.com" className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
@@ -183,85 +184,17 @@ export default function SWGLiveTest() {
             placeholder="Paste content to scan for sensitive data..." rows={3}
             className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />
         )}
+
         <button onClick={runCustomTest} className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500">
-          {customResult && (
-          <div className="mt-3 space-y-2">
-            {/* URL Check 專用可視化面板 */}
-            {customMode === 'url-check' ? (
-              <div className="bg-gray-800 rounded-lg p-4 text-sm">
-                {/* Risk Level Banner */}
-                <div className={`flex items-center gap-3 p-3 rounded-lg mb-3 ${
-                  customResult.risk_level === 'known_malicious' ? 'bg-red-900/50 border border-red-600' :
-                  customResult.risk_level === 'high_risk' ? 'bg-orange-900/50 border border-orange-600' :
-                  customResult.risk_level === 'medium_risk' ? 'bg-yellow-900/50 border border-yellow-600' :
-                  customResult.risk_level === 'low_risk' ? 'bg-green-900/50 border border-green-600' :
-                  'bg-gray-700 border border-gray-600'
-                }`}>
-                  <span className="text-2xl">
-                    {customResult.risk_level === 'known_malicious' ? '🔴' :
-                     customResult.risk_level === 'high_risk' ? '🟠' :
-                     customResult.risk_level === 'medium_risk' ? '🟡' :
-                     customResult.risk_level === 'low_risk' ? '🟢' : '⚪'}
-                  </span>
-                  <div>
-                    <div className="text-white font-bold text-base">
-                      {customResult.risk_level?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN'}
-                    </div>
-                    <div className="text-gray-300 text-xs">{customResult.url}</div>
-                  </div>
-                </div>
-                {/* Categories & Flags */}
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {customResult.categories?.map((c: string) => (
-                    <span key={c} className="px-2 py-0.5 bg-blue-800 text-blue-200 rounded text-xs font-mono">{c}</span>
-                  ))}
-                  {customResult.flags?.map((f: string) => (
-                    <span key={f} className="px-2 py-0.5 bg-purple-800 text-purple-200 rounded text-xs font-mono">{f}</span>
-                  ))}
-                </div>
-                {/* Reason */}
-                {customResult.reason && (
-                  <div className="text-gray-300 text-xs mb-3 p-2 bg-gray-700 rounded">
-                    <span className="text-gray-500">Reason: </span>{customResult.reason}
-                  </div>
-                )}
-                {/* Sources */}
-                {customResult.sources?.length > 0 && (
-                  <div>
-                    <div className="text-gray-400 text-xs font-semibold mb-1">THREAT INTEL SOURCES</div>
-                    <div className="space-y-1">
-                      {customResult.sources.map((src: any) => (
-                        <div key={src.name} className={`flex items-center justify-between px-3 py-1.5 rounded text-xs ${
-                          src.hit ? 'bg-red-900/40 border border-red-800' : 'bg-gray-700'
-                        }`}>
-                          <span className="text-gray-300 font-mono">{src.name}</span>
-                          <div className="flex items-center gap-2">
-                            {src.hit && src.categories?.map((c: string) => (
-                              <span key={c} className="text-orange-300">{c}</span>
-                            ))}
-                            <span className={src.hit ? 'text-red-400 font-bold' : 'text-gray-500'}>
-                              {src.hit ? '● HIT' : '○ miss'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Feed Status */}
-                {customResult.feedStatus && (
-                  <div className="mt-3 text-xs text-gray-500">
-                    Feed counts — URLhaus: {customResult.feedStatus.counts?.urlhaus} | Phishing Army: {customResult.feedStatus.counts?.phishingArmy} | OpenPhish: {customResult.feedStatus.counts?.openphish} | Local IOC: {customResult.feedStatus.counts?.localIoc}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">
-                {JSON.stringify(customResult, null, 2)}
-              </pre>
-            )}
+          Run Custom Test
+        </button>
+
+        {customResult && (
+          <div className="mt-3">
+            <pre className="bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">
+              {JSON.stringify(customResult, null, 2)}
+            </pre>
           </div>
-        )}
         )}
       </div>
     </div>
