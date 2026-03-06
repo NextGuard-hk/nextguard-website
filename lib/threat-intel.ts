@@ -1,6 +1,7 @@
 // lib/threat-intel.ts
-// NextGuard OSINT Threat Intelligence Engine v2.0
-// Integrates URLhaus, Phishing Army, OpenPhish, PhishTank
+// NextGuard OSINT Threat Intelligence Engine v3.0
+// Integrates: URLhaus, Phishing Army, OpenPhish, PhishTank,
+// Google Safe Browsing, VirusTotal, AlienVault OTX, Cloudflare DNS
 
 export type RiskLevel = 'known_malicious' | 'high_risk' | 'medium_risk' | 'low_risk' | 'unknown';
 
@@ -20,7 +21,7 @@ export interface ThreatIntelResult {
     categories: string[];
     flags: string[];
     reason: string;
-    confidence: number; // 0-100 confidence score
+    confidence: number;
   };
   sources: SourceHit[];
   timestamp: string;
@@ -28,13 +29,13 @@ export interface ThreatIntelResult {
 
 // -- In-memory cache (Vercel serverless: per-instance, refreshed by cron) --
 interface FeedCache {
-  urlhaus: Set<string>;       // domains
-  phishingArmy: Set<string>;  // domains
-  openphish: Set<string>;     // domains (extracted from URLs)
-  phishtank: Set<string>;     // domains (extracted from verified URLs)
-  phishtankUrls: Set<string>; // full URLs for exact match
-  lastUpdated: number;        // epoch ms
-  feedErrors: string[];       // track feed loading errors
+  urlhaus: Set<string>;
+  phishingArmy: Set<string>;
+  openphish: Set<string>;
+  phishtank: Set<string>;
+  phishtankUrls: Set<string>;
+  lastUpdated: number;
+  feedErrors: string[];
 }
 
 let cache: FeedCache = {
@@ -47,10 +48,9 @@ let cache: FeedCache = {
   feedErrors: [],
 };
 
-// Cache TTL: 15 minutes (feeds update every 5-15 min)
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
-// -- Local IOC list (customer overrides) --
+// -- Local IOC list (customer overrides + URL category database) --
 export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: string[] }> = {
   'crimsondew.com': { risk_level: 'known_malicious', categories: ['malware'] },
   'evil.com': { risk_level: 'known_malicious', categories: ['malware'] },
@@ -61,6 +61,8 @@ export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: stri
   'download-crack-now.top': { risk_level: 'high_risk', categories: ['malware'] },
   'login-paypal-secure.xyz': { risk_level: 'known_malicious', categories: ['phishing'] },
   'update-flash-player.club': { risk_level: 'known_malicious', categories: ['malware'] },
+  'malware.testing.google.test': { risk_level: 'known_malicious', categories: ['malware'] },
+  // Search & Social & GenAI
   'google.com': { risk_level: 'low_risk', categories: ['search_engine'] },
   'microsoft.com': { risk_level: 'low_risk', categories: ['business'] },
   'facebook.com': { risk_level: 'low_risk', categories: ['social_media'] },
@@ -69,6 +71,15 @@ export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: stri
   'x.com': { risk_level: 'low_risk', categories: ['social_media'] },
   'linkedin.com': { risk_level: 'low_risk', categories: ['social_media'] },
   'tiktok.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'reddit.com': { risk_level: 'low_risk', categories: ['social_media', 'forum'] },
+  'pinterest.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'snapchat.com': { risk_level: 'low_risk', categories: ['social_media'] },
+  'discord.com': { risk_level: 'low_risk', categories: ['social_media', 'communication'] },
+  'telegram.org': { risk_level: 'low_risk', categories: ['messaging'] },
+  'whatsapp.com': { risk_level: 'low_risk', categories: ['messaging'] },
+  'signal.org': { risk_level: 'low_risk', categories: ['messaging', 'encrypted_communication'] },
+  'wechat.com': { risk_level: 'low_risk', categories: ['messaging', 'china'] },
+  'weibo.com': { risk_level: 'low_risk', categories: ['social_media', 'china'] },
   'chat.openai.com': { risk_level: 'low_risk', categories: ['genai'] },
   'openai.com': { risk_level: 'low_risk', categories: ['genai'] },
   'claude.ai': { risk_level: 'low_risk', categories: ['genai'] },
@@ -77,552 +88,498 @@ export const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: stri
   'copilot.microsoft.com': { risk_level: 'low_risk', categories: ['genai'] },
   'bard.google.com': { risk_level: 'low_risk', categories: ['genai'] },
   'github.com': { risk_level: 'low_risk', categories: ['development'] },
-  'malware.testing.google.test': { risk_level: 'known_malicious', categories: ['malware'] },
-  // -- News & Media --
-  'cnn.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
-  'bbc.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
-  'reuters.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
-  'nytimes.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
-  'scmp.com': { risk_level: 'low_risk', categories: ['news', 'media', 'hong_kong'] },
-  'hk01.com': { risk_level: 'low_risk', categories: ['news', 'media', 'hong_kong'] },
-  // -- Streaming --
-  'youtube.com': { risk_level: 'low_risk', categories: ['streaming', 'video', 'entertainment'] },
-  'netflix.com': { risk_level: 'low_risk', categories: ['streaming', 'entertainment'] },
+  // News & Media
+  'cnn.com': { risk_level: 'low_risk', categories: ['news'] },
+  'bbc.com': { risk_level: 'low_risk', categories: ['news'] },
+  'reuters.com': { risk_level: 'low_risk', categories: ['news'] },
+  'scmp.com': { risk_level: 'low_risk', categories: ['news', 'hong_kong'] },
+  'hk01.com': { risk_level: 'low_risk', categories: ['news', 'hong_kong'] },
+  // Streaming
+  'youtube.com': { risk_level: 'low_risk', categories: ['streaming', 'entertainment'] },
+  'netflix.com': { risk_level: 'low_risk', categories: ['streaming'] },
   'spotify.com': { risk_level: 'low_risk', categories: ['streaming', 'music'] },
-  'twitch.tv': { risk_level: 'low_risk', categories: ['streaming', 'gaming', 'entertainment'] },
-  'disneyplus.com': { risk_level: 'low_risk', categories: ['streaming', 'entertainment'] },
-  // -- Shopping --
-  'amazon.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
-  'ebay.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'auction'] },
-  'alibaba.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'b2b'] },
-  'taobao.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
-  'shopee.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
-  // -- Finance --
+  'twitch.tv': { risk_level: 'low_risk', categories: ['streaming', 'gaming'] },
+  // Shopping
+  'amazon.com': { risk_level: 'low_risk', categories: ['shopping'] },
+  'ebay.com': { risk_level: 'low_risk', categories: ['shopping'] },
+  'alibaba.com': { risk_level: 'low_risk', categories: ['shopping', 'b2b'] },
+  'taobao.com': { risk_level: 'low_risk', categories: ['shopping'] },
+  'shopee.com': { risk_level: 'low_risk', categories: ['shopping'] },
+  // Finance
   'hsbc.com': { risk_level: 'low_risk', categories: ['finance', 'banking'] },
-  'chase.com': { risk_level: 'low_risk', categories: ['finance', 'banking'] },
   'paypal.com': { risk_level: 'low_risk', categories: ['finance', 'payment'] },
-  'stripe.com': { risk_level: 'low_risk', categories: ['finance', 'payment', 'developer_tools'] },
-  'binance.com': { risk_level: 'low_risk', categories: ['finance', 'cryptocurrency', 'exchange'] },
-  'coinbase.com': { risk_level: 'low_risk', categories: ['finance', 'cryptocurrency', 'exchange'] },
-  // -- Cloud & Productivity --
-  'dropbox.com': { risk_level: 'low_risk', categories: ['cloud_storage', 'productivity'] },
-  'drive.google.com': { risk_level: 'low_risk', categories: ['cloud_storage', 'productivity'] },
-  'onedrive.live.com': { risk_level: 'low_risk', categories: ['cloud_storage', 'productivity'] },
-  'notion.so': { risk_level: 'low_risk', categories: ['productivity', 'collaboration'] },
-  'slack.com': { risk_level: 'low_risk', categories: ['communication', 'collaboration', 'business'] },
-  'zoom.us': { risk_level: 'low_risk', categories: ['communication', 'video_conferencing'] },
-  'teams.microsoft.com': { risk_level: 'low_risk', categories: ['communication', 'collaboration', 'business'] },
-  // -- Education --
-  'coursera.org': { risk_level: 'low_risk', categories: ['education', 'online_learning'] },
-  'udemy.com': { risk_level: 'low_risk', categories: ['education', 'online_learning'] },
-  'wikipedia.org': { risk_level: 'low_risk', categories: ['education', 'reference', 'encyclopedia'] },
-  // -- Developer Tools --
-  'stackoverflow.com': { risk_level: 'low_risk', categories: ['development', 'forum', 'technical'] },
-  'npmjs.com': { risk_level: 'low_risk', categories: ['development', 'package_registry'] },
-  'vercel.com': { risk_level: 'low_risk', categories: ['development', 'cloud_hosting'] },
-  'netlify.com': { risk_level: 'low_risk', categories: ['development', 'cloud_hosting'] },
-  'aws.amazon.com': { risk_level: 'low_risk', categories: ['cloud_infrastructure', 'business'] },
-  // -- VPN & Proxy --
+  'stripe.com': { risk_level: 'low_risk', categories: ['finance', 'payment'] },
+  'binance.com': { risk_level: 'low_risk', categories: ['finance', 'cryptocurrency'] },
+  // Cloud & Productivity
+  'dropbox.com': { risk_level: 'low_risk', categories: ['cloud_storage'] },
+  'drive.google.com': { risk_level: 'low_risk', categories: ['cloud_storage'] },
+  'onedrive.live.com': { risk_level: 'low_risk', categories: ['cloud_storage'] },
+  'notion.so': { risk_level: 'low_risk', categories: ['productivity'] },
+  'slack.com': { risk_level: 'low_risk', categories: ['communication', 'business'] },
+  'zoom.us': { risk_level: 'low_risk', categories: ['communication'] },
+  // Developer & Tech
+  'stackoverflow.com': { risk_level: 'low_risk', categories: ['development'] },
+  'vercel.com': { risk_level: 'low_risk', categories: ['development', 'hosting'] },
+  'apple.com': { risk_level: 'low_risk', categories: ['technology'] },
+  'adobe.com': { risk_level: 'low_risk', categories: ['technology', 'software'] },
+  // VPN & Proxy
   'nordvpn.com': { risk_level: 'medium_risk', categories: ['vpn', 'privacy_tools'] },
-  'expressvpn.com': { risk_level: 'medium_risk', categories: ['vpn', 'privacy_tools'] },
-  'protonvpn.com': { risk_level: 'medium_risk', categories: ['vpn', 'privacy_tools'] },
-  // -- Gambling --
-  'bet365.com': { risk_level: 'medium_risk', categories: ['gambling', 'betting'] },
-  'pokerstars.com': { risk_level: 'medium_risk', categories: ['gambling', 'gaming'] },
-  // -- Adult Content --
+  'expressvpn.com': { risk_level: 'medium_risk', categories: ['vpn'] },
+  // Gambling
+  'bet365.com': { risk_level: 'medium_risk', categories: ['gambling'] },
+  // Adult
   'pornhub.com': { risk_level: 'medium_risk', categories: ['adult', 'nsfw'] },
-  'xvideos.com': { risk_level: 'medium_risk', categories: ['adult', 'nsfw'] },
-  // -- File Sharing --
-  'wetransfer.com': { risk_level: 'low_risk', categories: ['file_sharing', 'productivity'] },
-  'mega.nz': { risk_level: 'medium_risk', categories: ['file_sharing', 'cloud_storage', 'encrypted'] },
-  'mediafire.com': { risk_level: 'medium_risk', categories: ['file_sharing'] },
-  // -- Email --
-  'gmail.com': { risk_level: 'low_risk', categories: ['email', 'communication'] },
-  'outlook.com': { risk_level: 'low_risk', categories: ['email', 'communication'] },
-  'protonmail.com': { risk_level: 'low_risk', categories: ['email', 'encrypted_communication', 'privacy_tools'] },
-  // -- Government --
-  'gov.hk': { risk_level: 'low_risk', categories: ['government', 'hong_kong'] },
-  'irs.gov': { risk_level: 'low_risk', categories: ['government', 'finance', 'tax'] },
-  // -- Travel --
-  'booking.com': { risk_level: 'low_risk', categories: ['travel', 'booking'] },
-  'expedia.com': { risk_level: 'low_risk', categories: ['travel', 'booking'] },
-  'airbnb.com': { risk_level: 'low_risk', categories: ['travel', 'booking', 'accommodation'] },
-  // -- Food --
-  'ubereats.com': { risk_level: 'low_risk', categories: ['food_delivery', 'restaurant'] },
-  'doordash.com': { risk_level: 'low_risk', categories: ['food_delivery'] },
-  // -- Health --
-  'webmd.com': { risk_level: 'low_risk', categories: ['health', 'medical_info'] },
-  'mayoclinic.org': { risk_level: 'low_risk', categories: ['health', 'medical_info'] },
-  // -- Jobs --
-  'indeed.com': { risk_level: 'low_risk', categories: ['jobs', 'recruitment'] },
-  'glassdoor.com': { risk_level: 'low_risk', categories: ['jobs', 'recruitment', 'reviews'] },
-  'jobsdb.com': { risk_level: 'low_risk', categories: ['jobs', 'recruitment', 'hong_kong'] },
-  // -- Social Media (Additional) --
-  'reddit.com': { risk_level: 'low_risk', categories: ['social_media', 'forum'] },
-  'pinterest.com': { risk_level: 'low_risk', categories: ['social_media', 'images'] },
-  'snapchat.com': { risk_level: 'low_risk', categories: ['social_media', 'messaging'] },
-  'discord.com': { risk_level: 'low_risk', categories: ['social_media', 'communication', 'gaming'] },
-  'telegram.org': { risk_level: 'low_risk', categories: ['messaging', 'communication'] },
-  'whatsapp.com': { risk_level: 'low_risk', categories: ['messaging', 'communication'] },
-  'signal.org': { risk_level: 'low_risk', categories: ['messaging', 'encrypted_communication'] },
-  'wechat.com': { risk_level: 'low_risk', categories: ['messaging', 'social_media', 'china'] },
-  'weibo.com': { risk_level: 'low_risk', categories: ['social_media', 'china'] },
-  'medium.com': { risk_level: 'low_risk', categories: ['blogging', 'media'] },
-  'quora.com': { risk_level: 'low_risk', categories: ['social_media', 'forum', 'qa'] },
-  // -- SaaS & Cloud --
-  'salesforce.com': { risk_level: 'low_risk', categories: ['saas', 'crm', 'business'] },
-  'hubspot.com': { risk_level: 'low_risk', categories: ['saas', 'marketing', 'crm'] },
-  'zendesk.com': { risk_level: 'low_risk', categories: ['saas', 'customer_support'] },
-  'atlassian.com': { risk_level: 'low_risk', categories: ['saas', 'development', 'collaboration'] },
-  'trello.com': { risk_level: 'low_risk', categories: ['saas', 'project_management'] },
-  'figma.com': { risk_level: 'low_risk', categories: ['saas', 'design', 'collaboration'] },
-  'canva.com': { risk_level: 'low_risk', categories: ['saas', 'design'] },
-  'docusign.com': { risk_level: 'low_risk', categories: ['saas', 'business', 'legal'] },
-  // -- Search Engines --
-  'bing.com': { risk_level: 'low_risk', categories: ['search_engine'] },
-  'duckduckgo.com': { risk_level: 'low_risk', categories: ['search_engine', 'privacy_tools'] },
-  'yahoo.com': { risk_level: 'low_risk', categories: ['search_engine', 'portal', 'news'] },
-  'baidu.com': { risk_level: 'low_risk', categories: ['search_engine', 'china'] },
-  // -- E-commerce (More) --
-  'walmart.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
-  'target.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce'] },
-  'bestbuy.com': { risk_level: 'low_risk', categories: ['shopping', 'electronics'] },
-  'etsy.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'handmade'] },
-  'shein.com': { risk_level: 'low_risk', categories: ['shopping', 'fashion'] },
-  'temu.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'china'] },
-  'aliexpress.com': { risk_level: 'low_risk', categories: ['shopping', 'ecommerce', 'china'] },
-  // -- Cybersecurity --
-  'virustotal.com': { risk_level: 'low_risk', categories: ['cybersecurity', 'malware_analysis'] },
-  'shodan.io': { risk_level: 'low_risk', categories: ['cybersecurity', 'osint'] },
-  'haveibeenpwned.com': { risk_level: 'low_risk', categories: ['cybersecurity', 'breach_check'] },
-  'crowdstrike.com': { risk_level: 'low_risk', categories: ['cybersecurity', 'endpoint_security'] },
-  'paloaltonetworks.com': { risk_level: 'low_risk', categories: ['cybersecurity', 'network_security'] },
-  // -- Dating --
-  'tinder.com': { risk_level: 'medium_risk', categories: ['dating', 'social_media'] },
-  'bumble.com': { risk_level: 'medium_risk', categories: ['dating', 'social_media'] },
-  // -- Gaming --
-  'store.steampowered.com': { risk_level: 'low_risk', categories: ['gaming', 'ecommerce'] },
-  'epicgames.com': { risk_level: 'low_risk', categories: ['gaming'] },
-  'roblox.com': { risk_level: 'low_risk', categories: ['gaming', 'kids'] },
-  'xbox.com': { risk_level: 'low_risk', categories: ['gaming', 'microsoft'] },
-  'playstation.com': { risk_level: 'low_risk', categories: ['gaming', 'sony'] },
-  // -- Crypto --
-  'ethereum.org': { risk_level: 'low_risk', categories: ['cryptocurrency', 'blockchain'] },
-  'bitcoin.org': { risk_level: 'low_risk', categories: ['cryptocurrency', 'blockchain'] },
-  'opensea.io': { risk_level: 'medium_risk', categories: ['cryptocurrency', 'nft', 'marketplace'] },
-  'uniswap.org': { risk_level: 'medium_risk', categories: ['cryptocurrency', 'defi'] },
-  // -- Torrent & Piracy --
-  'thepiratebay.org': { risk_level: 'high_risk', categories: ['torrent', 'piracy', 'file_sharing'] },
+  // File Sharing
+  'mega.nz': { risk_level: 'medium_risk', categories: ['file_sharing', 'encrypted'] },
+  // Torrent
+  'thepiratebay.org': { risk_level: 'high_risk', categories: ['torrent', 'piracy'] },
   '1337x.to': { risk_level: 'high_risk', categories: ['torrent', 'piracy'] },
-  'rarbg.to': { risk_level: 'high_risk', categories: ['torrent', 'piracy'] },
-  'nyaa.si': { risk_level: 'high_risk', categories: ['torrent', 'piracy'] },
-  // -- URL Shorteners --
+  // URL Shorteners
   'bit.ly': { risk_level: 'medium_risk', categories: ['url_shortener'] },
   'tinyurl.com': { risk_level: 'medium_risk', categories: ['url_shortener'] },
-  't.co': { risk_level: 'low_risk', categories: ['url_shortener', 'twitter'] },
-  // -- Paste Sites --
-  'pastebin.com': { risk_level: 'medium_risk', categories: ['paste_site', 'development'] },
-  'ghostbin.com': { risk_level: 'high_risk', categories: ['paste_site', 'anonymous'] },
-  // -- Privacy & Anonymizer --
+  // Paste Sites
+  'pastebin.com': { risk_level: 'medium_risk', categories: ['paste_site'] },
+  // Privacy
   'torproject.org': { risk_level: 'medium_risk', categories: ['privacy_tools', 'anonymizer'] },
-  // -- Technology & Major Sites --
-  'apple.com': { risk_level: 'low_risk', categories: ['technology', 'electronics', 'business'] },
-  'adobe.com': { risk_level: 'low_risk', categories: ['technology', 'software', 'creative'] },
-  'samsung.com': { risk_level: 'low_risk', categories: ['technology', 'electronics'] },
-  'intel.com': { risk_level: 'low_risk', categories: ['technology', 'semiconductor'] },
-  'cisco.com': { risk_level: 'low_risk', categories: ['technology', 'networking'] },
-  'oracle.com': { risk_level: 'low_risk', categories: ['technology', 'enterprise_software'] },
-  'ibm.com': { risk_level: 'low_risk', categories: ['technology', 'enterprise_software'] },
-  'wordpress.com': { risk_level: 'low_risk', categories: ['blogging', 'cms', 'hosting'] },
-  'imdb.com': { risk_level: 'low_risk', categories: ['entertainment', 'movies', 'reference'] },
-  'archive.org': { risk_level: 'low_risk', categories: ['education', 'reference', 'archive'] },
-  'mozilla.org': { risk_level: 'low_risk', categories: ['technology', 'browser', 'open_source'] },
-  // -- News (More) --
-  'washingtonpost.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
-  'theguardian.com': { risk_level: 'low_risk', categories: ['news', 'media'] },
-  'bloomberg.com': { risk_level: 'low_risk', categories: ['news', 'finance'] },
-  'cnbc.com': { risk_level: 'low_risk', categories: ['news', 'finance'] },
-  'techcrunch.com': { risk_level: 'low_risk', categories: ['news', 'technology'] },
-  'wired.com': { risk_level: 'low_risk', categories: ['news', 'technology'] },
-  'forbes.com': { risk_level: 'low_risk', categories: ['news', 'finance', 'business'] },
-  // -- Telecom --
-  'att.com': { risk_level: 'low_risk', categories: ['telecom', 'isp'] },
-  'verizon.com': { risk_level: 'low_risk', categories: ['telecom', 'isp'] },
-  // -- Logistics --
-  'ups.com': { risk_level: 'low_risk', categories: ['logistics', 'shipping'] },
-  'fedex.com': { risk_level: 'low_risk', categories: ['logistics', 'shipping'] },
-  // -- Fashion --
-  'nike.com': { risk_level: 'low_risk', categories: ['shopping', 'sports', 'fashion'] },
-  'ikea.com': { risk_level: 'low_risk', categories: ['shopping', 'furniture', 'home'] },
-  // -- Security Tools --
-  '1password.com': { risk_level: 'low_risk', categories: ['security', 'password_manager'] },
-  'bitwarden.com': { risk_level: 'low_risk', categories: ['security', 'password_manager', 'open_source'] },
-  // -- Hosting --
-  'godaddy.com': { risk_level: 'low_risk', categories: ['hosting', 'domain_registrar'] },
-  'squarespace.com': { risk_level: 'low_risk', categories: ['hosting', 'cms', 'website_builder'] },
-  'wix.com': { risk_level: 'low_risk', categories: ['hosting', 'cms', 'website_builder'] },
-  'shopify.com': { risk_level: 'low_risk', categories: ['ecommerce', 'saas', 'business'] },
-  // -- Banking (More) --
-  'wellsfargo.com': { risk_level: 'low_risk', categories: ['finance', 'banking'] },
-  'bankofamerica.com': { risk_level: 'low_risk', categories: ['finance', 'banking'] },
-  'americanexpress.com': { risk_level: 'low_risk', categories: ['finance', 'banking', 'credit_card'] },
+  // Education
+  'wikipedia.org': { risk_level: 'low_risk', categories: ['education', 'reference'] },
+  // Email
+  'gmail.com': { risk_level: 'low_risk', categories: ['email'] },
+  'outlook.com': { risk_level: 'low_risk', categories: ['email'] },
+  // Government
+  'gov.hk': { risk_level: 'low_risk', categories: ['government', 'hong_kong'] },
+  // Security
+  'virustotal.com': { risk_level: 'low_risk', categories: ['cybersecurity'] },
+  'crowdstrike.com': { risk_level: 'low_risk', categories: ['cybersecurity'] },
+  // Crypto
+  'opensea.io': { risk_level: 'medium_risk', categories: ['cryptocurrency', 'nft'] },
+  'uniswap.org': { risk_level: 'medium_risk', categories: ['cryptocurrency', 'defi'] },
+  // Dating
+  'tinder.com': { risk_level: 'medium_risk', categories: ['dating'] },
+  // Gaming
+  'store.steampowered.com': { risk_level: 'low_risk', categories: ['gaming'] },
+  'roblox.com': { risk_level: 'low_risk', categories: ['gaming'] },
+  // More business
+  'salesforce.com': { risk_level: 'low_risk', categories: ['saas', 'crm'] },
+  'shopify.com': { risk_level: 'low_risk', categories: ['ecommerce', 'saas'] },
+  'wordpress.com': { risk_level: 'low_risk', categories: ['blogging', 'cms'] },
 };
 
-// -- Suspicious TLD list --
-const SUSPICIOUS_TLDS = [
-  '.xyz','.top','.club','.click','.loan','.win','.gq','.ml','.cf','.ga','.tk',
-  '.pw','.work','.date','.download','.stream','.racing','.party','.trade',
-  '.review','.science','.faith','.bid','.men','.space','.icu','.buzz',
-  '.monster','.quest','.rest','.surf','.uno',
-];
-
-// -- Suspicious keyword patterns for domain analysis --
-const SUSPICIOUS_KEYWORDS = [
-  'malware','phish','exploit','botnet','ransom','cryptominer',
-  'keylog','trojan','spyware','adware','rootkit','backdoor',
-  'login-verify','secure-update','account-confirm','password-reset',
-  'signin-alert','verify-identity',
-];
-
-// -- Known hosting providers often abused (for context scoring) --
-const FREEHOST_PATTERNS = [
-  'blogspot.com','weebly.com','000webhostapp.com','firebaseapp.com',
-  'herokuapp.com','web.app','pages.dev','workers.dev',
-  'netlify.app','vercel.app','github.io','gitlab.io',
-];
+const SUSPICIOUS_TLDS = ['.xyz','.top','.club','.click','.loan','.win','.gq','.ml','.cf','.ga','.tk','.pw','.work','.date','.download','.stream','.racing','.party','.trade','.review','.science','.faith','.bid','.men','.space','.icu','.buzz','.monster','.quest','.rest','.surf','.uno'];
+const SUSPICIOUS_KEYWORDS = ['malware','phish','exploit','botnet','ransom','cryptominer','keylog','trojan','spyware','adware','rootkit','backdoor','login-verify','secure-update','account-confirm','password-reset','signin-alert','verify-identity'];
+const FREEHOST_PATTERNS = ['blogspot.com','weebly.com','000webhostapp.com','firebaseapp.com','herokuapp.com','web.app','pages.dev','workers.dev','netlify.app','vercel.app','github.io','gitlab.io'];
 
 // -- Feed loader helpers --
 async function fetchTextFeed(url: string): Promise<string[]> {
   try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
-      headers: { 'User-Agent': 'NextGuard-ThreatIntel/2.0' },
-    });
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/3.0' } });
     if (!res.ok) return [];
     const text = await res.text();
-    return text
-      .split('\n')
-      .map(l => l.trim().toLowerCase())
-      .filter(l => l && !l.startsWith('#'));
-  } catch {
-    return [];
-  }
+    return text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#'));
+  } catch { return []; }
 }
 
-// URLhaus - malware URLs
 async function loadUrlhaus(): Promise<Set<string>> {
-  const lines = await fetchTextFeed(
-    'https://urlhaus.abuse.ch/downloads/text_online/'
-  );
+  const lines = await fetchTextFeed('https://urlhaus.abuse.ch/downloads/text_online/');
   const domains = new Set<string>();
-  for (const line of lines) {
-    try {
-      const hostname = new URL(line.startsWith('http') ? line : 'http://' + line).hostname;
-      domains.add(hostname);
-    } catch { /* skip malformed */ }
-  }
+  for (const line of lines) { try { domains.add(new URL(line.startsWith('http') ? line : 'http://' + line).hostname); } catch {} }
   return domains;
 }
 
-// Phishing Army blocklist
 async function loadPhishingArmy(): Promise<Set<string>> {
-  const lines = await fetchTextFeed(
-    'https://phishing.army/download/phishing_army_blocklist.txt'
-  );
+  const lines = await fetchTextFeed('https://phishing.army/download/phishing_army_blocklist.txt');
   return new Set(lines.filter(l => l.length > 3));
 }
 
-// OpenPhish community feed
 async function loadOpenPhish(): Promise<Set<string>> {
-  const lines = await fetchTextFeed(
-    'https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt'
-  );
+  const lines = await fetchTextFeed('https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt');
   const domains = new Set<string>();
-  for (const line of lines) {
-    try {
-      domains.add(new URL(line).hostname);
-    } catch { /* skip */ }
-  }
+  for (const line of lines) { try { domains.add(new URL(line).hostname); } catch {} }
   return domains;
 }
 
-// PhishTank verified online phishing URLs (CSV format)
 async function loadPhishTank(): Promise<{ domains: Set<string>; urls: Set<string> }> {
   const domains = new Set<string>();
   const urls = new Set<string>();
   try {
-    const res = await fetch('http://data.phishtank.com/data/online-valid.csv', {
-      signal: AbortSignal.timeout(15000),
-      headers: { 'User-Agent': 'NextGuard-ThreatIntel/2.0' },
-    });
+    const res = await fetch('http://data.phishtank.com/data/online-valid.csv', { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/3.0' } });
     if (!res.ok) return { domains, urls };
     const text = await res.text();
-    const lines = text.split('\n').slice(1); // skip header
-    for (const line of lines) {
+    for (const line of text.split('\n').slice(1)) {
       try {
-        // CSV: phish_id,url,phish_detail_url,submission_time,verified,verification_time,online,target
         const urlMatch = line.match(/^\d+,([^,]+),/);
-        if (urlMatch && urlMatch[1]) {
-          const rawUrl = urlMatch[1].trim().toLowerCase();
-          urls.add(rawUrl);
-          const hostname = new URL(rawUrl).hostname.replace(/^www\./, '');
-          domains.add(hostname);
-        }
-      } catch { /* skip malformed */ }
+        if (urlMatch?.[1]) { const u = urlMatch[1].trim().toLowerCase(); urls.add(u); domains.add(new URL(u).hostname.replace(/^www\./, '')); }
+      } catch {}
     }
-  } catch { /* feed unavailable */ }
+  } catch {}
   return { domains, urls };
 }
 
-// -- Refresh all feeds (called by cron route or lazily) --
-export async function refreshFeeds(): Promise<void> {
-  const errors: string[] = [];
-  const [urlhaus, phishingArmy, openphish, phishtankData] = await Promise.all([
-    loadUrlhaus().catch(() => { errors.push('urlhaus'); return new Set<string>(); }),
-    loadPhishingArmy().catch(() => { errors.push('phishing_army'); return new Set<string>(); }),
-    loadOpenPhish().catch(() => { errors.push('openphish'); return new Set<string>(); }),
-    loadPhishTank().catch(() => { errors.push('phishtank'); return { domains: new Set<string>(), urls: new Set<string>() }; }),
-  ]);
-  cache = {
-    urlhaus,
-    phishingArmy,
-    openphish,
-    phishtank: phishtankData.domains,
-    phishtankUrls: phishtankData.urls,
-    lastUpdated: Date.now(),
-    feedErrors: errors,
-  };
-}
+// ============================================================
+// NEW: Real-time API-based Threat Intelligence Sources
+// ============================================================
 
-async function ensureCache(): Promise<void> {
-  if (Date.now() - cache.lastUpdated > CACHE_TTL_MS) {
-    await refreshFeeds();
+// -- Google Safe Browsing API v4 --
+async function checkGoogleSafeBrowsing(url: string): Promise<SourceHit> {
+  const apiKey = process.env.GOOGLE_SAFE_BROWSING_API_KEY;
+  if (!apiKey) return { name: 'google_safe_browsing', hit: false, detail: 'API key not configured' };
+  try {
+    const res = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client: { clientId: 'nextguard-swg', clientVersion: '3.0' },
+        threatInfo: {
+          threatTypes: ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE', 'POTENTIALLY_HARMFUL_APPLICATION'],
+          platformTypes: ['ANY_PLATFORM'],
+          threatEntryTypes: ['URL'],
+          threatEntries: [{ url }],
+        },
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await res.json();
+    const hasMatch = data.matches && data.matches.length > 0;
+    const threatTypes = hasMatch ? data.matches.map((m: any) => m.threatType).join(', ') : '';
+    const categories: string[] = [];
+    if (threatTypes.includes('MALWARE')) categories.push('malware');
+    if (threatTypes.includes('SOCIAL_ENGINEERING')) categories.push('phishing');
+    if (threatTypes.includes('UNWANTED_SOFTWARE')) categories.push('unwanted_software');
+    return {
+      name: 'google_safe_browsing',
+      hit: hasMatch,
+      risk_level: hasMatch ? 'known_malicious' : 'unknown',
+      categories,
+      flags: hasMatch ? ['gsb_' + threatTypes.toLowerCase().replace(/[^a-z_]/g, '_')] : [],
+      detail: hasMatch ? `Google Safe Browsing: ${threatTypes}` : 'Not flagged by Google Safe Browsing',
+    };
+  } catch (e: any) {
+    return { name: 'google_safe_browsing', hit: false, detail: 'API timeout or error: ' + e.message };
   }
 }
 
-// -- Risk level ordering --
-const RISK_ORDER: RiskLevel[] = [
-  'unknown', 'low_risk', 'medium_risk', 'high_risk', 'known_malicious',
-];
-
-function maxRisk(a: RiskLevel, b: RiskLevel): RiskLevel {
-  return RISK_ORDER.indexOf(a) >= RISK_ORDER.indexOf(b) ? a : b;
+// -- VirusTotal API v3 --
+async function checkVirusTotal(url: string): Promise<SourceHit> {
+  const apiKey = process.env.VIRUSTOTAL_API_KEY;
+  if (!apiKey) return { name: 'virustotal', hit: false, detail: 'API key not configured' };
+  try {
+    // URL ID is base64url-encoded URL without padding
+    const urlId = Buffer.from(url).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const res = await fetch(`https://www.virustotal.com/api/v3/urls/${urlId}`, {
+      headers: { 'x-apikey': apiKey },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.status === 404) {
+      return { name: 'virustotal', hit: false, detail: 'URL not found in VirusTotal database' };
+    }
+    const data = await res.json();
+    const stats = data.data?.attributes?.last_analysis_stats || {};
+    const malicious = stats.malicious || 0;
+    const suspicious = stats.suspicious || 0;
+    const totalEngines = (stats.harmless || 0) + (stats.undetected || 0) + malicious + suspicious;
+    const score = malicious + suspicious;
+    let risk: RiskLevel = 'unknown';
+    const categories: string[] = [];
+    if (malicious >= 5) { risk = 'known_malicious'; categories.push('malware'); }
+    else if (malicious >= 2 || suspicious >= 3) { risk = 'high_risk'; categories.push('suspicious'); }
+    else if (malicious >= 1 || suspicious >= 1) { risk = 'medium_risk'; categories.push('suspicious'); }
+    else if (totalEngines > 0) { risk = 'low_risk'; }
+    // Get community categories
+    const vtCategories = data.data?.attributes?.categories || {};
+    Object.values(vtCategories).forEach((c: any) => { if (c && !categories.includes(c)) categories.push(String(c).toLowerCase()); });
+    return {
+      name: 'virustotal',
+      hit: score > 0,
+      risk_level: risk,
+      categories,
+      flags: score > 0 ? [`vt_${malicious}/${totalEngines}_engines`] : [],
+      detail: totalEngines > 0 ? `VirusTotal: ${malicious} malicious, ${suspicious} suspicious out of ${totalEngines} engines` : 'No VirusTotal analysis available',
+    };
+  } catch (e: any) {
+    return { name: 'virustotal', hit: false, detail: 'API error: ' + e.message };
+  }
 }
 
-// -- Confidence scoring helper --
-function calculateConfidence(sources: SourceHit[], finalRisk: RiskLevel, isLocalMatch: boolean): number {
-  const hitCount = sources.filter(s => s.hit).length;
-  let confidence = 0;
-  if (isLocalMatch) confidence += 40;
-  // Each OSINT feed hit adds confidence
-  confidence += hitCount * 20;
-  // Known malicious from any source = high confidence
-  if (finalRisk === 'known_malicious') confidence = Math.max(confidence, 80);
-  // Multiple feed corroboration boosts confidence
-  if (hitCount >= 3) confidence = Math.max(confidence, 95);
-  if (hitCount >= 2) confidence = Math.max(confidence, 75);
-  // Unknown with no hits = low confidence
-  if (finalRisk === 'unknown' && hitCount === 0) confidence = 10;
-  // Low risk from local IOC = moderate confidence
-  if (finalRisk === 'low_risk' && isLocalMatch) confidence = Math.max(confidence, 60);
-  return Math.min(confidence, 100);
+// -- AlienVault OTX --
+async function checkAlienVaultOTX(hostname: string): Promise<SourceHit> {
+  const apiKey = process.env.ALIENVAULT_OTX_API_KEY;
+  try {
+    const headers: Record<string, string> = { 'User-Agent': 'NextGuard-ThreatIntel/3.0' };
+    if (apiKey) headers['X-OTX-API-KEY'] = apiKey;
+    const res = await fetch(`https://otx.alienvault.com/api/v1/indicators/domain/${hostname}/general`, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return { name: 'alienvault_otx', hit: false, detail: `OTX API returned ${res.status}` };
+    const data = await res.json();
+    const pulseCount = data.pulse_info?.count || 0;
+    const hasReputation = data.reputation !== undefined && data.reputation !== null;
+    const hit = pulseCount > 0;
+    let risk: RiskLevel = 'unknown';
+    if (pulseCount >= 10) risk = 'known_malicious';
+    else if (pulseCount >= 5) risk = 'high_risk';
+    else if (pulseCount >= 2) risk = 'medium_risk';
+    else if (pulseCount >= 1) risk = 'low_risk';
+    const categories: string[] = [];
+    if (data.pulse_info?.pulses) {
+      for (const pulse of data.pulse_info.pulses.slice(0, 5)) {
+        if (pulse.tags) pulse.tags.forEach((t: string) => { const lt = t.toLowerCase(); if (!categories.includes(lt)) categories.push(lt); });
+      }
+    }
+    return {
+      name: 'alienvault_otx',
+      hit,
+      risk_level: risk,
+      categories: categories.slice(0, 5),
+      flags: hit ? [`otx_${pulseCount}_pulses`] : [],
+      detail: hit ? `AlienVault OTX: ${pulseCount} threat pulses${hasReputation ? ', reputation: ' + data.reputation : ''}` : 'Not found in AlienVault OTX',
+    };
+  } catch (e: any) {
+    return { name: 'alienvault_otx', hit: false, detail: 'OTX API error: ' + e.message };
+  }
 }
 
-// -- Main check function --
-export async function checkUrl(url: string): Promise<ThreatIntelResult> {
+// -- Cloudflare DNS Security Check (1.1.1.2 family filter) --
+async function checkCloudflareDNS(hostname: string): Promise<SourceHit> {
+  try {
+    // Use Cloudflare's security DNS (1.1.1.2) via DoH
+    const res = await fetch(`https://security.cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
+      headers: { 'Accept': 'application/dns-json' },
+      signal: AbortSignal.timeout(3000),
+    });
+    const data = await res.json();
+    // If Cloudflare blocks a domain, it returns 0.0.0.0 or NXDOMAIN
+    const blocked = data.Status === 3 || // NXDOMAIN
+      (data.Answer && data.Answer.some((a: any) => a.data === '0.0.0.0')) ||
+      (!data.Answer && data.Status === 0 && data.Authority);
+    // Also check against 1.1.1.1 (normal) to see if it's specifically blocked
+    let normalResolves = true;
+    if (blocked) {
+      try {
+        const normalRes = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
+          headers: { 'Accept': 'application/dns-json' },
+          signal: AbortSignal.timeout(3000),
+        });
+        const normalData = await normalRes.json();
+        normalResolves = normalData.Answer && normalData.Answer.length > 0;
+      } catch { normalResolves = true; }
+    }
+    const isBlocked = blocked && normalResolves; // blocked by security DNS but resolves normally
+    return {
+      name: 'cloudflare_dns',
+      hit: isBlocked,
+      risk_level: isBlocked ? 'high_risk' : 'unknown',
+      categories: isBlocked ? ['dns_blocked'] : [],
+      flags: isBlocked ? ['cf_dns_blocked'] : [],
+      detail: isBlocked ? 'Blocked by Cloudflare security DNS (1.1.1.2)' : 'Not blocked by Cloudflare DNS',
+    };
+  } catch (e: any) {
+    return { name: 'cloudflare_dns', hit: false, detail: 'DNS check error: ' + e.message };
+  }
+
+  // ============================================
+// Feed Refresh & Cache Management
+// ============================================
+
+let feedCache: {
+  phishtank: Set<string>;
+  urlhaus: { domains: Set<string>; urls: Set<string> };
+  openphish: Set<string>;
+  phishingArmy: Set<string>;
+  lastRefresh: number;
+} | null = null;
+
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function refreshFeeds(): Promise<void> {
+  const now = Date.now();
+  if (feedCache && (now - feedCache.lastRefresh) < CACHE_TTL) return;
+
+  console.log('[ThreatIntel] Refreshing threat feeds...');
+  const [phishtank, urlhaus, openphish, phishingArmy] = await Promise.all([
+    loadPhishTank(),
+    loadPhishTank(), // placeholder - urlhaus
+    loadOpenPhish(),
+    loadPhishingArmy(),
+  ]);
+
+  // Load URLhaus separately since it returns { domains, urls }
+  const urlhausData = await loadPhishTank();
+
+  feedCache = {
+    phishtank,
+    urlhaus: { domains: new Set<string>(), urls: new Set<string>() },
+    openphish,
+    phishingArmy,
+    lastRefresh: now,
+  };
+
+  // Try loading URLhaus properly
+  try {
+    const uh = await loadUrlhaus();
+    feedCache.urlhaus = uh;
+  } catch (e) {
+    console.warn('[ThreatIntel] URLhaus load failed:', e);
+  }
+
+  console.log(`[ThreatIntel] Feeds refreshed: PhishTank=${phishtank.size}, OpenPhish=${openphish.size}, PhishingArmy=${phishingArmy.size}, URLhaus=${feedCache.urlhaus.domains.size} domains`);
+}
+
+async function ensureCache() {
+  if (!feedCache) await refreshFeeds();
+}
+
+// ============================================
+// Main URL Check - Aggregated Multi-Source
+// ============================================
+
+export interface ThreatCheckResult {
+  url: string;
+  domain: string;
+  risk_level: 'high_risk' | 'medium_risk' | 'low_risk' | 'safe';
+  categories: string[];
+  flags: string[];
+  sources: {
+    name: string;
+    hit: boolean;
+    risk_level?: string;
+    detail?: string;
+  }[];
+  overall_score: number; // 0-100
+  checked_at: string;
+}
+
+export async function checkUrl(inputUrl: string): Promise<ThreatCheckResult> {
   await ensureCache();
 
-  let hostname = '';
-  let normalizedUrl = url.toLowerCase().trim();
+  let url = inputUrl.trim().toLowerCase();
+  if (!url.startsWith('http')) url = 'https://' + url;
+
+  let domain = '';
   try {
-    hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    domain = new URL(url).hostname;
   } catch {
-    return {
-      url,
-      final: {
-        risk_level: 'unknown',
-        categories: ['invalid_url'],
-        flags: [],
-        reason: 'Invalid URL format',
-        confidence: 0,
-      },
-      sources: [],
-      timestamp: new Date().toISOString(),
-    };
+    domain = url.replace(/^https?:\/\//, '').split('/')[0];
   }
 
-  const sources: SourceHit[] = [];
+  const sources: ThreatCheckResult['sources'] = [];
+  const categories: Set<string> = new Set();
+  const flags: Set<string> = new Set();
 
-  // 1. Local IOC check (highest priority)
-  const localMatch = LOCAL_IOC[hostname] || LOCAL_IOC[url];
+  // 1. Check known domains from hardcoded list
+  const knownResult = checkKnownDomain(domain);
   sources.push({
-    name: 'nextguard_local_ioc',
-    hit: !!localMatch,
-    risk_level: localMatch?.risk_level,
-    categories: localMatch?.categories,
-    flags: localMatch ? ['local_ioc'] : [],
+    name: 'known_domains',
+    hit: knownResult.risk_level !== 'unknown',
+    risk_level: knownResult.risk_level,
+    detail: knownResult.category,
   });
-
-  // 2. URLhaus check
-  const urlhausHit = cache.urlhaus.has(hostname);
-  sources.push({
-    name: 'urlhaus',
-    hit: urlhausHit,
-    risk_level: urlhausHit ? 'known_malicious' : 'unknown',
-    categories: urlhausHit ? ['malware'] : [],
-    flags: urlhausHit ? ['osint_urlhaus'] : [],
-    detail: urlhausHit ? 'Listed in URLhaus malware feed (abuse.ch)' : undefined,
-  });
-
-  // 3. Phishing Army check
-  const phishArmyHit = cache.phishingArmy.has(hostname);
-  sources.push({
-    name: 'phishing_army',
-    hit: phishArmyHit,
-    risk_level: phishArmyHit ? 'high_risk' : 'unknown',
-    categories: phishArmyHit ? ['phishing'] : [],
-    flags: phishArmyHit ? ['osint_phishing_army'] : [],
-    detail: phishArmyHit ? 'Listed in Phishing Army blocklist' : undefined,
-  });
-
-  // 4. OpenPhish check
-  const openPhishHit = cache.openphish.has(hostname);
-  sources.push({
-    name: 'openphish',
-    hit: openPhishHit,
-    risk_level: openPhishHit ? 'high_risk' : 'unknown',
-    categories: openPhishHit ? ['phishing'] : [],
-    flags: openPhishHit ? ['osint_openphish'] : [],
-    detail: openPhishHit ? 'Listed in OpenPhish community feed' : undefined,
-  });
-
-  // 5. PhishTank check (domain + exact URL match)
-  const phishtankDomainHit = cache.phishtank.has(hostname);
-  const phishtankUrlHit = cache.phishtankUrls.has(normalizedUrl);
-  const phishtankHit = phishtankDomainHit || phishtankUrlHit;
-  sources.push({
-    name: 'phishtank',
-    hit: phishtankHit,
-    risk_level: phishtankHit ? (phishtankUrlHit ? 'known_malicious' : 'high_risk') : 'unknown',
-    categories: phishtankHit ? ['phishing'] : [],
-    flags: phishtankHit ? (phishtankUrlHit ? ['osint_phishtank', 'exact_url_match'] : ['osint_phishtank']) : [],
-    detail: phishtankHit ? (phishtankUrlHit ? 'Exact URL match in PhishTank verified database' : 'Domain listed in PhishTank verified database') : undefined,
-  });
-
-  // -- Aggregation logic --
-  let final_risk: RiskLevel = 'unknown';
-  const final_categories: string[] = [];
-  const final_flags: string[] = [];
-  const reasons: string[] = [];
-
-  // Rule 1: Local IOC override
-  if (localMatch) {
-    final_risk = localMatch.risk_level;
-    final_categories.push(...localMatch.categories);
-    final_flags.push('customer_override', 'local_ioc');
-    reasons.push('Matched Nextguard local IOC list');
+  if (knownResult.risk_level !== 'unknown') {
+    categories.add(knownResult.category);
+    flags.push && flags.add('known_domain');
   }
 
-  // Rule 2: URLhaus = known_malicious
-  if (urlhausHit) {
-    final_risk = maxRisk(final_risk, 'known_malicious');
-    if (!final_categories.includes('malware')) final_categories.push('malware');
-    final_flags.push('osint_urlhaus');
-    reasons.push('Listed in URLhaus malware feed');
-  }
+  // 2. PhishTank feed
+  const inPhishTank = feedCache?.phishtank.has(domain) || feedCache?.phishtank.has(url) || false;
+  sources.push({ name: 'phishtank', hit: inPhishTank, detail: inPhishTank ? 'Found in PhishTank active phishing DB' : undefined });
+  if (inPhishTank) { categories.add('phishing'); flags.add('phishtank_hit'); }
 
-  // Rule 3: PhishTank exact URL match = known_malicious
-  if (phishtankUrlHit) {
-    final_risk = maxRisk(final_risk, 'known_malicious');
-    if (!final_categories.includes('phishing')) final_categories.push('phishing');
-    final_flags.push('osint_phishtank', 'exact_url_match');
-    reasons.push('Exact URL match in PhishTank verified database');
-  } else if (phishtankDomainHit) {
-    final_risk = maxRisk(final_risk, 'high_risk');
-    if (!final_categories.includes('phishing')) final_categories.push('phishing');
-    final_flags.push('osint_phishtank');
-    reasons.push('Domain found in PhishTank verified database');
-  }
+  // 3. URLhaus feed
+  const inUrlhaus = feedCache?.urlhaus.domains.has(domain) || feedCache?.urlhaus.urls.has(url) || false;
+  sources.push({ name: 'urlhaus', hit: inUrlhaus, detail: inUrlhaus ? 'Found in URLhaus malware URL DB' : undefined });
+  if (inUrlhaus) { categories.add('malware'); flags.add('urlhaus_hit'); }
 
-  // Rule 4: Multi-source phishing corroboration
-  const phishingSources = [openPhishHit, phishArmyHit, phishtankDomainHit].filter(Boolean).length;
-  if (phishingSources >= 2) {
-    final_risk = maxRisk(final_risk, 'known_malicious');
-    if (!final_categories.includes('phishing')) final_categories.push('phishing');
-    final_flags.push('multi_source_corroboration');
-    reasons.push(`Corroborated across ${phishingSources} phishing feeds`);
-  } else if (openPhishHit && !phishtankHit) {
-    final_risk = maxRisk(final_risk, 'high_risk');
-    if (!final_categories.includes('phishing')) final_categories.push('phishing');
-    final_flags.push('osint_openphish');
-    reasons.push('Listed in OpenPhish community feed');
-  } else if (phishArmyHit && !phishtankHit) {
-    final_risk = maxRisk(final_risk, 'high_risk');
-    if (!final_categories.includes('phishing')) final_categories.push('phishing');
-    final_flags.push('osint_phishing_army');
-    reasons.push('Listed in Phishing Army blocklist');
-  }
+  // 4. OpenPhish feed
+  const inOpenPhish = feedCache?.openphish.has(url) || false;
+  sources.push({ name: 'openphish', hit: inOpenPhish, detail: inOpenPhish ? 'Found in OpenPhish feed' : undefined });
+  if (inOpenPhish) { categories.add('phishing'); flags.add('openphish_hit'); }
 
-  // Rule 5: Greylist heuristics (only if no hits from feeds or local IOC)
-  if (final_risk === 'unknown') {
-    const hasSuspiciousTld = SUSPICIOUS_TLDS.some(t => hostname.endsWith(t));
-    const hasMaliciousKeyword = SUSPICIOUS_KEYWORDS.some(k => hostname.includes(k));
-    const isOnFreeHost = FREEHOST_PATTERNS.some(p => hostname.endsWith(p));
+  // 5. Phishing Army feed
+  const inPhishArmy = feedCache?.phishingArmy.has(domain) || false;
+  sources.push({ name: 'phishing_army', hit: inPhishArmy, detail: inPhishArmy ? 'Found in Phishing Army blocklist' : undefined });
+  if (inPhishArmy) { categories.add('phishing'); flags.add('phishing_army_hit'); }
 
-    if (hasMaliciousKeyword) {
-      final_risk = 'high_risk';
-      final_categories.push('suspicious');
-      final_flags.push('greylist', 'malicious_keyword');
-      reasons.push('Domain contains malicious keyword pattern');
-    } else if (hasSuspiciousTld && isOnFreeHost) {
-      final_risk = 'high_risk';
-      final_categories.push('suspicious');
-      final_flags.push('greylist', 'suspicious_tld', 'free_hosting');
-      reasons.push('Suspicious TLD on free hosting platform');
-    } else if (hasSuspiciousTld) {
-      final_risk = 'medium_risk';
-      final_categories.push('suspicious');
-      final_flags.push('greylist', 'suspicious_tld');
-      reasons.push('Domain uses high-risk TLD with no positive reputation');
-    } else if (isOnFreeHost) {
-      final_risk = 'medium_risk';
-      final_categories.push('suspicious');
-      final_flags.push('greylist', 'free_hosting');
-      reasons.push('Hosted on commonly-abused free hosting platform');
+  // 6. Google Safe Browsing (async)
+  try {
+    const gsb = await checkGoogleSafeBrowsing(url);
+    sources.push(gsb);
+    if (gsb.hit) {
+      categories.add('google_flagged');
+      flags.add('gsb_hit');
+    }
+  } catch { sources.push({ name: 'google_safe_browsing', hit: false, detail: 'API error' }); }
+
+  // 7. VirusTotal (async)
+  try {
+    const vt = await checkVirusTotal(url);
+    sources.push(vt);
+    if (vt.hit) {
+      categories.add('virustotal_flagged');
+      flags.add('vt_hit');
+    }
+  } catch { sources.push({ name: 'virustotal', hit: false, detail: 'API error' }); }
+
+  // 8. Cloudflare DNS (async)
+  try {
+    const cf = await checkCloudflareDns(domain);
+    sources.push(cf);
+    if (cf.hit) {
+      categories.add('dns_blocked');
+      flags.add('cf_dns_blocked');
+    }
+  } catch { sources.push({ name: 'cloudflare_dns', hit: false, detail: 'API error' }); }
+
+  // Calculate overall risk score
+  const hitCount = sources.filter(s => s.hit).length;
+  const totalSources = sources.length;
+  let score = 0;
+
+  // Weight: feed hits = 15 each, API hits = 20 each, known domain = 10
+  for (const s of sources) {
+    if (!s.hit) continue;
+    switch (s.name) {
+      case 'google_safe_browsing': score += 25; break;
+      case 'virustotal': score += 20; break;
+      case 'cloudflare_dns': score += 20; break;
+      case 'phishtank': score += 15; break;
+      case 'urlhaus': score += 15; break;
+      case 'openphish': score += 15; break;
+      case 'phishing_army': score += 10; break;
+      case 'known_domains': score += 10; break;
+      default: score += 10;
     }
   }
 
-  // Deduplicate
-  const uniqueFlags = [...new Set(final_flags)];
-  const uniqueCategories = final_categories.length > 0 ? [...new Set(final_categories)] : ['uncategorized'];
-  const confidence = calculateConfidence(sources, final_risk, !!localMatch);
+  score = Math.min(score, 100);
+
+  // Determine risk level
+  let risk_level: ThreatCheckResult['risk_level'] = 'safe';
+  if (score >= 50) risk_level = 'high_risk';
+  else if (score >= 25) risk_level = 'medium_risk';
+  else if (score >= 10) risk_level = 'low_risk';
 
   return {
-    url,
-    final: {
-      risk_level: final_risk,
-      categories: uniqueCategories,
-      flags: uniqueFlags,
-      reason: reasons.length > 0 ? reasons.join('; ') : 'No evidence of malicious activity in OSINT feeds',
-      confidence,
-    },
+    url: inputUrl,
+    domain,
+    risk_level,
+    categories: Array.from(categories),
+    flags: Array.from(flags),
     sources,
-    timestamp: new Date().toISOString(),
+    overall_score: score,
+    checked_at: new Date().toISOString(),
   };
 }
 
-// -- Feed status (for health check) --
-export function getFeedStatus() {
-  return {
-    lastUpdated: cache.lastUpdated ? new Date(cache.lastUpdated).toISOString() : null,
-    counts: {
-      urlhaus: cache.urlhaus.size,
-      phishingArmy: cache.phishingArmy.size,
-      openphish: cache.openphish.size,
-      phishtank: cache.phishtank.size,
-      phishtankUrls: cache.phishtankUrls.size,
-      localIoc: Object.keys(LOCAL_IOC).length,
-    },
-    errors: cache.feedErrors,
-  };
+// Helper: check known domain from hardcoded list
+function checkKnownDomain(domain: string): { risk_level: string; category: string } {
+  for (const [key, val] of Object.entries(KNOWN_DOMAINS)) {
+    if (domain === key || domain.endsWith('.' + key)) {
+      return { risk_level: (val as any).risk_level, category: (val as any).category };
+    }
+  }
+  return { risk_level: 'unknown', category: 'uncategorized' };
+}
+
+// Export feed refresh for manual trigger
+export { refreshFeeds, ensureCache };
 }
