@@ -220,10 +220,11 @@ export async function POST(request: NextRequest) {
       );
       const summary = {
         total: results.length,
+        known_malicious: results.filter(r => r.risk_level === 'known_malicious').length,
         high_risk: results.filter(r => r.risk_level === 'high_risk').length,
         medium_risk: results.filter(r => r.risk_level === 'medium_risk').length,
         low_risk: results.filter(r => r.risk_level === 'low_risk').length,
-        safe: results.filter(r => r.risk_level === 'safe').length,
+        unknown: results.filter(r => r.risk_level === 'unknown').length,
       };
       return NextResponse.json({
         mode: 'batch-url-check', summary, results,
