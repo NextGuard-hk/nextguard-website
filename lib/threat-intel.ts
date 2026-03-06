@@ -230,8 +230,8 @@ async function loadPhishTank(): Promise<{ domains: Set<string>; urls: Set<string
   
   // Try multiple PhishTank feed sources
   const feedUrls = [
-    'https://data.phishtank.com/data/online-valid.csv',
-    'http://data.phishtank.com/data/online-valid.csv',
+    `https://data.phishtank.com/data/${process.env.PHISHTANK_API_KEY || ''}/online-valid.csv`,
+    'https://data.phishtank.com/data/${process.env.PHISHTANK_API_KEY}/online-valid.csv',
     'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt',
   ];
   
