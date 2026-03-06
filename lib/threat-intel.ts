@@ -553,4 +553,104 @@ export function getFeedStatus() {
   };
 }
 
+
+// Fast batch URL check - feeds + local only, no external API calls
+export async function checkUrlFast(inputUrl: string): Promise<ThreatIntelResult> {
+  await refreshFeeds();
+  let url = inputUrl.trim().toLowerCase();
+  if (!url.startsWith('http')) url = 'https://' + url;
+  let domain = '';
+  try { domain = new URL(url).hostname; } catch { domain = url.replace(/^https?:\/\//, '').split('/')[0]; }
+
+  const sources: SourceHit[] = [];
+  const allCategories: Set<string> = new Set();
+  const allFlags: Set<string> = new Set();
+
+  // 1. Local IOC
+  const localMatch = LOCAL_IOC[domain];
+  if (localMatch) {
+    sources.push({ name: 'known_domains', hit: true, risk_level: localMatch.risk_level, categories: localMatch.categories, detail: localMatch.categories.join(', ') });
+    localMatch.categories.forEach(c => allCategories.add(c));
+    allFlags.add('known_domain');
+  } else {
+    let found = false;
+    for (const [key, val] of Object.entries(LOCAL_IOC)) {
+      if (domain.endsWith('.' + key)) {
+        sources.push({ name: 'known_domains', hit: true, risk_level: val.risk_level, categories: val.categories, detail: val.categories.join(', ') });
+        val.categories.forEach(c => allCategories.add(c));
+        allFlags.add('known_domain');
+        found = true; break;
+      }
+    }
+    if (!found) sources.push({ name: 'known_domains', hit: false, detail: 'Clean' });
+  }
+
+  // 2. Suspicious TLD/keyword
+  const hasSuspiciousTld = SUSPICIOUS_TLDS.some(t => domain.endsWith(t));
+  const hasSuspiciousKw = SUSPICIOUS_KEYWORDS.some(k => domain.includes(k));
+  if (hasSuspiciousTld || hasSuspiciousKw) {
+    sources.push({ name: 'heuristic', hit: true, detail: hasSuspiciousTld ? 'Suspicious TLD' : 'Suspicious keyword' });
+    allFlags.add('heuristic_hit');
+  }
+
+  // 3. Pattern analysis
+  const patternAnalysis = analyzeDomainPattern(domain, url);
+  if (patternAnalysis.score > 0) {
+    sources.push({ name: 'pattern_analysis', hit: true, detail: patternAnalysis.detail });
+    patternAnalysis.flags.forEach(f => allFlags.add(f));
+  }
+
+  // 4. Feed checks
+  const inUrlhaus = cache.urlhaus.has(domain);
+  sources.push({ name: 'urlhaus', hit: inUrlhaus, detail: inUrlhaus ? 'Found in URLhaus' : 'Clean' });
+  if (inUrlhaus) { allCategories.add('malware'); allFlags.add('urlhaus_hit'); }
+
+  const inPhishArmy = cache.phishingArmy.has(domain);
+  sources.push({ name: 'phishing_army', hit: inPhishArmy, detail: inPhishArmy ? 'Found in Phishing Army' : 'Clean' });
+  if (inPhishArmy) { allCategories.add('phishing'); allFlags.add('phishing_army_hit'); }
+
+  const inOpenPhish = cache.openphish.has(domain);
+  sources.push({ name: 'openphish', hit: inOpenPhish, detail: inOpenPhish ? 'Found in OpenPhish' : 'Clean' });
+  if (inOpenPhish) { allCategories.add('phishing'); allFlags.add('openphish_hit'); }
+
+  const inPhishTank = cache.phishtankDomains.has(domain) || cache.phishtankDomains.has(domain.replace(/^www\./, ''));
+  sources.push({ name: 'phishtank', hit: inPhishTank, detail: inPhishTank ? 'Found in PhishTank' : 'Clean' });
+  if (inPhishTank) { allCategories.add('phishing'); allFlags.add('phishtank_hit'); }
+
+  // Score calculation (no API sources)
+  let score = 0;
+  for (const s of sources) {
+    if (!s.hit) continue;
+    switch (s.name) {
+      case 'phishtank': score += 15; break;
+      case 'urlhaus': score += 15; break;
+      case 'openphish': score += 15; break;
+      case 'phishing_army': score += 10; break;
+      case 'known_domains': {
+        const rl = s.risk_level;
+        if (rl === 'known_malicious') score += 30;
+        else if (rl === 'high_risk') score += 20;
+        else if (rl === 'medium_risk') score += 10;
+        else score += 5;
+        break;
+      }
+      case 'heuristic': score += 5; break;
+      case 'pattern_analysis': score += patternAnalysis.score; break;
+      default: score += 10;
+    }
+  }
+  score = Math.min(score, 100);
+
+  let risk_level: RiskLevel = 'unknown';
+  if (score >= 50) risk_level = 'known_malicious';
+  else if (score >= 30) risk_level = 'high_risk';
+  else if (score >= 15) risk_level = 'medium_risk';
+  else if (score >= 5) risk_level = 'low_risk';
+
+  return {
+    url: inputUrl, domain, risk_level, overall_score: score,
+    categories: Array.from(allCategories), flags: Array.from(allFlags),
+    sources, checked_at: new Date().toISOString(),
+  };
+}
 export { refreshFeeds };
