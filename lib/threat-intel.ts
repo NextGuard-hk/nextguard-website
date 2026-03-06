@@ -3,7 +3,7 @@
 // Integrates: URLhaus, Phishing Army, OpenPhish, PhishTank,
 // Google Safe Browsing, VirusTotal, AlienVault OTX, Cloudflare DNS
 
-export type RiskLevel = 'known_malicious' | 'high_risk' | 'medium_risk' | 'low_risk' | 'unknown';
+export type RiskLevel = 'known_malicious' | 'high_risk' | 'medium_risk' | 'low_risk' | 'clean' | 'unknown';
 
 export interface SourceHit {
   name: string;
@@ -529,7 +529,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   if (score >= 50) risk_level = 'known_malicious';
   else if (score >= 30) risk_level = 'high_risk';
   else if (score >= 15) risk_level = 'medium_risk';
-  else if (score >= 5) risk_level = 'low_risk';
+  else if (score >= 5) risk_level = 'low_risk';   else if (score === 0 && cache.lastUpdated > 0) risk_level = 'clean';
 
   return {
     url: inputUrl, domain, risk_level, overall_score: score,
@@ -645,7 +645,7 @@ export async function checkUrlFast(inputUrl: string): Promise<ThreatIntelResult>
   if (score >= 50) risk_level = 'known_malicious';
   else if (score >= 30) risk_level = 'high_risk';
   else if (score >= 15) risk_level = 'medium_risk';
-  else if (score >= 5) risk_level = 'low_risk';
+  else if (score >= 5) risk_level = 'low_risk';   else if (score === 0 && cache.lastUpdated > 0) risk_level = 'clean';
 
   return {
     url: inputUrl, domain, risk_level, overall_score: score,
