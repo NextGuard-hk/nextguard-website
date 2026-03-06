@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkUrl, getFeedStatus } from '@/lib/threat-intel';
+import { checkUrl, checkUrlFast, getFeedStatus } from '@/lib/threat-intel';
 
 // DLP Pattern Definitions - Enterprise Grade
 const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; description: string }[]> = {
