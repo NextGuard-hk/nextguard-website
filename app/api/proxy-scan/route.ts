@@ -204,20 +204,27 @@ export async function POST(request: NextRequest) {
       if (urls.length > 5000) {
         return NextResponse.json({ error: 'Max 5000 URLs per batch' }, { status: 400 });
       }
-      const results = await Promise.all(
-        urls.map(async (url: string) => {
-          const tiResult = await checkUrl(url);
-          return {
-            url,
-            domain: tiResult.domain,
-            risk_level: tiResult.risk_level,
-            overall_score: tiResult.overall_score,
-            categories: tiResult.categories,
-            flags: tiResult.flags,
-            sources: tiResult.sources.filter(s => s.hit).map(s => s.name),
-          };
-        })
-      );
+      // Process in chunks of 5 to avoid API rate limits
+      const CHUNK_SIZE = 5;
+      const results: any[] = [];
+      for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
+        const chunk = urls.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async (url: string) => {
+            const tiResult = await checkUrl(url);
+            return {
+              url,
+              domain: tiResult.domain,
+              risk_level: tiResult.risk_level,
+              overall_score: tiResult.overall_score,
+              categories: tiResult.categories,
+              flags: tiResult.flags,
+              sources: tiResult.sources.filter(s => s.hit).map(s => s.name),
+            };
+          })
+        );
+        results.push(...chunkResults);
+      }
       const summary = {
         total: results.length,
         known_malicious: results.filter(r => r.risk_level === 'known_malicious').length,
