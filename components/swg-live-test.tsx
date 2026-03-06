@@ -211,7 +211,7 @@ export default function SWGLiveTest() {
     const file = e.target.files?.[0];
     if (!file) return;
         if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+            const XLSX = await import('xlsx');
       const data = await file.arrayBuffer();
       const wb = XLSX.read(data, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
