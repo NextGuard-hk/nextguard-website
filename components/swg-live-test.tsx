@@ -315,7 +315,7 @@ export default function SWGLiveTest() {
         {results.length > 0 && (<div className="space-y-1 mb-4">{TEST_SCENARIOS.map(sc => { const r = results.find(x => x.id === sc.id); const isActive = activeTest === sc.id; return (<div key={sc.id} className="flex items-center gap-2 text-sm py-1"><span>{isActive ? '\u23F3' : r ? (r.pass ? '\u2705' : '\u274C') : '\u2B1C'}</span><span className="text-white">{sc.name}</span><span className="text-gray-500">{r ? `${r.status} (${r.latency}ms)` : 'pending'}</span></div>); })}</div>)}
 
         <hr className="border-gray-700 my-4" />
-        <h3 className="text-lg font-semibold text-white mb-3">Custom Test</h3>
+        <h3 className="text-lg font-semibold text-white mb-3">Custom Test</h3>       <p className="text-gray-400 text-sm mb-3">Single-URL deep analysis. Performs full URL canonicalization, redirect unfolding, live content fetch, and explainable threat verdicts for validation and investigation.</p>
         <div className="flex gap-2 mb-3">{['dlp-scan','proxy','url-check'].map(m => (<button key={m} onClick={() => setCustomMode(m)} className={`px-3 py-1 rounded text-sm ${customMode === m ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-400'}`}>{m === 'dlp-scan' ? 'Network DLP Scan' : m === 'proxy' ? 'Web Proxy' : 'URL Check'}</button>))}</div>
         {(customMode === 'proxy' || customMode === 'url-check') && (<input value={customUrl} onChange={e => setCustomUrl(e.target.value)} placeholder="https://target-url.com" className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />)}
         {customMode === 'dlp-scan' && (<textarea value={customContent} onChange={e => setCustomContent(e.target.value)} placeholder="Paste content to scan..." rows={3} className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />)}
@@ -389,7 +389,7 @@ export default function SWGLiveTest() {
 
         <hr className="border-gray-700 my-4" />
         <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
-        <p className="text-gray-400 text-sm mb-3">Enter one URL per line (max 5,000) or import from CSV/Excel. URLs are processed in batches of 100.</p>
+        <p className="text-gray-400 text-sm mb-3">High-throughput batch screening for large URL lists. Optimized for fast triage using reputation feeds (PhishTank, URLhaus, Phishing Army), heuristic rules, and scalable batch processing. Results may differ from Custom Test as Batch Check prioritizes speed over deep analysis. For definitive single-URL verdicts, use Custom Test above.</p>
         <div className="flex gap-2 mb-3">
           <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-purple-700 text-white rounded-lg text-sm font-medium hover:bg-purple-600">Import CSV / Excel</button>
           <input ref={fileInputRef} type="file" accept=".csv,.txt,.xls,.xlsx" onChange={handleFileImport} className="hidden" />
