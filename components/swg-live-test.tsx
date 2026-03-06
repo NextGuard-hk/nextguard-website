@@ -20,7 +20,7 @@ const RISK_COLORS: Record<string, { bg: string; text: string; border: string }> 
   known_malicious: { bg: 'bg-red-900/60', text: 'text-red-300', border: 'border-red-600' },
   high_risk: { bg: 'bg-orange-900/60', text: 'text-orange-300', border: 'border-orange-600' },
   medium_risk: { bg: 'bg-yellow-900/60', text: 'text-yellow-300', border: 'border-yellow-600' },
-  low_risk: { bg: 'bg-green-900/60', text: 'text-green-300', border: 'border-green-600' },
+  low_risk: { bg: 'bg-green-900/60', text: 'text-green-300', border: 'border-green-600' },   clean: { bg: 'bg-cyan-900/60', text: 'text-cyan-300', border: 'border-cyan-600' },
   unknown: { bg: 'bg-gray-800/60', text: 'text-gray-400', border: 'border-gray-600' },
 };
 
@@ -28,7 +28,7 @@ const RISK_LABELS: Record<string, string> = {
   known_malicious: 'Malicious',
   high_risk: 'High Risk',
   medium_risk: 'Medium Risk',
-  low_risk: 'Low Risk',
+  low_risk: 'Low Risk',   clean: 'Clean',
   unknown: 'Unknown',
 };
 
@@ -51,7 +51,7 @@ function RiskDonut({ summary }: { summary: any }) {
     { key: 'known_malicious', count: summary.known_malicious, color: '#ef4444' },
     { key: 'high_risk', count: summary.high_risk, color: '#f97316' },
     { key: 'medium_risk', count: summary.medium_risk, color: '#eab308' },
-    { key: 'low_risk', count: summary.low_risk, color: '#22c55e' },
+    { key: 'low_risk', count: summary.low_risk, color: '#22c55e' },     { key: 'clean', count: summary.clean || 0, color: '#06b6d4' },
     { key: 'unknown', count: summary.unknown, color: '#6b7280' },
   ];
   let cumulative = 0;
@@ -91,7 +91,7 @@ function RiskDonut({ summary }: { summary: any }) {
 
 // Batch results table with visual display
 function BatchResultsTable({ results, sortBy, setSortBy }: { results: any[]; sortBy: string; setSortBy: (s: string) => void }) {
-  const riskOrder: Record<string, number> = { known_malicious: 0, high_risk: 1, medium_risk: 2, low_risk: 3, unknown: 4 };
+  const riskOrder: Record<string, number> = { known_malicious: 0, high_risk: 1, medium_risk: 2, low_risk: 3, clean: 4, unknown: 5 };
   const sorted = [...results].sort((a, b) => {
     if (sortBy === 'risk') return (riskOrder[a.risk_level] ?? 5) - (riskOrder[b.risk_level] ?? 5);
     if (sortBy === 'url') return a.url.localeCompare(b.url);
@@ -253,12 +253,12 @@ export default function SWGLiveTest() {
       }
       const elapsed = (Date.now() - startTime) / 1000;
       setBatchElapsed(elapsed);
-      const summary = { total: allResults.length, known_malicious: 0, high_risk: 0, medium_risk: 0, low_risk: 0, unknown: 0 };
+      const summary = { total: allResults.length, known_malicious: 0, high_risk: 0, medium_risk: 0, low_risk: 0, clean: 0, unknown: 0 };
       allResults.forEach((r: any) => {
         if (r.risk_level === 'known_malicious') summary.known_malicious++;
         else if (r.risk_level === 'high_risk') summary.high_risk++;
         else if (r.risk_level === 'medium_risk') summary.medium_risk++;
-        else if (r.risk_level === 'low_risk') summary.low_risk++;
+        else if (r.risk_level === 'low_risk') summary.low_risk++;     else if (r.risk_level === 'clean') summary.clean++;
         else summary.unknown++;
       });
       setBatchResult({ mode: 'batch-url-check', summary, results: allResults, elapsed_seconds: elapsed, feedStatus: allResults[0]?.feedStatus });
@@ -434,8 +434,8 @@ export default function SWGLiveTest() {
                         <div className="text-xs text-orange-300">High Risk</div>
                       </div>
                       <div className="bg-green-900/30 border border-green-800 rounded-lg p-3 text-center">
-                        <div className="text-2xl font-bold text-green-400">{batchResult.summary.low_risk + batchResult.summary.unknown}</div>
-                        <div className="text-xs text-green-300">Safe / Unknown</div>
+                        <div className="text-2xl font-bold text-green-400">{(batchResult.summary.low_risk || 0) + (batchResult.summary.clean || 0)}</div>
+                        <div className="text-xs text-green-300">Safe / Clean</div>
                       </div>
                     </div>
                   </div>
@@ -451,7 +451,7 @@ export default function SWGLiveTest() {
               </div>
               {batchView === 'table' && (
                 <div className="flex gap-1">
-                  {['all', 'known_malicious', 'high_risk', 'medium_risk', 'low_risk', 'unknown'].map(f => (
+                  {['all', 'known_malicious', 'high_risk', 'medium_risk', 'low_risk', 'clean', 'unknown'].map(f => (
                     <button key={f} onClick={() => setBatchFilter(f)} className={`px-2 py-1 rounded text-xs ${batchFilter === f ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}>
                       {f === 'all' ? `All (${batchResult.summary.total})` : `${RISK_LABELS[f]} (${batchResult.summary[f] || 0})`}
                     </button>
