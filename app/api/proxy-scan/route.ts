@@ -231,7 +231,8 @@ export async function POST(request: NextRequest) {
         high_risk: results.filter(r => r.risk_level === 'high_risk').length,
         medium_risk: results.filter(r => r.risk_level === 'medium_risk').length,
         low_risk: results.filter(r => r.risk_level === 'low_risk').length,
-        unknown: results.filter(r => r.risk_level === 'unknown').length,
+        clean: results.filter(r => r.risk_level === 'clean').length,       unknown: results.filter(r => r.risk_level === 'unknown').length,
+              unknown: results.filter(r => r.risk_level === 'unknown').length,
       };
       return NextResponse.json({
         mode: 'batch-url-check', summary, results,
