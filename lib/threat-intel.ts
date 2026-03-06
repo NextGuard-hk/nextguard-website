@@ -1,5 +1,5 @@
 // lib/threat-intel.ts
-// NextGuard OSINT Threat Intelligence Engine v3.0
+// NextGuard OSINT Threat Intelligence Engine v3.1
 // Integrates: URLhaus, Phishing Army, OpenPhish, PhishTank,
 // Google Safe Browsing, VirusTotal, AlienVault OTX, Cloudflare DNS
 
@@ -105,13 +105,95 @@ const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: string[] }>
   'wordpress.com': { risk_level: 'low_risk', categories: ['blogging'] },
 };
 
-const SUSPICIOUS_TLDS = ['.xyz','.top','.club','.click','.loan','.win','.gq','.ml','.cf','.ga','.tk','.pw','.icu','.buzz','.monster'];
-const SUSPICIOUS_KEYWORDS = ['malware','phish','exploit','botnet','ransom','trojan','spyware','login-verify','secure-update','account-confirm'];
+const SUSPICIOUS_TLDS = ['.xyz','.top','.club','.click','.loan','.win','.gq','.ml','.cf','.ga','.tk','.pw','.icu','.buzz','.monster','.rest','.fit','.surf','.bar','.bond','.sbs','.cfd'];
+const SUSPICIOUS_KEYWORDS = ['malware','phish','exploit','botnet','ransom','trojan','spyware','login-verify','secure-update','account-confirm','signin','verify-account','security-alert','update-now','free-prize','crypto-giveaway'];
+
+// Enhanced URL shortener detection
+const URL_SHORTENERS = ['bit.ly','t.co','tinyurl.com','goo.gl','ow.ly','is.gd','buff.ly','rebrand.ly','bl.ink','short.io','l.wl.co','l.ead.me','qr-codes.io','rb.gy','cutt.ly','shorturl.at'];
+
+// Enhanced domain pattern analysis
+function analyzeDomainPattern(domain: string, url: string): { score: number; flags: string[]; detail: string } {
+  let score = 0;
+  const flags: string[] = [];
+  const details: string[] = [];
+
+  // Check URL shorteners (phishing often uses these)
+  const isShortener = URL_SHORTENERS.some(s => domain === s || domain.endsWith('.' + s));
+  if (isShortener) {
+    score += 10;
+    flags.push('url_shortener');
+    details.push('URL shortener detected');
+  }
+
+  // Check for IP address as domain
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(domain)) {
+    score += 15;
+    flags.push('ip_address_url');
+    details.push('IP address used as domain');
+  }
+
+  // Check for excessive subdomains (e.g., login.paypal.com.evil.xyz)
+  const parts = domain.split('.');
+  if (parts.length >= 4) {
+    score += 8;
+    flags.push('excessive_subdomains');
+    details.push(`${parts.length} subdomain levels`);
+  }
+
+  // Check for brand impersonation patterns
+  const brands = ['paypal','google','microsoft','apple','amazon','netflix','facebook','instagram','whatsapp','telegram','dhl','fedex','usps','bank','secure','login','verify','account','update','confirm','wallet','crypto','bitcoin'];
+  const domainLower = domain.toLowerCase();
+  const hasBrandInSubdomain = brands.some(b => {
+    const idx = domainLower.indexOf(b);
+    if (idx < 0) return false;
+    // Check if brand is NOT in the actual registered domain (i.e., it's in a subdomain)
+    const tldParts = domain.split('.');
+    const registeredDomain = tldParts.slice(-2).join('.');
+    return !registeredDomain.includes(b) && domainLower.includes(b);
+  });
+  if (hasBrandInSubdomain) {
+    score += 12;
+    flags.push('brand_impersonation');
+    details.push('Possible brand impersonation in subdomain');
+  }
+
+  // Check for very long domain names (common in phishing)
+  if (domain.length > 40) {
+    score += 5;
+    flags.push('long_domain');
+    details.push('Unusually long domain name');
+  }
+
+  // Check for random-looking domain (high entropy)
+  const baseDomain = parts.slice(0, -1).join('.');
+  const consonantRatio = (baseDomain.match(/[bcdfghjklmnpqrstvwxyz]/gi) || []).length / Math.max(baseDomain.length, 1);
+  if (consonantRatio > 0.75 && baseDomain.length > 8) {
+    score += 8;
+    flags.push('random_domain');
+    details.push('Random-looking domain name');
+  }
+
+  // Check for encoded/obfuscated URLs
+  if (url.includes('%') && (url.match(/%[0-9a-fA-F]{2}/g) || []).length > 3) {
+    score += 5;
+    flags.push('encoded_url');
+    details.push('Heavily encoded URL');
+  }
+
+  // Check for double extensions or suspicious paths
+  if (/\.(php|asp|cgi|exe|scr|bat|cmd|js|vbs)$/i.test(url)) {
+    score += 5;
+    flags.push('suspicious_extension');
+    details.push('Suspicious file extension in URL');
+  }
+
+  return { score, flags, detail: details.join('; ') };
+}
 
 // Feed loader helpers
 async function fetchTextFeed(url: string): Promise<string[]> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/3.0' } });
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/3.1' } });
     if (!res.ok) return [];
     const text = await res.text();
     return text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#'));
@@ -121,7 +203,9 @@ async function fetchTextFeed(url: string): Promise<string[]> {
 async function loadUrlhaus(): Promise<Set<string>> {
   const lines = await fetchTextFeed('https://urlhaus.abuse.ch/downloads/text_online/');
   const domains = new Set<string>();
-  for (const line of lines) { try { domains.add(new URL(line.startsWith('http') ? line : 'http://' + line).hostname); } catch {} }
+  for (const line of lines) {
+    try { domains.add(new URL(line.startsWith('http') ? line : 'http://' + line).hostname); } catch {}
+  }
   return domains;
 }
 
@@ -133,24 +217,76 @@ async function loadPhishingArmy(): Promise<Set<string>> {
 async function loadOpenPhish(): Promise<Set<string>> {
   const lines = await fetchTextFeed('https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt');
   const domains = new Set<string>();
-  for (const line of lines) { try { domains.add(new URL(line).hostname); } catch {} }
+  for (const line of lines) {
+    try { domains.add(new URL(line).hostname); } catch {}
+  }
   return domains;
 }
 
+// FIXED: PhishTank feed loader with multiple fallback sources and better CSV parsing
 async function loadPhishTank(): Promise<{ domains: Set<string>; urls: Set<string> }> {
   const domains = new Set<string>();
   const urls = new Set<string>();
-  try {
-    const res = await fetch('http://data.phishtank.com/data/online-valid.csv', { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/3.0' } });
-    if (!res.ok) return { domains, urls };
-    const text = await res.text();
-    for (const line of text.split('\n').slice(1)) {
-      try {
-        const urlMatch = line.match(/^\d+,([^,]+),/);
-        if (urlMatch?.[1]) { const u = urlMatch[1].trim().toLowerCase(); urls.add(u); try { domains.add(new URL(u).hostname.replace(/^www\./, '')); } catch {} }
-      } catch {}
+  
+  // Try multiple PhishTank feed sources
+  const feedUrls = [
+    'https://data.phishtank.com/data/online-valid.csv',
+    'http://data.phishtank.com/data/online-valid.csv',
+    'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt',
+  ];
+  
+  for (const feedUrl of feedUrls) {
+    try {
+      const res = await fetch(feedUrl, {
+        signal: AbortSignal.timeout(20000),
+        headers: { 'User-Agent': 'NextGuard-ThreatIntel/3.1' },
+        redirect: 'follow',
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      
+      if (feedUrl.includes('phishing-domains-ACTIVE')) {
+        // Plain text domain list fallback
+        for (const line of text.split('\n')) {
+          const d = line.trim().toLowerCase();
+          if (d && !d.startsWith('#') && d.includes('.')) {
+            domains.add(d.replace(/^www\./, ''));
+          }
+        }
+        if (domains.size > 0) break;
+      } else {
+        // CSV format from PhishTank
+        const lines = text.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+          try {
+            const line = lines[i];
+            if (!line || line.length < 10) continue;
+            // Handle CSV with possible quoted fields
+            let urlStr = '';
+            if (line.startsWith('"')) {
+              // CSV with quoted fields
+              const match = line.match(/^"?\d+"?,"?([^"\s,]+)"?/);
+              if (match?.[1]) urlStr = match[1].trim().toLowerCase();
+            } else {
+              const parts = line.split(',');
+              urlStr = (parts[1] || '').trim().toLowerCase().replace(/^"/,'').replace(/"$/,'');
+            }
+            if (urlStr && (urlStr.startsWith('http') || urlStr.includes('.'))) {
+              urls.add(urlStr);
+              try {
+                const hostname = new URL(urlStr.startsWith('http') ? urlStr : 'http://' + urlStr).hostname;
+                domains.add(hostname.replace(/^www\./, ''));
+              } catch {}
+            }
+          } catch {}
+        }
+        if (domains.size > 0) break;
+      }
+    } catch {
+      continue;
     }
-  } catch {}
+  }
+  
   return { domains, urls };
 }
 
@@ -185,14 +321,25 @@ async function checkGoogleSafeBrowsing(url: string): Promise<SourceHit> {
   if (!apiKey) return { name: 'google_safe_browsing', hit: false, detail: 'API key not configured' };
   try {
     const res = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client: { clientId: 'nextguard-swg', clientVersion: '3.0' }, threatInfo: { threatTypes: ['MALWARE','SOCIAL_ENGINEERING','UNWANTED_SOFTWARE','POTENTIALLY_HARMFUL_APPLICATION'], platformTypes: ['ANY_PLATFORM'], threatEntryTypes: ['URL'], threatEntries: [{ url }] } }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client: { clientId: 'nextguard-swg', clientVersion: '3.1' },
+        threatInfo: {
+          threatTypes: ['MALWARE','SOCIAL_ENGINEERING','UNWANTED_SOFTWARE','POTENTIALLY_HARMFUL_APPLICATION'],
+          platformTypes: ['ANY_PLATFORM'],
+          threatEntryTypes: ['URL'],
+          threatEntries: [{ url }]
+        }
+      }),
       signal: AbortSignal.timeout(5000),
     });
     const data = await res.json();
     const hasMatch = data.matches && data.matches.length > 0;
     return { name: 'google_safe_browsing', hit: hasMatch, risk_level: hasMatch ? 'known_malicious' : 'unknown', categories: hasMatch ? ['malware'] : [], detail: hasMatch ? 'Flagged by Google Safe Browsing' : 'Not flagged' };
-  } catch (e: any) { return { name: 'google_safe_browsing', hit: false, detail: 'API error: ' + e.message }; }
+  } catch (e: any) {
+    return { name: 'google_safe_browsing', hit: false, detail: 'API error: ' + e.message };
+  }
 }
 
 // VirusTotal API
@@ -201,7 +348,9 @@ async function checkVirusTotal(url: string): Promise<SourceHit> {
   if (!apiKey) return { name: 'virustotal', hit: false, detail: 'API key not configured' };
   try {
     const urlId = Buffer.from(url).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const res = await fetch(`https://www.virustotal.com/api/v3/urls/${urlId}`, { headers: { 'x-apikey': apiKey }, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(`https://www.virustotal.com/api/v3/urls/${urlId}`, {
+      headers: { 'x-apikey': apiKey }, signal: AbortSignal.timeout(8000)
+    });
     if (res.status === 404) return { name: 'virustotal', hit: false, detail: 'Not in VT database' };
     const data = await res.json();
     const stats = data.data?.attributes?.last_analysis_stats || {};
@@ -214,16 +363,23 @@ async function checkVirusTotal(url: string): Promise<SourceHit> {
     else if (malicious >= 2) risk = 'high_risk';
     else if (score >= 1) risk = 'medium_risk';
     return { name: 'virustotal', hit: score > 0, risk_level: risk, detail: `VT: ${malicious}/${total} engines flagged` };
-  } catch (e: any) { return { name: 'virustotal', hit: false, detail: 'API error: ' + e.message }; }
+  } catch (e: any) {
+    return { name: 'virustotal', hit: false, detail: 'API error: ' + e.message };
+  }
 }
 
-// AlienVault OTX
+// FIXED: AlienVault OTX - properly encode hostname and handle errors
 async function checkAlienVaultOTX(hostname: string): Promise<SourceHit> {
   const apiKey = process.env.ALIENVAULT_OTX_API_KEY;
   try {
-    const headers: Record<string, string> = { 'User-Agent': 'NextGuard-ThreatIntel/3.0' };
+    // Clean hostname - remove port, path, etc.
+    const cleanHost = hostname.replace(/[^a-zA-Z0-9.-]/g, '').toLowerCase();
+    if (!cleanHost || cleanHost.length < 3) return { name: 'alienvault_otx', hit: false, detail: 'Invalid hostname' };
+    const headers: Record<string, string> = { 'User-Agent': 'NextGuard-ThreatIntel/3.1' };
     if (apiKey) headers['X-OTX-API-KEY'] = apiKey;
-    const res = await fetch(`https://otx.alienvault.com/api/v1/indicators/domain/${hostname}/general`, { headers, signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`https://otx.alienvault.com/api/v1/indicators/domain/${encodeURIComponent(cleanHost)}/general`, {
+      headers, signal: AbortSignal.timeout(5000)
+    });
     if (!res.ok) return { name: 'alienvault_otx', hit: false, detail: `OTX returned ${res.status}` };
     const data = await res.json();
     const pulseCount = data.pulse_info?.count || 0;
@@ -234,29 +390,37 @@ async function checkAlienVaultOTX(hostname: string): Promise<SourceHit> {
     else if (pulseCount >= 2) risk = 'medium_risk';
     else if (pulseCount >= 1) risk = 'low_risk';
     return { name: 'alienvault_otx', hit, risk_level: risk, detail: hit ? `OTX: ${pulseCount} threat pulses` : 'Not in OTX' };
-  } catch (e: any) { return { name: 'alienvault_otx', hit: false, detail: 'OTX error: ' + e.message }; }
+  } catch (e: any) {
+    return { name: 'alienvault_otx', hit: false, detail: 'OTX error: ' + e.message };
+  }
 }
 
 // Cloudflare DNS Security Check (1.1.1.2)
 async function checkCloudflareDNS(hostname: string): Promise<SourceHit> {
   try {
-    const res = await fetch(`https://security.cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, { headers: { 'Accept': 'application/dns-json' }, signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`https://security.cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
+      headers: { 'Accept': 'application/dns-json' }, signal: AbortSignal.timeout(3000)
+    });
     const data = await res.json();
     const blocked = data.Status === 3 || (data.Answer && data.Answer.some((a: any) => a.data === '0.0.0.0')) || (!data.Answer && data.Status === 0 && data.Authority);
     let normalResolves = true;
     if (blocked) {
       try {
-        const nr = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, { headers: { 'Accept': 'application/dns-json' }, signal: AbortSignal.timeout(3000) });
+        const nr = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
+          headers: { 'Accept': 'application/dns-json' }, signal: AbortSignal.timeout(3000)
+        });
         const nd = await nr.json();
         normalResolves = nd.Answer && nd.Answer.length > 0;
       } catch { normalResolves = true; }
     }
     const isBlocked = blocked && normalResolves;
     return { name: 'cloudflare_dns', hit: isBlocked, risk_level: isBlocked ? 'high_risk' : 'unknown', categories: isBlocked ? ['dns_blocked'] : [], detail: isBlocked ? 'Blocked by Cloudflare 1.1.1.2' : 'Not blocked' };
-  } catch (e: any) { return { name: 'cloudflare_dns', hit: false, detail: 'DNS error: ' + e.message }; }
+  } catch (e: any) {
+    return { name: 'cloudflare_dns', hit: false, detail: 'DNS error: ' + e.message };
+  }
 }
 
-// Main URL Check - Multi-Source Aggregation
+// Main URL Check - Multi-Source Aggregation with Enhanced Heuristics
 export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   await refreshFeeds();
   let url = inputUrl.trim().toLowerCase();
@@ -275,15 +439,17 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
     localMatch.categories.forEach(c => allCategories.add(c));
     allFlags.add('known_domain');
   } else {
-    // Check parent domains
     let found = false;
     for (const [key, val] of Object.entries(LOCAL_IOC)) {
       if (domain.endsWith('.' + key)) {
         sources.push({ name: 'known_domains', hit: true, risk_level: val.risk_level, categories: val.categories, detail: val.categories.join(', ') });
-        val.categories.forEach(c => allCategories.add(c)); allFlags.add('known_domain'); found = true; break;
+        val.categories.forEach(c => allCategories.add(c));
+        allFlags.add('known_domain');
+        found = true;
+        break;
       }
     }
-    if (!found) sources.push({ name: 'known_domains', hit: false });
+    if (!found) sources.push({ name: 'known_domains', hit: false, detail: 'Clean' });
   }
 
   // 2. Suspicious TLD/keyword heuristics
@@ -294,24 +460,31 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
     allFlags.add('heuristic_hit');
   }
 
-  // 3. Feed checks
+  // 3. Enhanced domain pattern analysis (NEW)
+  const patternAnalysis = analyzeDomainPattern(domain, url);
+  if (patternAnalysis.score > 0) {
+    sources.push({ name: 'pattern_analysis', hit: true, detail: patternAnalysis.detail });
+    patternAnalysis.flags.forEach(f => allFlags.add(f));
+  }
+
+  // 4. Feed checks
   const inUrlhaus = cache.urlhaus.has(domain);
-  sources.push({ name: 'urlhaus', hit: inUrlhaus, detail: inUrlhaus ? 'Found in URLhaus' : undefined });
+  sources.push({ name: 'urlhaus', hit: inUrlhaus, detail: inUrlhaus ? 'Found in URLhaus' : 'Clean' });
   if (inUrlhaus) { allCategories.add('malware'); allFlags.add('urlhaus_hit'); }
 
   const inPhishArmy = cache.phishingArmy.has(domain);
-  sources.push({ name: 'phishing_army', hit: inPhishArmy, detail: inPhishArmy ? 'Found in Phishing Army' : undefined });
+  sources.push({ name: 'phishing_army', hit: inPhishArmy, detail: inPhishArmy ? 'Found in Phishing Army' : 'Clean' });
   if (inPhishArmy) { allCategories.add('phishing'); allFlags.add('phishing_army_hit'); }
 
   const inOpenPhish = cache.openphish.has(domain);
-  sources.push({ name: 'openphish', hit: inOpenPhish, detail: inOpenPhish ? 'Found in OpenPhish' : undefined });
+  sources.push({ name: 'openphish', hit: inOpenPhish, detail: inOpenPhish ? 'Found in OpenPhish' : 'Clean' });
   if (inOpenPhish) { allCategories.add('phishing'); allFlags.add('openphish_hit'); }
 
   const inPhishTank = cache.phishtankDomains.has(domain) || cache.phishtankDomains.has(domain.replace(/^www\./, ''));
-  sources.push({ name: 'phishtank', hit: inPhishTank, detail: inPhishTank ? 'Found in PhishTank' : undefined });
+  sources.push({ name: 'phishtank', hit: inPhishTank, detail: inPhishTank ? 'Found in PhishTank' : 'Clean' });
   if (inPhishTank) { allCategories.add('phishing'); allFlags.add('phishtank_hit'); }
 
-  // 4. API checks (parallel)
+  // 5. API checks (parallel)
   const [gsb, vt, otx, cf] = await Promise.all([
     checkGoogleSafeBrowsing(url).catch(() => ({ name: 'google_safe_browsing', hit: false, detail: 'error' } as SourceHit)),
     checkVirusTotal(url).catch(() => ({ name: 'virustotal', hit: false, detail: 'error' } as SourceHit)),
@@ -324,7 +497,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   if (otx.hit) { allCategories.add('otx_flagged'); allFlags.add('otx_hit'); }
   if (cf.hit) { allCategories.add('dns_blocked'); allFlags.add('cf_dns_blocked'); }
 
-  // Calculate weighted score
+  // Calculate weighted score (ENHANCED)
   let score = 0;
   for (const s of sources) {
     if (!s.hit) continue;
@@ -346,6 +519,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
         break;
       }
       case 'heuristic': score += 5; break;
+      case 'pattern_analysis': score += patternAnalysis.score; break;
       default: score += 10;
     }
   }
@@ -358,14 +532,9 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   else if (score >= 5) risk_level = 'low_risk';
 
   return {
-    url: inputUrl,
-    domain,
-    risk_level,
-    overall_score: score,
-    categories: Array.from(allCategories),
-    flags: Array.from(allFlags),
-    sources,
-    checked_at: new Date().toISOString(),
+    url: inputUrl, domain, risk_level, overall_score: score,
+    categories: Array.from(allCategories), flags: Array.from(allFlags),
+    sources, checked_at: new Date().toISOString(),
   };
 }
 
@@ -380,7 +549,7 @@ export function getFeedStatus() {
       phishtank: cache.phishtankDomains.size,
     },
     errors: cache.feedErrors,
-    sources: ['known_domains', 'heuristic', 'urlhaus', 'phishing_army', 'openphish', 'phishtank', 'google_safe_browsing', 'virustotal', 'alienvault_otx', 'cloudflare_dns'],
+    sources: ['known_domains', 'heuristic', 'pattern_analysis', 'urlhaus', 'phishing_army', 'openphish', 'phishtank', 'google_safe_browsing', 'virustotal', 'alienvault_otx', 'cloudflare_dns'],
   };
 }
 
