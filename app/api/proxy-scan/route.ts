@@ -40,7 +40,7 @@ const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; descriptio
   ],
 };
 
-// URL Category Database (static categories for web filtering policy)
+// URL Category Database
 const URL_CATEGORIES: Record<string, string[]> = {
   malware: ['malware.testing.google.test', 'evil.com', 'phishing-site.com'],
   adult: ['adult-content.example.com'],
@@ -88,14 +88,7 @@ function scanContent(content: string, enabledRules: string[]) {
         positions.push(m.index);
       }
       if (matches.length > 0) {
-        findings.push({
-          rule: ruleKey,
-          matches,
-          severity: pattern.severity,
-          description: pattern.description,
-          count: matches.length,
-          positions,
-        });
+        findings.push({ rule: ruleKey, matches, severity: pattern.severity, description: pattern.description, count: matches.length, positions });
       }
     }
   }
@@ -134,13 +127,9 @@ export async function POST(request: NextRequest) {
       const blocked = urlCategories.some(c => blockedCategories.includes(c));
       if (blocked) {
         return NextResponse.json({
-          status: 'BLOCKED',
-          reason: 'URL_CATEGORY_BLOCK',
-          categories: urlCategories,
-          latency: Date.now() - startTime,
-          tlsInspection: inspectTLS(targetUrl),
-          timestamp: new Date().toISOString(),
-          proxyNode: 'nextguard-hk-1.edge.next-guard.com',
+          status: 'BLOCKED', reason: 'URL_CATEGORY_BLOCK', categories: urlCategories,
+          latency: Date.now() - startTime, tlsInspection: inspectTLS(targetUrl),
+          timestamp: new Date().toISOString(), proxyNode: 'nextguard-hk-1.edge.next-guard.com',
         });
       }
       let responseBody = '';
@@ -148,56 +137,26 @@ export async function POST(request: NextRequest) {
       let responseHeaders: Record<string, string> = {};
       try {
         const proxyResp = await fetch(targetUrl, {
-          method,
-          headers: { 'User-Agent': 'NextGuard-SWG/1.0', ...customHeaders },
+          method, headers: { 'User-Agent': 'NextGuard-SWG/1.0', ...customHeaders },
           signal: AbortSignal.timeout(10000),
         });
         responseStatus = proxyResp.status;
         responseBody = await proxyResp.text();
         proxyResp.headers.forEach((v, k) => { responseHeaders[k] = v; });
       } catch (e: any) {
-        return NextResponse.json({
-          status: 'ERROR',
-          reason: 'FETCH_FAILED',
-          error: e.message,
-          latency: Date.now() - startTime,
-          timestamp: new Date().toISOString(),
-        });
+        return NextResponse.json({ status: 'ERROR', reason: 'FETCH_FAILED', error: e.message, latency: Date.now() - startTime, timestamp: new Date().toISOString() });
       }
       const dlpFindings = scanContent(responseBody, enabledRules);
       const hasCritical = dlpFindings.some(f => f.severity === 'critical');
       const action = hasCritical ? 'BLOCK' : dlpFindings.length > 0 ? 'AUDIT' : 'ALLOW';
       return NextResponse.json({
         status: action,
-        proxy: {
-          targetUrl,
-          method,
-          responseStatus,
-          responseSize: responseBody.length,
-          responseHeaders,
-          contentPreview: responseBody.substring(0, 500),
-        },
-        dlp: {
-          scanned: true,
-          findings: dlpFindings,
-          totalFindings: dlpFindings.length,
-          action,
-        },
-        urlFilter: {
-          categories: urlCategories,
-          allowed: !blocked,
-        },
+        proxy: { targetUrl, method, responseStatus, responseSize: responseBody.length, responseHeaders, contentPreview: responseBody.substring(0, 500) },
+        dlp: { scanned: true, findings: dlpFindings, totalFindings: dlpFindings.length, action },
+        urlFilter: { categories: urlCategories, allowed: !blocked },
         tlsInspection: inspectTLS(targetUrl),
-        threatPrevention: {
-          malwareDetected: false,
-          phishingScore: 0,
-          reputation: 'clean',
-        },
-        performance: {
-          latency: Date.now() - startTime,
-          proxyNode: 'nextguard-hk-1.edge.next-guard.com',
-          cacheHit: false,
-        },
+        threatPrevention: { malwareDetected: false, phishingScore: 0, reputation: 'clean' },
+        performance: { latency: Date.now() - startTime, proxyNode: 'nextguard-hk-1.edge.next-guard.com', cacheHit: false },
         timestamp: new Date().toISOString(),
       });
     }
@@ -212,83 +171,67 @@ export async function POST(request: NextRequest) {
       const action = maxSeverity === 'critical' ? 'BLOCK' : maxSeverity === 'high' ? 'QUARANTINE' : dlpFindings.length > 0 ? 'AUDIT' : 'ALLOW';
       return NextResponse.json({
         status: action,
-        dlp: {
-          scanned: true,
-          findings: dlpFindings,
-          totalFindings: dlpFindings.length,
-          action,
-          maxSeverity,
-          contentLength: (content || '').length,
-          scanEngine: 'NextGuard Cloud DLP v2.0',
-        },
-        icap: {
-          mode: 'REQMOD',
-          service: 'nextguard-dlp-icap',
-          istag: '"NextGuard-DLP-2.0"',
-        },
-        timestamp: new Date().toISOString(),
-        latency: Date.now() - startTime,
+        dlp: { scanned: true, findings: dlpFindings, totalFindings: dlpFindings.length, action, maxSeverity, contentLength: (content || '').length, scanEngine: 'NextGuard Cloud DLP v2.0' },
+        icap: { mode: 'REQMOD', service: 'nextguard-dlp-icap', istag: '"NextGuard-DLP-2.0"' },
+        timestamp: new Date().toISOString(), latency: Date.now() - startTime,
       });
     }
 
-    // MODE 3: URL Check - OSINT Threat Intelligence
+    // MODE 3: URL Check - Multi-Source OSINT Threat Intelligence
     if (mode === 'url-check') {
       const tiResult = await checkUrl(targetUrl || '');
       return NextResponse.json({
         url: targetUrl,
-        categories: tiResult.final.categories,
-        reputation: tiResult.final.risk_level,
-        risk_level: tiResult.final.risk_level,
-        flags: tiResult.final.flags,
-        reason: tiResult.final.reason,
+        domain: tiResult.domain,
+        risk_level: tiResult.risk_level,
+        overall_score: tiResult.overall_score,
+        categories: tiResult.categories,
+        flags: tiResult.flags,
         sources: tiResult.sources,
         feedStatus: getFeedStatus(),
         tlsInspection: inspectTLS(targetUrl || ''),
+        checked_at: tiResult.checked_at,
         timestamp: new Date().toISOString(),
       });
     }
 
-        // MODE 4: Batch URL Check
+    // MODE 4: Batch URL Check
     if (mode === 'batch-url-check') {
       const urls: string[] = body.urls || [];
       if (!Array.isArray(urls) || urls.length === 0) {
         return NextResponse.json({ error: 'Please provide urls array' }, { status: 400 });
       }
       if (urls.length > 5000) {
-        return NextResponse.json({ error: 'Max 50 URLs per batch' }, { status: 400 });
+        return NextResponse.json({ error: 'Max 5000 URLs per batch' }, { status: 400 });
       }
       const results = await Promise.all(
         urls.map(async (url: string) => {
           const tiResult = await checkUrl(url);
           return {
             url,
-            risk_level: tiResult.final.risk_level,
-            categories: tiResult.final.categories,
-            flags: tiResult.final.flags,
-            reason: tiResult.final.reason,
+            domain: tiResult.domain,
+            risk_level: tiResult.risk_level,
+            overall_score: tiResult.overall_score,
+            categories: tiResult.categories,
+            flags: tiResult.flags,
             sources: tiResult.sources.filter(s => s.hit).map(s => s.name),
           };
         })
       );
       const summary = {
         total: results.length,
-        known_malicious: results.filter(r => r.risk_level === 'known_malicious').length,
         high_risk: results.filter(r => r.risk_level === 'high_risk').length,
         medium_risk: results.filter(r => r.risk_level === 'medium_risk').length,
         low_risk: results.filter(r => r.risk_level === 'low_risk').length,
-        unknown: results.filter(r => r.risk_level === 'unknown').length,
+        safe: results.filter(r => r.risk_level === 'safe').length,
       };
       return NextResponse.json({
-        mode: 'batch-url-check',
-        summary,
-        results,
-        feedStatus: getFeedStatus(),
-        timestamp: new Date().toISOString(),
-        latency: Date.now() - startTime,
+        mode: 'batch-url-check', summary, results,
+        feedStatus: getFeedStatus(), timestamp: new Date().toISOString(), latency: Date.now() - startTime,
       });
     }
 
-    return NextResponse.json({ error: 'Invalid mode. Use: proxy, dlp-scan, or url-check' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid mode. Use: proxy, dlp-scan, url-check, or batch-url-check' }, { status: 400 });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
@@ -298,8 +241,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     service: 'NextGuard Cloud SWG',
-    version: '2.1',
-    capabilities: ['forward-proxy', 'ssl-inspection', 'dlp-scan', 'url-filtering', 'threat-prevention', 'icap', 'network-dlp', 'osint-threat-intel'],
+    version: '2.2',
+    capabilities: ['forward-proxy', 'ssl-inspection', 'dlp-scan', 'url-filtering', 'threat-prevention', 'icap', 'network-dlp', 'osint-threat-intel', 'multi-source-aggregation'],
     proxyNodes: [
       { id: 'hk-1', location: 'Hong Kong', status: 'active' },
       { id: 'sg-1', location: 'Singapore', status: 'active' },
@@ -308,6 +251,7 @@ export async function GET() {
     dlpPatterns: Object.keys(DLP_PATTERNS),
     urlCategories: Object.keys(URL_CATEGORIES),
     threatIntel: getFeedStatus(),
+    threatSources: ['known_domains', 'phishtank', 'urlhaus', 'openphish', 'phishing_army', 'google_safe_browsing', 'virustotal', 'cloudflare_dns'],
     status: 'operational',
     timestamp: new Date().toISOString(),
   });
