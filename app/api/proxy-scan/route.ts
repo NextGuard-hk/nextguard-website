@@ -205,13 +205,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Max 5000 URLs per batch' }, { status: 400 });
       }
       // Process in chunks of 5 to avoid API rate limits
-      const CHUNK_SIZE = 5;
+      const CHUNK_SIZE = 50;
       const results: any[] = [];
       for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
         const chunk = urls.slice(i, i + CHUNK_SIZE);
         const chunkResults = await Promise.all(
           chunk.map(async (url: string) => {
-            const tiResult = await checkUrl(url);
+            const tiResult = await checkUrlFast(url);
             return {
               url,
               domain: tiResult.domain,
