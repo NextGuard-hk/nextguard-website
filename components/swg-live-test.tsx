@@ -207,22 +207,32 @@ export default function SWGLiveTest() {
   const fetchPac = async () => { try { const r = await fetch('/api/pac'); setPacContent(await r.text()); setPacVisible(true); } catch (e: any) { setPacContent('Error: ' + e.message); setPacVisible(true); } };
   const fetchStatus = async () => { try { const r = await fetch('/api/proxy-scan'); setSwgStatus(await r.json()); } catch (e: any) { setSwgStatus({ error: e.message }); } };
 
-  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
-      if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const urls: string[] = [];
+      rows.forEach((row: any) => {
+        Object.values(row).forEach((val: any) => {
+          const s = String(val).trim();
+          if (s.match(/^https?:\/\//)) urls.push(s);
+        });
+      });
+      setBatchUrls([...new Set(urls)].join('\n'));
+    } else {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target?.result as string;
         const lines = text.split(/[\r\n]+/).map(l => l.split(',')[0].trim().replace(/^"|"$/g, '')).filter(l => l.startsWith('http'));
         setBatchUrls(lines.join('\n'));
-      } else if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
-        const urlRegex = /https?:\/\/[^\s<"',]+/g;
-        const matches = text.match(urlRegex) || [];
-        setBatchUrls([...new Set(matches)].join('\n'));
-      }
-    };
-    reader.readAsText(file);
+      };
+      reader.readAsText(file);
+    }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
