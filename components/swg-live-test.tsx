@@ -310,7 +310,72 @@ export default function SWGLiveTest() {
         {(customMode === 'proxy' || customMode === 'url-check') && (<input value={customUrl} onChange={e => setCustomUrl(e.target.value)} placeholder="https://target-url.com" className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />)}
         {customMode === 'dlp-scan' && (<textarea value={customContent} onChange={e => setCustomContent(e.target.value)} placeholder="Paste content to scan..." rows={3} className="w-full mb-2 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm" />)}
         <button onClick={runCustomTest} className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500">Run Custom Test</button>
-        {customResult && (<pre className="mt-3 bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">{JSON.stringify(customResult, null, 2)}</pre>)}
+        {customResult && (customMode === 'url-check' && customResult.risk_level ? (
+          <div className="mt-3 space-y-3">
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <RiskBadge level={customResult.risk_level} />
+                  <span className="text-white font-mono text-sm">{customResult.url || customResult.domain}</span>
+                </div>
+                {customResult.overall_score !== undefined && (
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-white">{customResult.overall_score}<span className="text-sm text-gray-400">/100</span></div>
+                    <div className="text-xs text-gray-500">Risk Score</div>
+                  </div>
+                )}
+              </div>
+              {(customResult.categories?.length > 0 || customResult.flags?.length > 0) && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {(customResult.categories || []).map((c: string, i: number) => (
+                    <span key={`cat-${i}`} className="px-2 py-0.5 bg-gray-700 text-gray-300 rounded text-xs">{c}</span>
+                  ))}
+                  {(customResult.flags || []).map((f: string, i: number) => (
+                    <span key={`flag-${i}`} className="px-2 py-0.5 bg-blue-900/50 text-blue-300 rounded text-xs">{f}</span>
+                  ))}
+                </div>
+              )}
+              {customResult.sources && (
+                <div className="border-t border-gray-700 pt-3">
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2">Threat Intel Sources</h4>
+                  <div className="grid grid-cols-1 gap-1">
+                    {customResult.sources.map((s: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between py-1 px-2 rounded text-xs hover:bg-gray-700/50">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${s.hit ? 'bg-red-500' : 'bg-green-500'}`} />
+                          <span className="text-gray-300 font-medium">{s.name}</span>
+                        </div>
+                        <span className="text-gray-500">{s.detail || (s.hit ? 'Detected' : 'Clean')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {customResult.tlsInspection && (
+                <div className="border-t border-gray-700 pt-3 mt-3">
+                  <h4 className="text-xs font-semibold text-gray-400 mb-1">TLS Inspection</h4>
+                  <div className="text-xs text-gray-500">Protocol: {customResult.tlsInspection.protocol} | Inspected: {customResult.tlsInspection.inspected ? 'Yes' : 'No'}</div>
+                </div>
+              )}
+              {customResult.feedStatus && (
+                <div className="border-t border-gray-700 pt-3 mt-3">
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2">Feed Status</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(customResult.feedStatus.feeds || {}).map(([k, v]: [string, any]) => (
+                      <span key={k} className="px-2 py-1 bg-gray-700 rounded text-xs text-gray-300">{k}: <strong className="text-white">{typeof v === 'number' ? v.toLocaleString() : v}</strong></span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <details className="text-xs">
+              <summary className="text-gray-500 cursor-pointer hover:text-gray-300">View Raw JSON</summary>
+              <pre className="mt-2 bg-gray-800 rounded-lg p-3 text-gray-300 overflow-auto max-h-48 whitespace-pre-wrap">{JSON.stringify(customResult, null, 2)}</pre>
+            </details>
+          </div>
+        ) : (
+          <pre className="mt-3 bg-gray-800 rounded-lg p-3 text-xs text-gray-300 overflow-auto max-h-64 whitespace-pre-wrap">{JSON.stringify(customResult, null, 2)}</pre>
+        ))}
 
         <hr className="border-gray-700 my-4" />
         <h3 className="text-lg font-semibold text-cyan-400 mb-3">Batch URL Check</h3>
