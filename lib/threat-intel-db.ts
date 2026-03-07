@@ -31,31 +31,30 @@ const FEED_CATEGORIES: Record<string, string[]> = {
 const FEED_TTL_DAYS: Record<string, number> = {
   urlhaus: 30, phishing_army: 7, openphish: 3, phishtank: 30,
   threatfox: 90, feodo_tracker: 60, c2_intel: 30, ipsum: 7,
-  blocklist_de: 14, emerging_threats: 7, disposable_emails: 365, local_ioc: 3650,
+  blocklist_de: 14, emerging_threats: 7,
+  disposable_emails: 365, local_ioc: 3650,
 };
 
-// DB tables are created by /api/v1/threat-intel/init endpoint
-// No heavy schema init needed here
 function ensureDB() {
   return getDB();
 }
 
 export async function ingestIndicators(
   feedId: string,
-    // Limit indicators per feed to prevent timeout
-  const limitedIndicators = indicators.slice(0, 2000);
   indicators: Array<{ value: string; type: string; description?: string; threat_actor?: string; campaign?: string }>
 ): Promise<{ added: number; updated: number }> {
   const db = ensureDB();
+  const limitedIndicators = indicators.slice(0, 500);
   const ttlDays = FEED_TTL_DAYS[feedId] ?? 30;
   const validUntil = new Date(Date.now() + ttlDays * 86400000).toISOString();
   const confidence = FEED_CONFIDENCE[feedId] ?? 70;
   const riskLevel = FEED_RISK[feedId] ?? 'medium_risk';
   const categories = JSON.stringify(FEED_CATEGORIES[feedId] ?? []);
+
   let added = 0;
   let updated = 0;
 
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 50;
   for (let i = 0; i < limitedIndicators.length; i += BATCH_SIZE) {
     const batch = limitedIndicators.slice(i, i + BATCH_SIZE);
     const statements = batch.map(ind => {
@@ -71,20 +70,18 @@ export async function ingestIndicators(
     try {
       await db.batch(statements, 'write');
       added += batch.length;
-    } catch (e) {
-      for (const stmt of statements) {
-        try {
-          const result = await db.execute(stmt);
-          if (result.rowsAffected > 0) added++;
-        } catch { updated++; }
-      }
+    } catch {
+      updated += batch.length;
     }
   }
 
   await db.execute({
-    sql: `UPDATE feeds SET entries_count = (SELECT COUNT(*) FROM indicators WHERE source_feed = ? AND is_active = 1), total_ingested = total_ingested + ?, last_success = datetime('now'), last_refresh = datetime('now'), status = 'active', updated_at = datetime('now') WHERE id = ?`,
+    sql: `UPDATE feeds SET entries_count = (SELECT COUNT(*) FROM indicators WHERE source_feed = ? AND is_active = 1),
+          total_ingested = total_ingested + ?, last_success = datetime('now'), last_refresh = datetime('now'),
+          status = 'active', updated_at = datetime('now') WHERE id = ?`,
     args: [feedId, added + updated, feedId],
   });
+
   return { added, updated };
 }
 
@@ -111,12 +108,10 @@ export async function lookupIndicator(value: string): Promise<{
   } catch {}
   const valuesToCheck = [...new Set([normalized, hostname])].filter(Boolean);
   const placeholders = valuesToCheck.map(() => '?').join(',');
-
   const result = await db.execute({
     sql: `SELECT source_feed, risk_level, confidence, categories, first_seen, last_seen FROM indicators WHERE value_normalized IN (${placeholders}) AND is_active = 1 ORDER BY confidence DESC`,
     args: valuesToCheck,
   });
-
   const hits = result.rows.map(row => ({
     feed: row.source_feed as string,
     risk_level: row.risk_level as RiskLevel,
@@ -125,17 +120,14 @@ export async function lookupIndicator(value: string): Promise<{
     first_seen: row.first_seen as string,
     last_seen: row.last_seen as string,
   }));
-
   const feedCount = await db.execute(`SELECT COUNT(*) as cnt FROM feeds WHERE enabled = 1 AND status = 'active'`);
   const totalChecked = (feedCount.rows[0]?.cnt as number) || 11;
-
   try {
     await db.execute({
       sql: `INSERT INTO lookup_log (indicator_value, result_risk_level, sources_hit, sources_checked) VALUES (?, ?, ?, ?)`,
       args: [normalized, hits[0]?.risk_level ?? 'clean', hits.length, totalChecked],
     });
   } catch {}
-
   if (hits.length > 0) {
     await db.execute({
       sql: `UPDATE indicators SET hit_count = hit_count + 1, last_hit_at = datetime('now') WHERE value_normalized IN (${placeholders}) AND is_active = 1`,
@@ -155,8 +147,7 @@ export async function getFeedStatusFromDB() {
     lastError: row.last_error as string | null, feed_type: row.feed_type as string,
   }));
   return {
-    feeds,
-    totalEntries: (totalResult.rows[0]?.total as number) || 0,
+    feeds, totalEntries: (totalResult.rows[0]?.total as number) || 0,
     lastUpdated: feeds.find(f => f.lastUpdated)?.lastUpdated ?? null,
     feedErrors: feeds.filter(f => f.status === 'error').map(f => f.name),
   };
