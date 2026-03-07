@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { runPhase2Migration } from '@/lib/stix-migration';
 
 async function initDatabase(request: Request) {
   try {
@@ -9,9 +10,21 @@ async function initDatabase(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const phase = searchParams.get('phase');
     const db = getDb();
 
-    // Create v1 API tables
+    // Phase 2: STIX 2.1 Migration
+    if (phase === '2') {
+      const result = await runPhase2Migration();
+      return NextResponse.json({
+        success: true,
+        phase: 2,
+        message: 'Phase 2 STIX 2.1 migration completed',
+        ...result,
+      });
+    }
+
+    // Phase 1: Original init (create v1 API tables)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS threat_indicators (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,10 +106,11 @@ async function initDatabase(request: Request) {
 
     return NextResponse.json({
       success: true,
+      phase: 1,
       tables_created: ['threat_indicators', 'threat_feeds', 'lookup_audit'],
       indexes_created: 6,
       feeds_seeded: feeds.length,
-      message: 'Threat Intelligence DB initialized successfully',
+      message: 'Phase 1: Threat Intelligence DB initialized. Run with ?phase=2 for STIX 2.1 migration.',
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
