@@ -63,32 +63,15 @@ async function ingestOpenPhish(): Promise<number> {
 // Parse PhishTank - domain list from GitHub mirror
 async function ingestPhishTank(): Promise<number> {
   const urls = [
-    `https://data.phishtank.com/data/${process.env.PHISHTANK_API_KEY || ''}/online-valid.csv`,
     'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt',
   ];
   for (const feedUrl of urls) {
     try {
       const lines = await fetchTextLines(feedUrl);
       if (lines.length < 10) continue;
-      let indicators: { value: string; type: string }[];
-      if (feedUrl.includes('phishing-domains-ACTIVE')) {
-        indicators = lines
-          .filter(l => l.includes('.'))
-          .map(l => ({ value: l.replace(/^www\./, ''), type: 'domain' }));
-      } else {
-        // CSV: skip header, extract URL column
-        indicators = [];
-        for (let i = 1; i < lines.length; i++) {
-          try {
-            const parts = lines[i].split(',');
-            const urlStr = (parts[1] || '').replace(/^"|"$/g, '').trim();
-            if (urlStr.startsWith('http')) {
-              const hostname = new URL(urlStr).hostname.replace(/^www\./, '');
-              if (hostname) indicators.push({ value: hostname, type: 'domain' });
-            }
-          } catch {}
-        }
-      }
+      const indicators = lines
+        .filter(l => l.includes('.'))
+        .map(l => ({ value: l.replace(/^www\./, ''), type: 'domain' }));
       if (indicators.length > 0) {
         const { added, updated } = await ingestIndicators('phishtank', indicators);
         return added + updated;
@@ -185,10 +168,17 @@ async function ingestDisposableEmails(): Promise<number> {
 
 // Verify cron or API key auth
 function isAuthorized(request: NextRequest): boolean {
+  // Accept Bearer token (for Vercel Cron)
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return false;
-  return true;
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true;
+  // Accept query parameter key (for manual triggering)
+  const key = request.nextUrl.searchParams.get('key');
+  const adminKey = process.env.TI_ADMIN_KEY;
+  if (adminKey && key === adminKey) return true;
+  // If no secrets configured, allow access
+  if (!cronSecret && !adminKey) return true;
+  return false;
 }
 
 export async function GET(request: NextRequest) {
@@ -198,9 +188,8 @@ export async function GET(request: NextRequest) {
 
   const feedParam = request.nextUrl.searchParams.get('feed');
   const startTime = Date.now();
-  const results: Record<string, { count: number; error?: string }> = {};
+  const results: Record<string, any> = {};
 
-  // Map of feed ID to ingest function
   const feedFunctions: Record<string, () => Promise<number>> = {
     urlhaus: ingestUrlhaus,
     phishing_army: ingestPhishingArmy,
@@ -232,7 +221,6 @@ export async function GET(request: NextRequest) {
     }));
   }
 
-  // Expire old IOCs
   const expired = await expireOldIndicators();
 
   return NextResponse.json({
