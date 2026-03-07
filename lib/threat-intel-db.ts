@@ -42,6 +42,8 @@ function ensureDB() {
 
 export async function ingestIndicators(
   feedId: string,
+    // Limit indicators per feed to prevent timeout
+  const limitedIndicators = indicators.slice(0, 2000);
   indicators: Array<{ value: string; type: string; description?: string; threat_actor?: string; campaign?: string }>
 ): Promise<{ added: number; updated: number }> {
   const db = ensureDB();
@@ -53,9 +55,9 @@ export async function ingestIndicators(
   let added = 0;
   let updated = 0;
 
-  const BATCH_SIZE = 500;
-  for (let i = 0; i < indicators.length; i += BATCH_SIZE) {
-    const batch = indicators.slice(i, i + BATCH_SIZE);
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < limitedIndicators.length; i += BATCH_SIZE) {
+    const batch = limitedIndicators.slice(i, i + BATCH_SIZE);
     const statements = batch.map(ind => {
       const normalized = normalizeValue(ind.value, ind.type);
       const id = generateIndicatorId(ind.type, normalized, feedId);
