@@ -71,11 +71,8 @@ const FEED_TTL_DAYS: Record<string, number> = {
 // No need to call initDB() on every request
 async function ensureDB(): Promise<void> {
   // Tables already created by init endpoint
-  // Just verify connection works
-  getDB();
-}
-    await initDB();
-    dbInitialized = true;
+    getDB();
+  
   }
 }
 
