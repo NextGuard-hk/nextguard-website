@@ -67,11 +67,13 @@ const FEED_TTL_DAYS: Record<string, number> = {
   disposable_emails: 365,
   local_ioc: 3650,
 };
-
-let dbInitialized = false;
-
+// DB is initialized via /api/v1/threat-intel/init endpoint
+// No need to call initDB() on every request
 async function ensureDB(): Promise<void> {
-  if (!dbInitialized) {
+  // Tables already created by init endpoint
+  // Just verify connection works
+  getDB();
+}
     await initDB();
     dbInitialized = true;
   }
