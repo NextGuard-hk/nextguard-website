@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDB } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '7');
-
-    const db = getDb();
+    const db = getDB();
 
     // Overall indicator counts by type
     const byType = await db.execute({
-      sql: `SELECT type, COUNT(*) as count, 
-              SUM(CASE WHEN confidence >= 80 THEN 1 ELSE 0 END) as high_confidence,
-              AVG(confidence) as avg_confidence
-            FROM threat_indicators 
+      sql: `SELECT type, COUNT(*) as count,
+            SUM(CASE WHEN confidence >= 80 THEN 1 ELSE 0 END) as high_confidence,
+            AVG(confidence) as avg_confidence
+            FROM indicators WHERE is_active = 1
             GROUP BY type ORDER BY count DESC`,
       args: [],
     });
@@ -21,68 +20,66 @@ export async function GET(request: Request) {
     // Counts by source feed
     const byFeed = await db.execute({
       sql: `SELECT source_feed, COUNT(*) as count,
-              SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count,
-              MAX(created_at) as last_added
-            FROM threat_indicators 
+            SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count,
+            MAX(updated_at) as last_added
+            FROM indicators
             GROUP BY source_feed ORDER BY count DESC`,
       args: [],
     });
 
-    // Counts by threat category
+    // Counts by risk level (replaces threat_category)
     const byCategory = await db.execute({
-      sql: `SELECT threat_category, COUNT(*) as count
-            FROM threat_indicators 
-            WHERE threat_category IS NOT NULL
-            GROUP BY threat_category ORDER BY count DESC LIMIT 20`,
+      sql: `SELECT risk_level, COUNT(*) as count
+            FROM indicators
+            WHERE is_active = 1
+            GROUP BY risk_level ORDER BY count DESC`,
       args: [],
     });
 
-    // Recent ingestion trend (last N days)
+    // Recent ingestion trend
     const trend = await db.execute({
-      sql: `SELECT DATE(created_at) as date, COUNT(*) as added
-            FROM threat_indicators
-            WHERE created_at >= datetime('now', '-' || ? || ' days')
-            GROUP BY DATE(created_at)
+      sql: `SELECT DATE(updated_at) as date, COUNT(*) as added
+            FROM indicators
+            WHERE updated_at >= datetime('now', '-' || ? || ' days')
+            GROUP BY DATE(updated_at)
             ORDER BY date ASC`,
       args: [days],
     });
 
     // Total counts
     const totals = await db.execute({
-      sql: `SELECT 
-              COUNT(*) as total,
-              SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-              SUM(CASE WHEN confidence >= 80 THEN 1 ELSE 0 END) as high_confidence,
-              SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical,
-              SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high,
-              SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) as medium,
-              SUM(CASE WHEN severity = 'low' THEN 1 ELSE 0 END) as low,
-              MIN(created_at) as oldest_indicator,
-              MAX(updated_at) as last_updated
-            FROM threat_indicators`,
+      sql: `SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN confidence >= 80 THEN 1 ELSE 0 END) as high_confidence,
+            SUM(CASE WHEN risk_level = 'known_malicious' THEN 1 ELSE 0 END) as critical,
+            SUM(CASE WHEN risk_level = 'high_risk' THEN 1 ELSE 0 END) as high,
+            SUM(CASE WHEN risk_level = 'medium_risk' THEN 1 ELSE 0 END) as medium,
+            SUM(CASE WHEN risk_level = 'low_risk' THEN 1 ELSE 0 END) as low,
+            MIN(first_seen) as oldest_indicator,
+            MAX(updated_at) as last_updated
+            FROM indicators`,
       args: [],
     });
 
     // Feed health summary
     const feedHealth = await db.execute({
-      sql: `SELECT 
-              COUNT(*) as total_feeds,
-              SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_feeds,
-              MIN(last_fetch) as oldest_fetch,
-              MAX(last_fetch) as newest_fetch
-            FROM threat_feeds`,
+      sql: `SELECT
+            COUNT(*) as total_feeds,
+            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_feeds,
+            MIN(last_refresh) as oldest_fetch,
+            MAX(last_refresh) as newest_fetch
+            FROM feeds`,
       args: [],
     });
 
     // Lookup performance stats (last 24h)
     const lookupStats = await db.execute({
-      sql: `SELECT 
-              COUNT(*) as total_lookups,
-              SUM(CASE WHEN verdict != 'clean' THEN 1 ELSE 0 END) as threats_detected,
-              AVG(lookup_ms) as avg_lookup_ms,
-              MAX(lookup_ms) as max_lookup_ms
-            FROM lookup_audit
-            WHERE checked_at >= datetime('now', '-1 day')`,
+      sql: `SELECT
+            COUNT(*) as total_lookups,
+            SUM(CASE WHEN result_risk_level != 'clean' THEN 1 ELSE 0 END) as threats_detected
+            FROM lookup_log
+            WHERE created_at >= datetime('now', '-1 day')`,
       args: [],
     });
 
@@ -123,7 +120,7 @@ export async function GET(request: Request) {
         last_added: r.last_added,
       })),
       by_category: byCategory.rows.map((r: any) => ({
-        category: r.threat_category,
+        category: r.risk_level,
         count: Number(r.count),
       })),
       trend: {
@@ -139,8 +136,8 @@ export async function GET(request: Request) {
         detection_rate: ls?.total_lookups > 0
           ? ((Number(ls.threats_detected) / Number(ls.total_lookups)) * 100).toFixed(2) + '%'
           : '0%',
-        avg_lookup_ms: Math.round(Number(ls?.avg_lookup_ms || 0)),
-        max_lookup_ms: Number(ls?.max_lookup_ms || 0),
+        avg_lookup_ms: 0,
+        max_lookup_ms: 0,
       },
       generated_at: new Date().toISOString(),
     });
