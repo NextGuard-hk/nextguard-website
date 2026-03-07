@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDB } from '@/lib/db';
+import { lookupIndicator } from '@/lib/threat-intel-db';
 
 export async function GET(request: Request) {
   try {
@@ -12,81 +13,73 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'indicator parameter required' }, { status: 400 });
     }
 
-    const db = getDb();
     const normalizedIndicator = indicator.toLowerCase().trim();
-
-    // Detect type if not provided
     const detectedType = type || detectIndicatorType(normalizedIndicator);
 
-    // Query DB for exact match
-    const results = await db.execute({
-      sql: `SELECT id, type, value, source_feed, confidence, severity,
-              threat_category, first_seen, last_seen, is_active, tags
-            FROM threat_indicators
-            WHERE LOWER(value) = ? AND is_active = 1
-            ORDER BY confidence DESC`,
-      args: [normalizedIndicator],
-    });
+    // Extract hostname from URL if needed
+    let lookupValue = normalizedIndicator;
+    if (detectedType === 'url') {
+      try {
+        lookupValue = new URL(normalizedIndicator.startsWith('http') ? normalizedIndicator : `https://${normalizedIndicator}`).hostname.replace(/^www\./, '');
+      } catch {}
+    } else if (detectedType === 'domain') {
+      lookupValue = normalizedIndicator.replace(/^www\./, '');
+    }
 
+    // Query v2 DB via lookupIndicator
+    const { hits, totalChecked } = await lookupIndicator(lookupValue);
     const lookupMs = Date.now() - startTime;
-    const hits = results.rows as any[];
 
     // Build verdict
     let verdict = 'clean';
     let maxConfidence = 0;
-    let maxSeverity = 'low';
+    let riskLevel = 'clean';
     const sourcesHit: string[] = [];
+    const categories: string[] = [];
 
     if (hits.length > 0) {
       verdict = 'malicious';
+      riskLevel = hits[0].risk_level;
       for (const hit of hits) {
         maxConfidence = Math.max(maxConfidence, hit.confidence || 0);
-        sourcesHit.push(hit.source_feed);
-        if (severityRank(hit.severity) > severityRank(maxSeverity)) {
-          maxSeverity = hit.severity;
-        }
+        sourcesHit.push(hit.feed);
+        hit.categories.forEach((c: string) => {
+          if (!categories.includes(c)) categories.push(c);
+        });
       }
     }
 
-    // Also do heuristic checks
+    // Heuristic checks for URLs/domains not in DB
     const heuristics = runHeuristics(normalizedIndicator, detectedType);
     if (heuristics.suspicious && verdict === 'clean') {
       verdict = 'suspicious';
+      riskLevel = 'medium_risk';
       maxConfidence = Math.max(maxConfidence, heuristics.confidence);
-    }
-
-    // Audit log
-    try {
-      await db.execute({
-        sql: `INSERT INTO lookup_audit (query_type, query_value, verdict, sources_hit, confidence, lookup_ms)
-              VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [detectedType, normalizedIndicator, verdict, JSON.stringify(sourcesHit), maxConfidence, lookupMs],
-      });
-    } catch (auditErr) {
-      // Non-critical, don't fail lookup
     }
 
     return NextResponse.json({
       indicator: normalizedIndicator,
       type: detectedType,
       verdict,
+      risk_level: riskLevel,
       confidence: maxConfidence,
-      severity: maxSeverity,
+      severity: riskLevel === 'known_malicious' ? 'critical' : riskLevel === 'high_risk' ? 'high' : riskLevel === 'medium_risk' ? 'medium' : 'low',
       sources_hit: sourcesHit,
       total_matches: hits.length,
-      matches: hits.map((h: any) => ({
-        source: h.source_feed,
+      total_feeds_checked: totalChecked,
+      categories,
+      matches: hits.map(h => ({
+        source: h.feed,
         confidence: h.confidence,
-        severity: h.severity,
-        category: h.threat_category,
+        risk_level: h.risk_level,
+        categories: h.categories,
         first_seen: h.first_seen,
         last_seen: h.last_seen,
-        tags: h.tags ? JSON.parse(h.tags) : [],
       })),
       heuristics: heuristics.flags,
       lookup_ms: lookupMs,
       checked_at: new Date().toISOString(),
-      engine_version: '5.0',
+      engine_version: '5.1-db',
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -97,36 +90,34 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const indicators: string[] = body.indicators || [];
-
     if (!indicators.length) {
       return NextResponse.json({ error: 'indicators array required' }, { status: 400 });
     }
 
-    const db = getDb();
     const results = await Promise.all(
-      indicators.map(async (ind) => {
+      indicators.slice(0, 100).map(async (ind) => {
         const startTime = Date.now();
         const normalized = ind.toLowerCase().trim();
         const detectedType = detectIndicatorType(normalized);
 
-        const dbResults = await db.execute({
-          sql: `SELECT source_feed, confidence, severity, threat_category
-                FROM threat_indicators
-                WHERE LOWER(value) = ? AND is_active = 1
-                ORDER BY confidence DESC LIMIT 5`,
-          args: [normalized],
-        });
+        let lookupValue = normalized;
+        if (detectedType === 'url') {
+          try { lookupValue = new URL(normalized.startsWith('http') ? normalized : `https://${normalized}`).hostname.replace(/^www\./, ''); } catch {}
+        } else if (detectedType === 'domain') {
+          lookupValue = normalized.replace(/^www\./, '');
+        }
 
-        const hits = dbResults.rows as any[];
+        const { hits } = await lookupIndicator(lookupValue);
         const verdict = hits.length > 0 ? 'malicious' : 'clean';
-        const maxConf = hits.reduce((max: number, h: any) => Math.max(max, h.confidence || 0), 0);
-
+        const maxConf = hits.reduce((max: number, h) => Math.max(max, h.confidence || 0), 0);
         return {
           indicator: normalized,
           type: detectedType,
           verdict,
+          risk_level: hits[0]?.risk_level || 'clean',
           confidence: maxConf,
-          sources: hits.map((h: any) => h.source_feed),
+          sources: hits.map(h => h.feed),
+          categories: hits.flatMap(h => h.categories).filter((v, i, a) => a.indexOf(v) === i),
           lookup_ms: Date.now() - startTime,
         };
       })
@@ -155,31 +146,20 @@ function detectIndicatorType(value: string): string {
   return 'unknown';
 }
 
-function severityRank(severity: string): number {
-  const ranks: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
-  return ranks[severity] || 0;
-}
-
 function runHeuristics(value: string, type: string): { suspicious: boolean; confidence: number; flags: string[] } {
   const flags: string[] = [];
-
-  if (type === 'domain') {
-    if (value.length > 50) flags.push('unusually_long_domain');
-    if (/\d{4,}/.test(value)) flags.push('excessive_numbers_in_domain');
-    if ((value.match(/\./g) || []).length > 4) flags.push('excessive_subdomains');
-    if (/^[a-z0-9]{15,}\.[a-z]+$/i.test(value)) flags.push('dga_pattern_detected');
+  if (type === 'domain' || type === 'url') {
+    const domain = type === 'url' ? (() => { try { return new URL(value.startsWith('http') ? value : `https://${value}`).hostname; } catch { return value; } })() : value;
+    if (domain.length > 50) flags.push('unusually_long_domain');
+    if (/\d{4,}/.test(domain)) flags.push('excessive_numbers');
+    if ((domain.match(/\./g) || []).length > 4) flags.push('excessive_subdomains');
+    if (/^[a-z0-9]{15,}\.[a-z]+$/i.test(domain)) flags.push('dga_pattern');
   }
-
   if (type === 'url') {
     if (value.includes('@')) flags.push('at_sign_in_url');
     if (/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(value)) flags.push('ip_in_url');
     if (value.length > 200) flags.push('unusually_long_url');
     if (/(%[0-9a-f]{2}){3,}/i.test(value)) flags.push('heavy_encoding');
   }
-
-  return {
-    suspicious: flags.length > 0,
-    confidence: Math.min(flags.length * 20, 60),
-    flags,
-  };
+  return { suspicious: flags.length > 0, confidence: Math.min(flags.length * 20, 60), flags };
 }
