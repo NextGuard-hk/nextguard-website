@@ -371,9 +371,7 @@ export default function SWGLiveTest() {
                 <div className="border-t border-gray-700 pt-3 mt-3">
                   <h4 className="text-xs font-semibold text-gray-400 mb-2">Feed Status</h4>
                   <div className="flex flex-wrap gap-2">
-                    {Object.entries(customResult.feedStatus.feeds || {}).map(([k, v]: [string, any]) => (
-                      <span key={k} className="px-2 py-1 bg-gray-700 rounded text-xs text-gray-300">{k}: <strong className="text-white">{typeof v === 'number' ? v.toLocaleString() : v}</strong></span>
-                    ))}
+                    {(Array.isArray(customResult.feedStatus.feeds) ? customResult.feedStatus.feeds : Object.entries(customResult.feedStatus.feeds || {})).map((item: any, idx: number) => { const name = Array.isArray(customResult.feedStatus.feeds) ? item.name : item[0]; const count = Array.isArray(customResult.feedStatus.feeds) ? item.entries : item[1]; return (<span key={idx} className="px-2 py-1 bg-gray-700 rounded text-xs text-gray-300">{name}: <strong className="text-white">{typeof count === 'number' ? count.toLocaleString() : count}</strong></span>); })}
                   </div>
                 </div>
               )}
