@@ -2,6 +2,57 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { runPhase2Migration } from '@/lib/stix-migration';
 
+async function runPhase3Migration() {
+  const db = getDb();
+
+  // Add client_ip column to lookup_log if missing
+  try {
+    await db.execute(`ALTER TABLE lookup_log ADD COLUMN client_ip TEXT`);
+  } catch {}
+
+  try {
+    await db.execute(`ALTER TABLE lookup_log ADD COLUMN lookup_ms INTEGER`);
+  } catch {}
+
+  // Create api_keys table for Phase 3 auth
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL DEFAULT 'read' CHECK(role IN ('read', 'write', 'admin')),
+      rate_limit_per_min INTEGER NOT NULL DEFAULT 120,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT
+    )
+  `);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_api_keys_active ON api_keys(is_active)`);
+
+  // Create rate_limit_log for persistent rate tracking
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS rate_limit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_ip TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      request_count INTEGER NOT NULL DEFAULT 1,
+      window_start TEXT NOT NULL DEFAULT (datetime('now')),
+      window_end TEXT NOT NULL
+    )
+  `);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_rl_ip_window ON rate_limit_log(client_ip, window_start)`);
+
+  return {
+    tables_created: ['api_keys', 'rate_limit_log'],
+    indexes_created: 3,
+    message: 'Phase 3: API-ification complete. Endpoints active: /api/v1/indicators, /api/v1/feeds, /api/v1/lookup',
+  };
+}
+
 async function initDatabase(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,6 +63,16 @@ async function initDatabase(request: Request) {
 
     const phase = searchParams.get('phase');
     const db = getDb();
+
+    // Phase 3: API-ification migration
+    if (phase === '3') {
+      const result = await runPhase3Migration();
+      return NextResponse.json({
+        success: true,
+        phase: 3,
+        ...result,
+      });
+    }
 
     // Phase 2: STIX 2.1 Migration
     if (phase === '2') {
@@ -110,7 +171,7 @@ async function initDatabase(request: Request) {
       tables_created: ['threat_indicators', 'threat_feeds', 'lookup_audit'],
       indexes_created: 6,
       feeds_seeded: feeds.length,
-      message: 'Phase 1: Threat Intelligence DB initialized. Run with ?phase=2 for STIX 2.1 migration.',
+      message: 'Phase 1: Threat Intelligence DB initialized. Run with ?phase=2 for STIX 2.1, ?phase=3 for API-ification.',
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
