@@ -16,6 +16,9 @@ export function getDB(): Client {
   return client;
 }
 
+// Alias for v1 API routes
+export const getDb = getDB;
+
 // Initialize database schema
 export async function initDB(): Promise<void> {
   const db = getDB();
@@ -23,30 +26,30 @@ export async function initDB(): Promise<void> {
   await db.batch([
     // Core IOC indicators table (STIX 2.1 aligned)
     `CREATE TABLE IF NOT EXISTS indicators (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL CHECK(type IN ('domain','ipv4-addr','ipv6-addr','url','email-addr','file-hash')),
-      value TEXT NOT NULL,
-      value_normalized TEXT NOT NULL,
-      risk_level TEXT NOT NULL DEFAULT 'unknown' CHECK(risk_level IN ('known_malicious','high_risk','medium_risk','low_risk','clean','unknown')),
-      confidence INTEGER NOT NULL DEFAULT 50 CHECK(confidence BETWEEN 0 AND 100),
-      tlp TEXT NOT NULL DEFAULT 'white' CHECK(tlp IN ('white','green','amber','red')),
-      categories TEXT DEFAULT '[]',
-      tags TEXT DEFAULT '[]',
-      description TEXT,
-      source_feed TEXT NOT NULL,
-      source_ref TEXT,
-      first_seen TEXT NOT NULL DEFAULT (datetime('now')),
-      last_seen TEXT NOT NULL DEFAULT (datetime('now')),
-      valid_from TEXT NOT NULL DEFAULT (datetime('now')),
-      valid_until TEXT,
-      kill_chain_phase TEXT,
-      threat_actor TEXT,
-      campaign TEXT,
-      hit_count INTEGER NOT NULL DEFAULT 0,
-      last_hit_at TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('domain','ipv4-addr','ipv6-addr','url','email-addr','file-hash')),
+        value TEXT NOT NULL,
+        value_normalized TEXT NOT NULL,
+        risk_level TEXT NOT NULL DEFAULT 'unknown' CHECK(risk_level IN ('known_malicious','high_risk','medium_risk','low_risk','clean','unknown')),
+        confidence INTEGER NOT NULL DEFAULT 50 CHECK(confidence BETWEEN 0 AND 100),
+        tlp TEXT NOT NULL DEFAULT 'white' CHECK(tlp IN ('white','green','amber','red')),
+        categories TEXT DEFAULT '[]',
+        tags TEXT DEFAULT '[]',
+        description TEXT,
+        source_feed TEXT NOT NULL,
+        source_ref TEXT,
+        first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+        last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+        valid_from TEXT NOT NULL DEFAULT (datetime('now')),
+        valid_until TEXT,
+        kill_chain_phase TEXT,
+        threat_actor TEXT,
+        campaign TEXT,
+        hit_count INTEGER NOT NULL DEFAULT 0,
+        last_hit_at TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
     // Indexes for fast lookup
@@ -60,59 +63,110 @@ export async function initDB(): Promise<void> {
 
     // Feed management table
     `CREATE TABLE IF NOT EXISTS feeds (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      url TEXT NOT NULL,
-      feed_type TEXT NOT NULL DEFAULT 'osint' CHECK(feed_type IN ('osint','commercial','internal','community')),
-      indicator_type TEXT NOT NULL DEFAULT 'domain',
-      parser TEXT NOT NULL DEFAULT 'text_lines',
-      enabled INTEGER NOT NULL DEFAULT 1,
-      refresh_interval_min INTEGER NOT NULL DEFAULT 15,
-      last_refresh TEXT,
-      last_success TEXT,
-      last_error TEXT,
-      entries_count INTEGER NOT NULL DEFAULT 0,
-      total_ingested INTEGER NOT NULL DEFAULT 0,
-      avg_refresh_ms INTEGER DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('active','error','pending','disabled')),
-      config TEXT DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        feed_type TEXT NOT NULL DEFAULT 'osint' CHECK(feed_type IN ('osint','commercial','internal','community')),
+        indicator_type TEXT NOT NULL DEFAULT 'domain',
+        parser TEXT NOT NULL DEFAULT 'text_lines',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        refresh_interval_min INTEGER NOT NULL DEFAULT 15,
+        last_refresh TEXT,
+        last_success TEXT,
+        last_error TEXT,
+        entries_count INTEGER NOT NULL DEFAULT 0,
+        total_ingested INTEGER NOT NULL DEFAULT 0,
+        avg_refresh_ms INTEGER DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('active','error','pending','disabled')),
+        config TEXT DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
     // Ingestion log for audit trail
     `CREATE TABLE IF NOT EXISTS ingestion_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      feed_id TEXT NOT NULL,
-      started_at TEXT NOT NULL DEFAULT (datetime('now')),
-      completed_at TEXT,
-      status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running','success','error','partial')),
-      indicators_added INTEGER DEFAULT 0,
-      indicators_updated INTEGER DEFAULT 0,
-      indicators_removed INTEGER DEFAULT 0,
-      duration_ms INTEGER,
-      error_message TEXT,
-      FOREIGN KEY (feed_id) REFERENCES feeds(id)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        feed_id TEXT NOT NULL,
+        started_at TEXT NOT NULL DEFAULT (datetime('now')),
+        completed_at TEXT,
+        status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running','success','error','partial')),
+        indicators_added INTEGER DEFAULT 0,
+        indicators_updated INTEGER DEFAULT 0,
+        indicators_removed INTEGER DEFAULT 0,
+        duration_ms INTEGER,
+        error_message TEXT,
+        FOREIGN KEY (feed_id) REFERENCES feeds(id)
     )`,
-
     `CREATE INDEX IF NOT EXISTS idx_ingestion_feed ON ingestion_log(feed_id)`,
     `CREATE INDEX IF NOT EXISTS idx_ingestion_status ON ingestion_log(status)`,
 
     // Lookup history for analytics
     `CREATE TABLE IF NOT EXISTS lookup_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      indicator_value TEXT NOT NULL,
-      indicator_type TEXT,
-      result_risk_level TEXT,
-      sources_hit INTEGER DEFAULT 0,
-      sources_checked INTEGER DEFAULT 0,
-      lookup_ms INTEGER,
-      client_ip TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        indicator_value TEXT NOT NULL,
+        indicator_type TEXT,
+        result_risk_level TEXT,
+        sources_hit INTEGER DEFAULT 0,
+        sources_checked INTEGER DEFAULT 0,
+        lookup_ms INTEGER,
+        client_ip TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-
     `CREATE INDEX IF NOT EXISTS idx_lookup_created ON lookup_log(created_at)`,
     `CREATE INDEX IF NOT EXISTS idx_lookup_value ON lookup_log(indicator_value)`,
+
+    // v1 API tables (threat_indicators, threat_feeds, lookup_audit)
+    `CREATE TABLE IF NOT EXISTS threat_indicators (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        value TEXT NOT NULL,
+        source_feed TEXT NOT NULL,
+        confidence INTEGER DEFAULT 50,
+        severity TEXT DEFAULT 'medium',
+        threat_category TEXT,
+        first_seen TEXT DEFAULT (datetime('now')),
+        last_seen TEXT DEFAULT (datetime('now')),
+        expiry TEXT,
+        is_active INTEGER DEFAULT 1,
+        tags TEXT,
+        stix_id TEXT,
+        stix_pattern TEXT,
+        raw_data TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_ti_value ON threat_indicators(value)`,
+    `CREATE INDEX IF NOT EXISTS idx_ti_type ON threat_indicators(type)`,
+    `CREATE INDEX IF NOT EXISTS idx_ti_type_value ON threat_indicators(type, value)`,
+    `CREATE INDEX IF NOT EXISTS idx_ti_source ON threat_indicators(source_feed)`,
+    `CREATE INDEX IF NOT EXISTS idx_ti_active ON threat_indicators(is_active)`,
+
+    `CREATE TABLE IF NOT EXISTS threat_feeds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        url TEXT NOT NULL,
+        type TEXT NOT NULL,
+        format TEXT DEFAULT 'csv',
+        is_active INTEGER DEFAULT 1,
+        last_fetch TEXT,
+        next_fetch TEXT,
+        fetch_interval_minutes INTEGER DEFAULT 60,
+        last_error TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS lookup_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        query_type TEXT NOT NULL,
+        query_value TEXT NOT NULL,
+        verdict TEXT NOT NULL,
+        sources_hit TEXT,
+        confidence INTEGER,
+        lookup_ms REAL,
+        client_ip TEXT,
+        checked_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_la_checked ON lookup_audit(checked_at)`,
   ], 'write');
 
   // Seed default feed configurations
