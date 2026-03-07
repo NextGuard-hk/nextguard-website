@@ -260,7 +260,7 @@ export async function GET() {
     dlpPatterns: Object.keys(DLP_PATTERNS),
     urlCategories: Object.keys(URL_CATEGORIES),
     threatIntel: getFeedStatus(),
-    threatSources: ['known_domains', 'phishtank', 'urlhaus', 'openphish', 'phishing_army', 'google_safe_browsing', 'virustotal', 'cloudflare_dns'],
+    threatSources: ['urlhaus', 'phishing_army', 'openphish', 'phishtank', 'threatfox', 'feodo_tracker', 'c2_intel', 'ipsum', 'blocklist_de', 'emerging_threats', 'disposable_emails'],
     status: 'operational',
     timestamp: new Date().toISOString(),
   });
