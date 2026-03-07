@@ -259,7 +259,7 @@ async function loadDisposableEmails(): Promise<Set<string>> {
   return new Set(lines.filter(l => l.includes('.') && l.length > 3));
 }
 
-async function refreshFeeds(): Promise<void> {
+export async function refreshFeeds(): Promise<void> {
   const now = Date.now();
   if (cache.lastUpdated > 0 && (now - cache.lastUpdated) < CACHE_TTL_MS) return;
   console.log('[ThreatIntel v4] Refreshing 11 threat feeds...');
