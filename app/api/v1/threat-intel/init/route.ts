@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
-export async function POST(request: Request) {
+async function initDatabase(request: Request) {
   try {
-    // Simple auth check
     const { searchParams } = new URL(request.url);
     const key = searchParams.get('key');
     if (key !== process.env.TI_ADMIN_KEY && key !== 'init-setup') {
@@ -12,7 +11,7 @@ export async function POST(request: Request) {
 
     const db = getDb();
 
-    // Create tables
+    // Create v1 API tables
     await db.execute(`
       CREATE TABLE IF NOT EXISTS threat_indicators (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,13 +64,13 @@ export async function POST(request: Request) {
       )
     `);
 
-    // Create indexes for fast lookups
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_indicators_value ON threat_indicators(value)`);
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_indicators_type ON threat_indicators(type)`);
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_indicators_type_value ON threat_indicators(type, value)`);
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_indicators_source ON threat_indicators(source_feed)`);
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_indicators_active ON threat_indicators(is_active)`);
-    await db.execute(`CREATE INDEX IF NOT EXISTS idx_lookup_checked ON lookup_audit(checked_at)`);
+    // Create indexes
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_ti_value ON threat_indicators(value)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_ti_type ON threat_indicators(type)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_ti_type_value ON threat_indicators(type, value)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_ti_source ON threat_indicators(source_feed)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_ti_active ON threat_indicators(is_active)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_la_checked ON lookup_audit(checked_at)`);
 
     // Seed default feeds
     const feeds = [
@@ -102,4 +101,12 @@ export async function POST(request: Request) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
+}
+
+export async function POST(request: Request) {
+  return initDatabase(request);
+}
+
+export async function GET(request: Request) {
+  return initDatabase(request);
 }
