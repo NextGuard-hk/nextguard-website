@@ -1,7 +1,7 @@
 // lib/threat-intel.ts
-// NextGuard OSINT Threat Intelligence Engine v4.0
+// NextGuard OSINT Threat Intelligence Engine v4.1
 // Integrates: URLhaus, Phishing Army, OpenPhish, PhishTank,
-// ThreatFox, Feodo Tracker, SSLBL, IPsum, blocklist.de,
+// ThreatFox, Feodo Tracker, C2IntelFeeds (replaces deprecated SSLBL), IPsum, blocklist.de,
 // Emerging Threats, Disposable Emails
 
 export type RiskLevel = 'known_malicious' | 'high_risk' | 'medium_risk' | 'low_risk' | 'clean' | 'unknown';
@@ -34,7 +34,7 @@ interface FeedCache {
   phishtankUrls: Set<string>;
   threatfox: Set<string>;
   feodoIPs: Set<string>;
-  sslblIPs: Set<string>;
+  c2intelIPs: Set<string>;
   ipsumIPs: Set<string>;
   blocklistDeIPs: Set<string>;
   emergingThreats: Set<string>;
@@ -44,10 +44,12 @@ interface FeedCache {
 }
 
 let cache: FeedCache = {
-  urlhaus: new Set(), phishingArmy: new Set(), openphish: new Set(),
-  phishtankDomains: new Set(), phishtankUrls: new Set(), threatfox: new Set(),
-  feodoIPs: new Set(), sslblIPs: new Set(), ipsumIPs: new Set(),
-  blocklistDeIPs: new Set(), emergingThreats: new Set(), disposableEmails: new Set(),
+  urlhaus: new Set(), phishingArmy: new Set(),
+  openphish: new Set(), phishtankDomains: new Set(),
+  phishtankUrls: new Set(), threatfox: new Set(),
+  feodoIPs: new Set(), c2intelIPs: new Set(),
+  ipsumIPs: new Set(), blocklistDeIPs: new Set(),
+  emergingThreats: new Set(), disposableEmails: new Set(),
   lastUpdated: 0, feedErrors: [],
 };
 
@@ -114,12 +116,19 @@ const SUSPICIOUS_KEYWORDS = ['malware','phish','exploit','botnet','ransom','troj
 const URL_SHORTENERS = ['bit.ly','t.co','tinyurl.com','goo.gl','ow.ly','is.gd','buff.ly','rebrand.ly','bl.ink','short.io','rb.gy','cutt.ly','shorturl.at'];
 
 function analyzeDomainPattern(domain: string, url: string): { score: number; flags: string[]; detail: string } {
-  let score = 0; const flags: string[] = []; const details: string[] = [];
-  if (URL_SHORTENERS.some(s => domain === s || domain.endsWith('.' + s))) { score += 10; flags.push('url_shortener'); details.push('URL shortener'); }
-  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(domain)) { score += 15; flags.push('ip_address_url'); details.push('IP as domain'); }
+  let score = 0;
+  const flags: string[] = [];
+  const details: string[] = [];
+  if (URL_SHORTENERS.some(s => domain === s || domain.endsWith('.' + s))) {
+    score += 10; flags.push('url_shortener'); details.push('URL shortener');
+  }
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(domain)) {
+    score += 15; flags.push('ip_address_url'); details.push('IP as domain');
+  }
   if (domain.split('.').length >= 4) { score += 8; flags.push('excessive_subdomains'); }
   const brands = ['paypal','google','microsoft','apple','amazon','netflix','facebook','bank','secure','login','verify','wallet','crypto','bitcoin'];
-  const dl = domain.toLowerCase(); const rd = domain.split('.').slice(-2).join('.');
+  const dl = domain.toLowerCase();
+  const rd = domain.split('.').slice(-2).join('.');
   if (brands.some(b => dl.includes(b) && !rd.includes(b))) { score += 12; flags.push('brand_impersonation'); }
   if (domain.length > 40) { score += 5; flags.push('long_domain'); }
   const base = domain.split('.').slice(0,-1).join('.');
@@ -132,7 +141,7 @@ function analyzeDomainPattern(domain: string, url: string): { score: number; fla
 
 async function fetchTextFeed(url: string): Promise<string[]> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.0' } });
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' } });
     if (!res.ok) return [];
     const text = await res.text();
     return text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#'));
@@ -142,7 +151,9 @@ async function fetchTextFeed(url: string): Promise<string[]> {
 async function loadUrlhaus(): Promise<Set<string>> {
   const lines = await fetchTextFeed('https://urlhaus.abuse.ch/downloads/text_online/');
   const domains = new Set<string>();
-  for (const line of lines) { try { domains.add(new URL(line.startsWith('http') ? line : 'http://' + line).hostname); } catch {} }
+  for (const line of lines) {
+    try { domains.add(new URL(line.startsWith('http') ? line : 'http://' + line).hostname); } catch {}
+  }
   return domains;
 }
 
@@ -154,19 +165,22 @@ async function loadPhishingArmy(): Promise<Set<string>> {
 async function loadOpenPhish(): Promise<Set<string>> {
   const lines = await fetchTextFeed('https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt');
   const domains = new Set<string>();
-  for (const line of lines) { try { domains.add(new URL(line).hostname); } catch {} }
+  for (const line of lines) {
+    try { domains.add(new URL(line).hostname); } catch {}
+  }
   return domains;
 }
 
 async function loadPhishTank(): Promise<{ domains: Set<string>; urls: Set<string> }> {
-  const domains = new Set<string>(); const urls = new Set<string>();
+  const domains = new Set<string>();
+  const urls = new Set<string>();
   const feedUrls = [
     `https://data.phishtank.com/data/${process.env.PHISHTANK_API_KEY || ''}/online-valid.csv`,
     'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt',
   ];
   for (const feedUrl of feedUrls) {
     try {
-      const res = await fetch(feedUrl, { signal: AbortSignal.timeout(20000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.0' }, redirect: 'follow' });
+      const res = await fetch(feedUrl, { signal: AbortSignal.timeout(20000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' }, redirect: 'follow' });
       if (!res.ok) continue;
       const text = await res.text();
       if (feedUrl.includes('phishing-domains-ACTIVE')) {
@@ -179,7 +193,8 @@ async function loadPhishTank(): Promise<{ domains: Set<string>; urls: Set<string
         const lines = text.split('\n');
         for (let i = 1; i < lines.length; i++) {
           try {
-            const line = lines[i]; if (!line || line.length < 10) continue;
+            const line = lines[i];
+            if (!line || line.length < 10) continue;
             let urlStr = '';
             if (line.startsWith('"')) {
               const match = line.match(/^"?\d+"?,"?([^"\s,]+)"?/);
@@ -218,19 +233,25 @@ async function loadFeodoTracker(): Promise<Set<string>> {
   return new Set(lines.filter(l => /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(l)));
 }
 
-async function loadSSLBL(): Promise<Set<string>> {
+// C2IntelFeeds replaces deprecated SSLBL Botnet C2 IP Blacklist (discontinued 2025-01-03)
+// Source: https://github.com/drb-ra/C2IntelFeeds - Active C2 server IPs (30-day rolling)
+async function loadC2Intel(): Promise<Set<string>> {
+  const ips = new Set<string>();
   try {
-    const res = await fetch('https://sslbl.abuse.ch/blacklist/sslipblacklist.csv', { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.0' } });
-    if (!res.ok) return new Set();
-    const text = await res.text(); const ips = new Set<string>();
+    const res = await fetch('https://raw.githubusercontent.com/drb-ra/C2IntelFeeds/master/feeds/IPC2s-30day.csv', {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' }
+    });
+    if (!res.ok) return ips;
+    const text = await res.text();
     for (const line of text.split('\n')) {
-      const t = line.trim(); if (t && !t.startsWith('#')) {
-        const ip = (t.split(',')[1] || t.split(',')[0] || '').trim();
-        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) ips.add(ip);
-      }
+      const t = line.trim();
+      if (!t || t.startsWith('#') || t === '#ip,ioc') continue;
+      const ip = t.split(',')[0].trim();
+      if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) ips.add(ip);
     }
-    return ips;
-  } catch { return new Set(); }
+  } catch {}
+  return ips;
 }
 
 async function loadIPsum(): Promise<Set<string>> {
@@ -247,10 +268,20 @@ async function loadEmergingThreats(): Promise<Set<string>> {
   const lines = await fetchTextFeed('https://rules.emergingthreats.net/blockrules/compromised-ips.txt');
   const domains = new Set<string>();
   try {
-    const res2 = await fetch('https://raw.githubusercontent.com/stamparm/maltrail/master/trails/static/suspicious/domain.txt', { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.0' } });
-    if (res2.ok) { const t2 = await res2.text(); for (const l of t2.split('\n')) { const d = l.trim().toLowerCase(); if (d && !d.startsWith('#') && d.includes('.')) domains.add(d); } }
+    const res2 = await fetch('https://raw.githubusercontent.com/stamparm/maltrail/master/trails/static/suspicious/domain.txt', {
+      signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' }
+    });
+    if (res2.ok) {
+      const t2 = await res2.text();
+      for (const l of t2.split('\n')) {
+        const d = l.trim().toLowerCase();
+        if (d && !d.startsWith('#') && d.includes('.')) domains.add(d);
+      }
+    }
   } catch {}
-  for (const l of lines) { if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(l)) domains.add(l); }
+  for (const l of lines) {
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(l)) domains.add(l);
+  }
   return domains;
 }
 
@@ -262,31 +293,41 @@ async function loadDisposableEmails(): Promise<Set<string>> {
 export async function refreshFeeds(): Promise<void> {
   const now = Date.now();
   if (cache.lastUpdated > 0 && (now - cache.lastUpdated) < CACHE_TTL_MS) return;
-  console.log('[ThreatIntel v4] Refreshing 11 threat feeds...');
+  console.log('[ThreatIntel v4.1] Refreshing 11 threat feeds...');
   cache.feedErrors = [];
   try {
-    const [urlhaus, phishingArmy, openphish, phishtank, threatfox, feodo, sslbl, ipsum, blocklistDe, et, disposable] = await Promise.all([
+    const [urlhaus, phishingArmy, openphish, phishtank, threatfox, feodo, c2intel, ipsum, blocklistDe, et, disposable] = await Promise.all([
       loadUrlhaus().catch(e => { cache.feedErrors.push('urlhaus: ' + e.message); return new Set<string>(); }),
       loadPhishingArmy().catch(e => { cache.feedErrors.push('phishingArmy: ' + e.message); return new Set<string>(); }),
       loadOpenPhish().catch(e => { cache.feedErrors.push('openphish: ' + e.message); return new Set<string>(); }),
       loadPhishTank().catch(e => { cache.feedErrors.push('phishtank: ' + e.message); return { domains: new Set<string>(), urls: new Set<string>() }; }),
       loadThreatFox().catch(e => { cache.feedErrors.push('threatfox: ' + e.message); return new Set<string>(); }),
       loadFeodoTracker().catch(e => { cache.feedErrors.push('feodo: ' + e.message); return new Set<string>(); }),
-      loadSSLBL().catch(e => { cache.feedErrors.push('sslbl: ' + e.message); return new Set<string>(); }),
+      loadC2Intel().catch(e => { cache.feedErrors.push('c2intel: ' + e.message); return new Set<string>(); }),
       loadIPsum().catch(e => { cache.feedErrors.push('ipsum: ' + e.message); return new Set<string>(); }),
       loadBlocklistDe().catch(e => { cache.feedErrors.push('blocklistde: ' + e.message); return new Set<string>(); }),
       loadEmergingThreats().catch(e => { cache.feedErrors.push('et: ' + e.message); return new Set<string>(); }),
       loadDisposableEmails().catch(e => { cache.feedErrors.push('disposable: ' + e.message); return new Set<string>(); }),
     ]);
-    cache.urlhaus = urlhaus; cache.phishingArmy = phishingArmy; cache.openphish = openphish;
-    cache.phishtankDomains = (phishtank as any).domains || new Set(); cache.phishtankUrls = (phishtank as any).urls || new Set();
-    cache.threatfox = threatfox as Set<string>; cache.feodoIPs = feodo as Set<string>;
-    cache.sslblIPs = sslbl as Set<string>; cache.ipsumIPs = ipsum as Set<string>;
-    cache.blocklistDeIPs = blocklistDe as Set<string>; cache.emergingThreats = et as Set<string>;
+    cache.urlhaus = urlhaus;
+    cache.phishingArmy = phishingArmy;
+    cache.openphish = openphish;
+    cache.phishtankDomains = (phishtank as any).domains || new Set();
+    cache.phishtankUrls = (phishtank as any).urls || new Set();
+    cache.threatfox = threatfox as Set<string>;
+    cache.feodoIPs = feodo as Set<string>;
+    cache.c2intelIPs = c2intel as Set<string>;
+    cache.ipsumIPs = ipsum as Set<string>;
+    cache.blocklistDeIPs = blocklistDe as Set<string>;
+    cache.emergingThreats = et as Set<string>;
     cache.disposableEmails = disposable as Set<string>;
     cache.lastUpdated = now;
-    const total = urlhaus.size + phishingArmy.size + openphish.size + ((phishtank as any).domains?.size || 0) + (threatfox as Set<string>).size + (feodo as Set<string>).size + (sslbl as Set<string>).size + (ipsum as Set<string>).size + (blocklistDe as Set<string>).size + (et as Set<string>).size + (disposable as Set<string>).size;
-    console.log(`[ThreatIntel v4] All feeds loaded. Total IOCs: ${total}`);
+    const total = urlhaus.size + phishingArmy.size + openphish.size +
+      ((phishtank as any).domains?.size || 0) + (threatfox as Set<string>).size +
+      (feodo as Set<string>).size + (c2intel as Set<string>).size +
+      (ipsum as Set<string>).size + (blocklistDe as Set<string>).size +
+      (et as Set<string>).size + (disposable as Set<string>).size;
+    console.log(`[ThreatIntel v4.1] All feeds loaded. Total IOCs: ${total}`);
   } catch (e: any) { cache.feedErrors.push('refresh: ' + e.message); }
 }
 
@@ -296,7 +337,8 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   await ensureFeedsLoaded();
   const sources: SourceHit[] = [];
   let hostname = '';
-  try { hostname = new URL(inputUrl.startsWith('http') ? inputUrl : `https://${inputUrl}`).hostname.toLowerCase(); } catch { hostname = inputUrl.toLowerCase(); }
+  try { hostname = new URL(inputUrl.startsWith('http') ? inputUrl : `https://${inputUrl}`).hostname.toLowerCase(); }
+  catch { hostname = inputUrl.toLowerCase(); }
   const allCategories: string[] = [];
   const allFlags: string[] = [];
   let totalScore = 0;
@@ -341,10 +383,10 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   sources.push({ name: 'Feodo Tracker', hit: feHit, risk_level: feHit ? 'known_malicious' : undefined, categories: feHit ? ['botnet', 'c2'] : undefined });
   if (feHit) { allCategories.push('botnet'); totalScore += 95; }
 
-  // SSLBL
-  const slHit = cache.sslblIPs.has(hostname);
-  sources.push({ name: 'SSLBL', hit: slHit, risk_level: slHit ? 'high_risk' : undefined, categories: slHit ? ['malware'] : undefined });
-  if (slHit) { allCategories.push('malware'); totalScore += 80; }
+  // C2IntelFeeds (replaced SSLBL)
+  const c2Hit = cache.c2intelIPs.has(hostname);
+  sources.push({ name: 'C2 Intel', hit: c2Hit, risk_level: c2Hit ? 'known_malicious' : undefined, categories: c2Hit ? ['c2', 'botnet'] : undefined, detail: c2Hit ? 'Active C2 server (30-day feed)' : undefined });
+  if (c2Hit) { allCategories.push('c2', 'botnet'); totalScore += 90; }
 
   // IPsum
   const ipHit = cache.ipsumIPs.has(hostname);
@@ -382,14 +424,9 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   else riskLevel = 'clean';
 
   return {
-    url: inputUrl,
-    domain: hostname,
-    risk_level: riskLevel,
-    overall_score: overallScore,
-    categories: [...new Set(allCategories)],
-    flags: [...new Set(allFlags)],
-    sources,
-    checked_at: new Date().toISOString(),
+    url: inputUrl, domain: hostname, risk_level: riskLevel,
+    overall_score: overallScore, categories: [...new Set(allCategories)],
+    flags: [...new Set(allFlags)], sources, checked_at: new Date().toISOString(),
   };
 }
 
@@ -406,7 +443,7 @@ export function getFeedStatus() {
       { name: 'PhishTank', entries: cache.phishtankDomains.size + cache.phishtankUrls.size, status: cache.phishtankDomains.size > 0 ? 'active' : 'error' },
       { name: 'ThreatFox', entries: cache.threatfox.size, status: cache.threatfox.size > 0 ? 'active' : 'error' },
       { name: 'Feodo Tracker', entries: cache.feodoIPs.size, status: cache.feodoIPs.size > 0 ? 'active' : 'error' },
-      { name: 'SSLBL', entries: cache.sslblIPs.size, status: cache.sslblIPs.size > 0 ? 'active' : 'error' },
+      { name: 'C2 Intel', entries: cache.c2intelIPs.size, status: cache.c2intelIPs.size > 0 ? 'active' : 'error' },
       { name: 'IPsum', entries: cache.ipsumIPs.size, status: cache.ipsumIPs.size > 0 ? 'active' : 'error' },
       { name: 'blocklist.de', entries: cache.blocklistDeIPs.size, status: cache.blocklistDeIPs.size > 0 ? 'active' : 'error' },
       { name: 'Emerging Threats', entries: cache.emergingThreats.size, status: cache.emergingThreats.size > 0 ? 'active' : 'error' },
@@ -414,6 +451,9 @@ export function getFeedStatus() {
     ],
     lastUpdated: cache.lastUpdated > 0 ? new Date(cache.lastUpdated).toISOString() : null,
     feedErrors: cache.feedErrors,
-    totalEntries: cache.urlhaus.size + cache.phishingArmy.size + cache.openphish.size + cache.phishtankDomains.size + cache.phishtankUrls.size + cache.threatfox.size + cache.feodoIPs.size + cache.sslblIPs.size + cache.ipsumIPs.size + cache.blocklistDeIPs.size + cache.emergingThreats.size + cache.disposableEmails.size,
+    totalEntries: cache.urlhaus.size + cache.phishingArmy.size + cache.openphish.size +
+      cache.phishtankDomains.size + cache.phishtankUrls.size + cache.threatfox.size +
+      cache.feodoIPs.size + cache.c2intelIPs.size + cache.ipsumIPs.size +
+      cache.blocklistDeIPs.size + cache.emergingThreats.size + cache.disposableEmails.size,
   };
 }
