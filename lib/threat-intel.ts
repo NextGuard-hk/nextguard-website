@@ -1,9 +1,10 @@
 import { categorizeUrl } from './url-categories';
 // lib/threat-intel.ts
-// NextGuard OSINT Threat Intelligence Engine v4.1
+// NextGuard OSINT Threat Intelligence Engine v4.2
 // Integrates: URLhaus, Phishing Army, OpenPhish, PhishTank,
 // ThreatFox, Feodo Tracker, C2IntelFeeds (replaces deprecated SSLBL), IPsum, blocklist.de,
 // Emerging Threats, Disposable Emails
+// v4.2 fixes: exact domain matching, whitelist override, PhishTank/OpenPhish hostname extraction
 
 export type RiskLevel = 'known_malicious' | 'high_risk' | 'medium_risk' | 'low_risk' | 'clean' | 'unknown';
 
@@ -55,6 +56,29 @@ let cache: FeedCache = {
 };
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
+
+// Whitelist: Known-good domains that should NEVER be flagged as malicious
+// These domains are immune to threat feed false positives
+const WHITELIST_DOMAINS = new Set([
+  'google.com', 'www.google.com', 'microsoft.com', 'facebook.com', 'instagram.com',
+  'twitter.com', 'x.com', 'linkedin.com', 'tiktok.com', 'reddit.com', 'discord.com',
+  'telegram.org', 'whatsapp.com', 'chat.openai.com', 'openai.com', 'claude.ai',
+  'perplexity.ai', 'github.com', 'youtube.com', 'netflix.com', 'amazon.com',
+  'hsbc.com', 'paypal.com', 'dropbox.com', 'gmail.com', 'outlook.com', 'gov.hk',
+  'virustotal.com', 'apple.com', 'adobe.com', 'zoom.us', 'slack.com',
+  'salesforce.com', 'shopify.com', 'wordpress.com', 'wikipedia.org',
+  'stackoverflow.com', 'cloudflare.com', 'aws.amazon.com', 'azure.microsoft.com',
+  'yahoo.com', 'bing.com', 'duckduckgo.com', 'baidu.com', 'example.com',
+]);
+
+function isWhitelistedDomain(hostname: string): boolean {
+  if (WHITELIST_DOMAINS.has(hostname)) return true;
+  // Check if it's a subdomain of a whitelisted domain
+  for (const wd of WHITELIST_DOMAINS) {
+    if (hostname.endsWith('.' + wd)) return true;
+  }
+  return false;
+}
 
 const LOCAL_IOC: Record<string, { risk_level: RiskLevel; categories: string[] }> = {
   'crimsondew.com': { risk_level: 'known_malicious', categories: ['malware'] },
@@ -140,9 +164,25 @@ function analyzeDomainPattern(domain: string, url: string): { score: number; fla
   return { score, flags, detail: details.join('; ') };
 }
 
+// Helper: safely extract hostname from a URL string
+function safeExtractHostname(urlStr: string): string {
+  try {
+    return new URL(urlStr.startsWith('http') ? urlStr : 'http://' + urlStr).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+// Helper: exact domain match (domain === target or domain ends with .target)
+function domainMatches(hostname: string, target: string): boolean {
+  const h = hostname.replace(/^www\./, '');
+  const t = target.replace(/^www\./, '');
+  return h === t || h.endsWith('.' + t);
+}
+
 async function fetchTextFeed(url: string): Promise<string[]> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' } });
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.2' } });
     if (!res.ok) return [];
     const text = await res.text();
     return text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#'));
@@ -181,7 +221,7 @@ async function loadPhishTank(): Promise<{ domains: Set<string>; urls: Set<string
   ];
   for (const feedUrl of feedUrls) {
     try {
-      const res = await fetch(feedUrl, { signal: AbortSignal.timeout(20000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' }, redirect: 'follow' });
+      const res = await fetch(feedUrl, { signal: AbortSignal.timeout(20000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.2' }, redirect: 'follow' });
       if (!res.ok) continue;
       const text = await res.text();
       if (feedUrl.includes('phishing-domains-ACTIVE')) {
@@ -234,14 +274,12 @@ async function loadFeodoTracker(): Promise<Set<string>> {
   return new Set(lines.filter(l => /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(l)));
 }
 
-// C2IntelFeeds replaces deprecated SSLBL Botnet C2 IP Blacklist (discontinued 2025-01-03)
-// Source: https://github.com/drb-ra/C2IntelFeeds - Active C2 server IPs (30-day rolling)
 async function loadC2Intel(): Promise<Set<string>> {
   const ips = new Set<string>();
   try {
     const res = await fetch('https://raw.githubusercontent.com/drb-ra/C2IntelFeeds/master/feeds/IPC2s-30day.csv', {
       signal: AbortSignal.timeout(15000),
-      headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' }
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.2' }
     });
     if (!res.ok) return ips;
     const text = await res.text();
@@ -270,7 +308,7 @@ async function loadEmergingThreats(): Promise<Set<string>> {
   const domains = new Set<string>();
   try {
     const res2 = await fetch('https://raw.githubusercontent.com/stamparm/maltrail/master/trails/static/suspicious/domain.txt', {
-      signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.1' }
+      signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'NextGuard-ThreatIntel/4.2' }
     });
     if (res2.ok) {
       const t2 = await res2.text();
@@ -294,7 +332,7 @@ async function loadDisposableEmails(): Promise<Set<string>> {
 export async function refreshFeeds(): Promise<void> {
   const now = Date.now();
   if (cache.lastUpdated > 0 && (now - cache.lastUpdated) < CACHE_TTL_MS) return;
-  console.log('[ThreatIntel v4.1] Refreshing 11 threat feeds...');
+  console.log('[ThreatIntel v4.2] Refreshing 11 threat feeds...');
   cache.feedErrors = [];
   try {
     const [urlhaus, phishingArmy, openphish, phishtank, threatfox, feodo, c2intel, ipsum, blocklistDe, et, disposable] = await Promise.all([
@@ -328,7 +366,7 @@ export async function refreshFeeds(): Promise<void> {
       (feodo as Set<string>).size + (c2intel as Set<string>).size +
       (ipsum as Set<string>).size + (blocklistDe as Set<string>).size +
       (et as Set<string>).size + (disposable as Set<string>).size;
-    console.log(`[ThreatIntel v4.1] All feeds loaded. Total IOCs: ${total}`);
+    console.log(`[ThreatIntel v4.2] All feeds loaded. Total IOCs: ${total}`);
   } catch (e: any) { cache.feedErrors.push('refresh: ' + e.message); }
 }
 
@@ -340,42 +378,77 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   let hostname = '';
   try { hostname = new URL(inputUrl.startsWith('http') ? inputUrl : `https://${inputUrl}`).hostname.toLowerCase(); }
   catch { hostname = inputUrl.toLowerCase(); }
+  const cleanHostname = hostname.replace(/^www\./, '');
+
   const allCategories: string[] = [];
   const allFlags: string[] = [];
   let totalScore = 0;
 
-  // Local IOC
-  const localMatch = Object.entries(LOCAL_IOC).find(([k]) => hostname.includes(k) || hostname.endsWith(k));
+  // === FIX v4.2: Whitelist check - known-good domains bypass threat feeds ===
+  const whitelisted = isWhitelistedDomain(cleanHostname);
+
+  // === FIX v4.2: Local IOC - use EXACT domain match instead of .includes() ===
+  const localMatch = Object.entries(LOCAL_IOC).find(([k]) => domainMatches(cleanHostname, k));
   if (localMatch) {
     sources.push({ name: 'Local IOC', hit: true, risk_level: localMatch[1].risk_level, categories: localMatch[1].categories, detail: `Matched: ${localMatch[0]}` });
     allCategories.push(...localMatch[1].categories);
     totalScore += localMatch[1].risk_level === 'known_malicious' ? 90 : localMatch[1].risk_level === 'high_risk' ? 70 : localMatch[1].risk_level === 'medium_risk' ? 40 : 10;
   } else { sources.push({ name: 'Local IOC', hit: false }); }
 
-  // URLhaus
-  const uhHit = cache.urlhaus.has(hostname) || cache.urlhaus.has(inputUrl);
+  // === For whitelisted domains, mark all feeds as Clean and skip feed checks ===
+  if (whitelisted) {
+    const feedNames = ['URLhaus', 'Phishing Army', 'OpenPhish', 'PhishTank', 'ThreatFox', 'Feodo Tracker', 'C2 Intel', 'IPsum', 'blocklist.de', 'Emerging Threats', 'Disposable Emails'];
+    for (const name of feedNames) {
+      sources.push({ name, hit: false });
+    }
+    // For whitelisted domains, use Local IOC or url-categories for categorization
+    const cats = localMatch ? localMatch[1].categories : categorizeUrl(cleanHostname);
+    const riskLvl = localMatch ? localMatch[1].risk_level : 'clean';
+    return {
+      url: inputUrl, domain: hostname, risk_level: riskLvl,
+      overall_score: Math.min(totalScore, 15),
+      categories: cats.length > 0 ? [...new Set(cats)] : categorizeUrl(cleanHostname),
+      flags: [], sources,
+      checked_at: new Date().toISOString(),
+    };
+  }
+
+  // URLhaus - exact domain match
+  const uhHit = cache.urlhaus.has(cleanHostname) || cache.urlhaus.has(hostname);
   sources.push({ name: 'URLhaus', hit: uhHit, risk_level: uhHit ? 'known_malicious' : undefined, categories: uhHit ? ['malware'] : undefined, detail: uhHit ? 'Active malware distribution' : undefined });
   if (uhHit) { allCategories.push('malware'); totalScore += 90; }
 
-  // Phishing Army
-  const paHit = cache.phishingArmy.has(hostname);
+  // Phishing Army - exact domain match
+  const paHit = cache.phishingArmy.has(cleanHostname) || cache.phishingArmy.has(hostname);
   sources.push({ name: 'Phishing Army', hit: paHit, risk_level: paHit ? 'known_malicious' : undefined, categories: paHit ? ['phishing'] : undefined });
   if (paHit) { allCategories.push('phishing'); totalScore += 85; }
 
-  // OpenPhish
+  // === FIX v4.2: OpenPhish - extract hostname from URLs, then exact match ===
+  // OLD (BUGGY): for (const u of cache.openphish) { if (u.includes(hostname)) { opHit = true; break; } }
+  // NEW (FIXED): extract hostname from each URL and compare exactly
   let opHit = false;
-  for (const u of cache.openphish) { if (u.includes(hostname)) { opHit = true; break; } }
+  for (const u of cache.openphish) {
+    const feedHost = safeExtractHostname(u);
+    if (feedHost && domainMatches(feedHost, cleanHostname)) { opHit = true; break; }
+  }
   sources.push({ name: 'OpenPhish', hit: opHit, risk_level: opHit ? 'known_malicious' : undefined, categories: opHit ? ['phishing'] : undefined });
   if (opHit) { allCategories.push('phishing'); totalScore += 85; }
 
-  // PhishTank
-  let ptHit = cache.phishtankDomains.has(hostname);
-  if (!ptHit) { for (const u of cache.phishtankUrls) { if (u.includes(hostname)) { ptHit = true; break; } } }
+  // === FIX v4.2: PhishTank - exact domain match only ===
+  // OLD (BUGGY): for (const u of cache.phishtankUrls) { if (u.includes(hostname)) { ptHit = true; break; } }
+  // NEW (FIXED): check domain set first, then extract hostname from URL set
+  let ptHit = cache.phishtankDomains.has(cleanHostname) || cache.phishtankDomains.has(hostname);
+  if (!ptHit) {
+    for (const u of cache.phishtankUrls) {
+      const feedHost = safeExtractHostname(u);
+      if (feedHost && domainMatches(feedHost, cleanHostname)) { ptHit = true; break; }
+    }
+  }
   sources.push({ name: 'PhishTank', hit: ptHit, risk_level: ptHit ? 'known_malicious' : undefined, categories: ptHit ? ['phishing'] : undefined });
   if (ptHit) { allCategories.push('phishing'); totalScore += 85; }
 
-  // ThreatFox
-  const tfHit = cache.threatfox.has(hostname);
+  // ThreatFox - exact domain match
+  const tfHit = cache.threatfox.has(cleanHostname) || cache.threatfox.has(hostname);
   sources.push({ name: 'ThreatFox', hit: tfHit, risk_level: tfHit ? 'known_malicious' : undefined, categories: tfHit ? ['malware', 'c2'] : undefined });
   if (tfHit) { allCategories.push('malware', 'c2'); totalScore += 90; }
 
@@ -384,7 +457,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   sources.push({ name: 'Feodo Tracker', hit: feHit, risk_level: feHit ? 'known_malicious' : undefined, categories: feHit ? ['botnet', 'c2'] : undefined });
   if (feHit) { allCategories.push('botnet'); totalScore += 95; }
 
-  // C2IntelFeeds (replaced SSLBL)
+  // C2IntelFeeds
   const c2Hit = cache.c2intelIPs.has(hostname);
   sources.push({ name: 'C2 Intel', hit: c2Hit, risk_level: c2Hit ? 'known_malicious' : undefined, categories: c2Hit ? ['c2', 'botnet'] : undefined, detail: c2Hit ? 'Active C2 server (30-day feed)' : undefined });
   if (c2Hit) { allCategories.push('c2', 'botnet'); totalScore += 90; }
@@ -400,12 +473,12 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   if (blHit) { allCategories.push('attack_source'); totalScore += 70; }
 
   // Emerging Threats
-  const etHit = cache.emergingThreats.has(hostname);
+  const etHit = cache.emergingThreats.has(cleanHostname) || cache.emergingThreats.has(hostname);
   sources.push({ name: 'Emerging Threats', hit: etHit, risk_level: etHit ? 'high_risk' : undefined, categories: etHit ? ['compromised'] : undefined });
   if (etHit) { allCategories.push('compromised'); totalScore += 70; }
 
   // Disposable Emails
-  const deHit = cache.disposableEmails.has(hostname) || cache.disposableEmails.has(hostname.replace(/^www\./, ''));
+  const deHit = cache.disposableEmails.has(cleanHostname) || cache.disposableEmails.has(hostname);
   sources.push({ name: 'Disposable Emails', hit: deHit, risk_level: deHit ? 'low_risk' : undefined, categories: deHit ? ['disposable_email'] : undefined });
   if (deHit) { allCategories.push('disposable_email'); totalScore += 15; }
 
@@ -426,11 +499,12 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
 
   return {
     url: inputUrl, domain: hostname, risk_level: riskLevel,
-          overall_score: overallScore, categories: allCategories.length > 0 ? [...new Set(allCategories)] : categorizeUrl(hostname),
-      flags: [...new Set(allFlags)], sources,
-          checked_at: new Date().toISOString(),
-};
+    overall_score: overallScore, categories: allCategories.length > 0 ? [...new Set(allCategories)] : categorizeUrl(cleanHostname),
+    flags: [...new Set(allFlags)], sources,
+    checked_at: new Date().toISOString(),
+  };
 }
+
 export async function checkUrlFast(inputUrl: string): Promise<ThreatIntelResult> {
   return checkUrl(inputUrl);
 }
