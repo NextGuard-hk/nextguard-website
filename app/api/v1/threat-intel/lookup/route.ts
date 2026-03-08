@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { lookupIndicator } from '@/lib/threat-intel-db';
+import { categorizeUrl } from '@/lib/url-categories';
 
 export async function GET(request: Request) {
   try {
@@ -49,6 +50,15 @@ export async function GET(request: Request) {
       }
     }
 
+    // Always add URL categorization for domain/url types
+    if (detectedType === 'url' || detectedType === 'domain') {
+      const urlForCat = detectedType === 'url' ? normalizedIndicator : `https://${normalizedIndicator}`;
+      const urlCats = categorizeUrl(urlForCat);
+      urlCats.forEach((c: string) => {
+        if (!categories.includes(c)) categories.push(c);
+      });
+    }
+
     // Heuristic checks for URLs/domains not in DB
     const heuristics = runHeuristics(normalizedIndicator, detectedType);
     if (heuristics.suspicious && verdict === 'clean') {
@@ -79,7 +89,7 @@ export async function GET(request: Request) {
       heuristics: heuristics.flags,
       lookup_ms: lookupMs,
       checked_at: new Date().toISOString(),
-      engine_version: '5.1-db',
+      engine_version: '5.2-db',
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -93,23 +103,27 @@ export async function POST(request: Request) {
     if (!indicators.length) {
       return NextResponse.json({ error: 'indicators array required' }, { status: 400 });
     }
-
     const results = await Promise.all(
       indicators.slice(0, 100).map(async (ind) => {
         const startTime = Date.now();
         const normalized = ind.toLowerCase().trim();
         const detectedType = detectIndicatorType(normalized);
-
         let lookupValue = normalized;
         if (detectedType === 'url') {
           try { lookupValue = new URL(normalized.startsWith('http') ? normalized : `https://${normalized}`).hostname.replace(/^www\./, ''); } catch {}
         } else if (detectedType === 'domain') {
           lookupValue = normalized.replace(/^www\./, '');
         }
-
         const { hits } = await lookupIndicator(lookupValue);
         const verdict = hits.length > 0 ? 'malicious' : 'clean';
         const maxConf = hits.reduce((max: number, h) => Math.max(max, h.confidence || 0), 0);
+        const categories = hits.flatMap(h => h.categories).filter((v, i, a) => a.indexOf(v) === i);
+        // Add URL categorization
+        if (detectedType === 'url' || detectedType === 'domain') {
+          const urlForCat = detectedType === 'url' ? normalized : `https://${normalized}`;
+          const urlCats = categorizeUrl(urlForCat);
+          urlCats.forEach((c: string) => { if (!categories.includes(c)) categories.push(c); });
+        }
         return {
           indicator: normalized,
           type: detectedType,
@@ -117,12 +131,11 @@ export async function POST(request: Request) {
           risk_level: hits[0]?.risk_level || 'clean',
           confidence: maxConf,
           sources: hits.map(h => h.feed),
-          categories: hits.flatMap(h => h.categories).filter((v, i, a) => a.indexOf(v) === i),
+          categories,
           lookup_ms: Date.now() - startTime,
         };
       })
     );
-
     return NextResponse.json({
       results,
       total: results.length,
