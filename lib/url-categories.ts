@@ -1,5 +1,5 @@
 // lib/url-categories.ts
-// Enterprise URL Categorization Engine v2.0
+// Enterprise URL Categorization Engine v3.0 - Word-boundary keyword matching
 // Provides accurate category for every URL - clean or malicious
 // Enhanced: Dynamic DNS detection, suspicious TLD heuristics, domain pattern analysis
 
@@ -291,7 +291,7 @@ export function categorizeUrl(domain: string): string[] {
     // Still check keywords for additional context
     const words = d.split(/[^a-z0-9]+/).join(' ');
     for (const rule of CATEGORY_KEYWORDS) {
-      if (rule.keywords.some(kw => words.includes(kw))) {
+      if (rule.keywords.some(kw => kw.length >= 4 && new RegExp('\b' + kw + '\b').test(words))) {
         rule.categories.forEach(c => cats.add(c));
       }
     }
@@ -306,7 +306,7 @@ export function categorizeUrl(domain: string): string[] {
   // 5. Keyword-based categories
   const words = d.split(/[^a-z0-9]+/).join(' ');
   for (const rule of CATEGORY_KEYWORDS) {
-    if (rule.keywords.some(kw => words.includes(kw))) {
+    if (rule.keywords.some(kw => kw.length >= 4 && new RegExp('\b' + kw + '\b').test(words))) {
       rule.categories.forEach(c => cats.add(c));
     }
   }
@@ -328,25 +328,25 @@ export function categorizeUrl(domain: string): string[] {
   }
 
   // 9. Common infrastructure patterns
-  if (d.includes('cdn') || d.includes('cache') || d.includes('static') || d.includes('assets')) {
+  if (/\b(cdn|cache|static|assets)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('CDN & Infrastructure');
   }
-  if (d.includes('api') || d.includes('gateway') || d.includes('endpoint')) {
+  if (/\b(api|gateway|endpoint)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('API & Web Services');
   }
-  if (d.includes('mail') || d.includes('smtp') || d.includes('mx')) {
+  if (/\b(mail|smtp|mx)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('Email & Messaging');
   }
-  if (d.includes('ftp') || d.includes('upload') || d.includes('download') || d.includes('file')) {
+  if (/\b(ftp|upload|download|file)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('File Sharing');
   }
-  if (d.includes('login') || d.includes('auth') || d.includes('sso') || d.includes('account')) {
+  if (/\b(login|auth|sso|account)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('Authentication');
   }
-  if (d.includes('tracker') || d.includes('analytics') || d.includes('pixel') || d.includes('telemetry')) {
+  if (/\b(tracker|analytics|pixel|telemetry)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('Tracking & Analytics');
   }
-  if (d.includes('ad') && (d.includes('server') || d.includes('network') || d.includes('click'))) {
+  if (/\b(adserver|adnetwork|adclick|adsense|adtech|doubleclick)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
     cats.add('Advertising');
   }
 
@@ -363,7 +363,7 @@ export function categorizeUrl(domain: string): string[] {
   const parts = d.split('.');
   const tld = '.' + parts[parts.length - 1];
   if (['.com','.net','.org','.co'].includes(tld)) {
-    return ['General Website'];
+    return ['Uncategorized'];
   }
 
   return ['Uncategorized'];
