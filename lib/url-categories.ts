@@ -101,7 +101,7 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'chat.openai.com':['Generative AI'],'claude.ai':['Generative AI'],
   'perplexity.ai':['Generative AI'],'gemini.google.com':['Generative AI'],
   'thepiratebay.org':['Torrent & P2P','Piracy'],
-  '1337x.to':['Torrent & P2P','Piracy'],
+  '1337x.to':['Torrent & P2P','Piracy'],   'chatgpt.com':['Generative AI'],'copilot.microsoft.com':['Generative AI'],   'booking.com':['Travel'],'airbnb.com':['Travel'],   'uber.com':['Transportation'],'lyft.com':['Transportation'],   'weather.com':['Weather'],'accuweather.com':['Weather'],   'imdb.com':['Entertainment','Reference'],'rottentomatoes.com':['Entertainment'],   'craigslist.org':['Classifieds'],'zillow.com':['Real Estate'],   'webex.com':['Email & Messaging','Business & Economy'],   'teams.microsoft.com':['Email & Messaging','Business & Economy'],
 };
 
 const CATEGORY_KEYWORDS: Array<{keywords:string[];categories:string[]}> = [
