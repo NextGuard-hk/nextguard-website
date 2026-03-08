@@ -71,13 +71,21 @@ const WHITELIST_DOMAINS = new Set([
   'yahoo.com', 'bing.com', 'duckduckgo.com', 'baidu.com', 'example.com',
     'booking.com', 'airbnb.com', 'expedia.com', 'tripadvisor.com',
   'chatgpt.com', 'gemini.google.com', 'copilot.microsoft.com',
-  'coinbase.com', 'binance.com', 'coursera.org', 'udemy.com',
+  'coinbase.com', 'binance.com', 'coursera.org', 'udemy.com',   'archive.org', 'quora.com', 'medium.com', 'wix.com', 'squarespace.com',   'figma.com', 'canva.com', 'notion.so', 'stripe.com', 'grammarly.com',   'flickr.com', 'naver.com', 'yandex.com', 'producthunt.com', 'researchgate.net',   'fiverr.com', 'upwork.com', 'calendly.com', 'digitalocean.com', 'heroku.com',   'crowdstrike.com', 'zscaler.com', 'paloaltonetworks.com', 'cisco.com', 'fortinet.com',   'samsung.com', 'dell.com', 'hp.com', 'lenovo.com', 'sony.com', 'nike.com',   'walmart.com', 'target.com', 'forbes.com', 'wired.com', 'cnet.com',   '1password.com', 'lastpass.com', 'hbomax.com', 'duolingo.com',
 ]);
 
 function isWhitelistedDomain(hostname: string): boolean {
   if (WHITELIST_DOMAINS.has(hostname)) return true;
   // Check if it's a subdomain of a whitelisted domain
   for (const wd of WHITELIST_DOMAINS) {
+      'archive.org', 'quora.com', 'medium.com', 'wix.com', 'squarespace.com',
+  'figma.com', 'canva.com', 'notion.so', 'stripe.com', 'grammarly.com',
+  'flickr.com', 'naver.com', 'yandex.com', 'producthunt.com', 'researchgate.net',
+  'fiverr.com', 'upwork.com', 'calendly.com', 'digitalocean.com', 'heroku.com',
+  'crowdstrike.com', 'zscaler.com', 'paloaltonetworks.com', 'cisco.com', 'fortinet.com',
+  'samsung.com', 'dell.com', 'hp.com', 'lenovo.com', 'sony.com', 'nike.com',
+  'walmart.com', 'target.com', 'forbes.com', 'wired.com', 'cnet.com',
+  '1password.com', 'lastpass.com', 'hbomax.com', 'duolingo.com',
     if (hostname.endsWith('.' + wd)) return true;
   }
   return false;
