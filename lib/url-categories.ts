@@ -1,6 +1,7 @@
 // lib/url-categories.ts
-// Enterprise URL Categorization Engine
+// Enterprise URL Categorization Engine v2.0
 // Provides accurate category for every URL - clean or malicious
+// Enhanced: Dynamic DNS detection, suspicious TLD heuristics, domain pattern analysis
 
 const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'google.com':['Search Engine'],'bing.com':['Search Engine'],
@@ -95,7 +96,7 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'doordash.com':['Food & Dining'],'ubereats.com':['Food & Dining'],
   'foodpanda.com':['Food & Dining'],'openrice.com':['Food & Dining'],
   'indeed.com':['Job Search'],'glassdoor.com':['Job Search'],
-  'jobsdb.com':['Job Search'],'linkedin.com':['Job Search','Social Media'],
+  'jobsdb.com':['Job Search'],
   'openai.com':['Generative AI','Technology'],
   'chat.openai.com':['Generative AI'],'claude.ai':['Generative AI'],
   'perplexity.ai':['Generative AI'],'gemini.google.com':['Generative AI'],
@@ -104,27 +105,44 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
 };
 
 const CATEGORY_KEYWORDS: Array<{keywords:string[];categories:string[]}> = [
-  {keywords:['sport','nba','nfl','soccer','football','basketball','tennis','golf'],categories:['Sports']},
-  {keywords:['news','herald','times','post','daily','gazette','press','journal'],categories:['News & Media']},
-  {keywords:['bank','finance','invest','stock','trading','wallet','exchange'],categories:['Finance & Banking']},
-  {keywords:['bitcoin','ethereum','crypto','nft','defi','blockchain','coin'],categories:['Cryptocurrency']},
-  {keywords:['shop','store','buy','mall','market','checkout','cart'],categories:['Shopping & E-Commerce']},
-  {keywords:['game','gaming','esport','guild','quest','rpg','steam'],categories:['Gaming']},
-  {keywords:['learn','course','school','university','college','academy'],categories:['Education']},
-  {keywords:['gov','government','ministry','department','bureau'],categories:['Government']},
-  {keywords:['health','medical','clinic','hospital','pharma','doctor'],categories:['Healthcare']},
-  {keywords:['travel','hotel','flight','booking','tour','vacation','airline'],categories:['Travel']},
-  {keywords:['porn','adult','xxx','sex','erotic'],categories:['Adult Content']},
-  {keywords:['casino','bet','poker','gambling','lottery','wager'],categories:['Gambling']},
-  {keywords:['dating','tinder','single','romance'],categories:['Dating']},
-  {keywords:['vpn','proxy','anonymous','tunnel'],categories:['VPN & Proxy']},
-  {keywords:['torrent','pirate','crack','warez','keygen'],categories:['Torrent & P2P','Piracy']},
-  {keywords:['phish','scam','fake','fraud','spoof'],categories:['Phishing','Suspicious']},
-  {keywords:['hack','exploit','malware','botnet','ransom','trojan'],categories:['Hacking','Suspicious']},
-  {keywords:['food','recipe','restaurant','dining','kitchen'],categories:['Food & Dining']},
-  {keywords:['music','song','album','artist','lyrics','playlist'],categories:['Music']},
-  {keywords:['cloud','hosting','devops','deploy'],categories:['Cloud Services']},
-  {keywords:['ai','gpt','llm','chatbot','neural','openai','gemini'],categories:['Generative AI','AI & Machine Learning']},
+  {keywords:['sport','nba','nfl','soccer','football','basketball','tennis','golf','cricket','rugby','hockey','boxing','wrestling','martial'],categories:['Sports']},
+  {keywords:['news','herald','times','post','daily','gazette','press','journal','tribune','chronicle','reporter','media','broadcast'],categories:['News & Media']},
+  {keywords:['bank','finance','invest','stock','trading','wallet','exchange','capital','fund','wealth','insurance','mortgage','loan','credit'],categories:['Finance & Banking']},
+  {keywords:['bitcoin','ethereum','crypto','nft','defi','blockchain','coin','token','mining','ledger','web3'],categories:['Cryptocurrency']},
+  {keywords:['shop','store','buy','mall','market','checkout','cart','deal','discount','sale','price','product','retail','ecommerce'],categories:['Shopping & E-Commerce']},
+  {keywords:['game','gaming','esport','guild','quest','rpg','steam','gamer','play','xbox','playstation','nintendo','mmorpg','fps'],categories:['Gaming']},
+  {keywords:['learn','course','school','university','college','academy','tutor','study','education','lecture','degree','campus','student'],categories:['Education']},
+  {keywords:['gov','government','ministry','department','bureau','federal','municipal','council','senate','parliament','civic','public'],categories:['Government']},
+  {keywords:['health','medical','clinic','hospital','pharma','doctor','patient','therapy','wellness','dental','surgery','diagnosis','medicine'],categories:['Healthcare']},
+  {keywords:['travel','hotel','flight','booking','tour','vacation','airline','hostel','resort','cruise','trip','destination','airfare'],categories:['Travel']},
+  {keywords:['porn','adult','xxx','sex','erotic','nsfw','nude','fetish'],categories:['Adult Content']},
+  {keywords:['casino','bet','poker','gambling','lottery','wager','slots','jackpot','bingo','roulette','blackjack','sportsbook'],categories:['Gambling']},
+  {keywords:['dating','tinder','single','romance','match','hookup','personals','cupid'],categories:['Dating']},
+  {keywords:['vpn','proxy','anonymous','tunnel','unblock','bypass','hide','socks5','shadowsocks'],categories:['VPN & Proxy']},
+  {keywords:['torrent','pirate','crack','warez','keygen','serial','nulled','cracked','p2p','magnet'],categories:['Torrent & P2P','Piracy']},
+  {keywords:['phish','scam','fake','fraud','spoof','impersonat'],categories:['Phishing','Suspicious']},
+  {keywords:['hack','exploit','malware','botnet','ransom','trojan','rootkit','keylog','backdoor','payload','shellcode','vulnerability','cve'],categories:['Hacking','Suspicious']},
+  {keywords:['food','recipe','restaurant','dining','kitchen','cook','chef','meal','delivery','eat','menu','cuisine'],categories:['Food & Dining']},
+  {keywords:['music','song','album','artist','lyrics','playlist','band','concert','dj','remix'],categories:['Music']},
+  {keywords:['cloud','hosting','devops','deploy','server','container','docker','kubernetes','saas','paas','iaas'],categories:['Cloud Services']},
+  {keywords:['ai','gpt','llm','chatbot','neural','openai','gemini','copilot','diffusion','transformer','deeplearn','machinelearn'],categories:['Generative AI','AI & Machine Learning']},
+  {keywords:['tech','software','code','develop','program','engineer','debug','compile','api','framework','library','sdk'],categories:['Technology','Software Development']},
+  {keywords:['blog','wordpress','medium','substack','newsletter','article','opinion','editorial'],categories:['Blog & Personal']},
+  {keywords:['email','mail','smtp','imap','inbox','webmail','postfix'],categories:['Email & Messaging']},
+  {keywords:['chat','messenger','messaging','signal','whatsapp','telegram','wechat','line'],categories:['Email & Messaging']},
+  {keywords:['video','stream','watch','movie','film','cinema','tv','series','episode','anime','cartoon'],categories:['Streaming Media','Entertainment']},
+  {keywords:['photo','image','gallery','picture','snapshot','camera','photography'],categories:['Photography & Images']},
+  {keywords:['forum','community','discuss','board','thread','topic','answer','question'],categories:['Forum & Community']},
+  {keywords:['wiki','encyclopedia','reference','dictionary','glossary','knowledge','library','archive'],categories:['Reference']},
+  {keywords:['real','estate','property','apartment','house','rent','lease','condo','mortgage','realty'],categories:['Real Estate']},
+  {keywords:['auto','car','vehicle','motor','drive','truck','suv','sedan','dealership'],categories:['Automotive']},
+  {keywords:['fashion','clothing','apparel','wear','style','outfit','designer','boutique'],categories:['Fashion & Apparel']},
+  {keywords:['pet','animal','dog','cat','vet','veterinary','puppy','kitten'],categories:['Pets & Animals']},
+  {keywords:['weather','forecast','climate','temperature','rain','storm','meteorolog'],categories:['Weather']},
+  {keywords:['legal','law','attorney','lawyer','court','justice','litigation','counsel'],categories:['Legal']},
+  {keywords:['recruit','hire','job','career','resume','employment','talent','staffing'],categories:['Job Search']},
+  {keywords:['charity','nonprofit','donate','volunteer','foundation','humanitarian','relief'],categories:['Charity & Nonprofit']},
+  {keywords:['religion','church','mosque','temple','faith','spiritual','prayer','worship'],categories:['Religion & Spirituality']},
 ];
 
 const TLD_CATEGORIES: Record<string,string[]> = {
@@ -132,29 +150,221 @@ const TLD_CATEGORIES: Record<string,string[]> = {
   '.mil':['Government'],'.org':['Reference'],
   '.health':['Healthcare'],'.bank':['Finance & Banking'],
   '.sport':['Sports'],'.media':['News & Media'],
+  '.travel':['Travel'],'.museum':['Education','Reference'],
+  '.aero':['Travel'],'.coop':['Business & Economy'],
+  '.jobs':['Job Search'],'.mobi':['Technology'],
+  '.tel':['Technology'],'.pro':['Business & Economy'],
+  '.church':['Religion & Spirituality'],
+  '.casino':['Gambling'],'.bet':['Gambling'],
+  '.dating':['Dating'],'.adult':['Adult Content'],
+  '.sexy':['Adult Content'],'.porn':['Adult Content'],
+  '.game':['Gaming'],'.games':['Gaming'],
+  '.app':['Technology'],'.dev':['Software Development'],
+  '.io':['Technology'],'.ai':['AI & Machine Learning','Technology'],
+  '.tech':['Technology'],'.cloud':['Cloud Services'],
+  '.shop':['Shopping & E-Commerce'],'.store':['Shopping & E-Commerce'],
+  '.market':['Shopping & E-Commerce'],'.buy':['Shopping & E-Commerce'],
+  '.news':['News & Media'],'.blog':['Blog & Personal'],
+  '.video':['Streaming Media'],'.tv':['Streaming Media'],
+  '.music':['Music'],'.film':['Entertainment'],
+  '.food':['Food & Dining'],'.restaurant':['Food & Dining'],
+  '.auto':['Automotive'],'.car':['Automotive'],'.cars':['Automotive'],
+  '.fashion':['Fashion & Apparel'],'.style':['Fashion & Apparel'],
+  '.beauty':['Fashion & Apparel'],
+  '.law':['Legal'],'.legal':['Legal'],
+  '.realty':['Real Estate'],'.property':['Real Estate'],
+  '.photo':['Photography & Images'],'.photography':['Photography & Images'],
+  '.wiki':['Reference'],
+  '.chat':['Email & Messaging'],'.email':['Email & Messaging'],
+  '.social':['Social Media'],
+  '.finance':['Finance & Banking'],'.money':['Finance & Banking'],
+  '.insurance':['Finance & Banking'],
 };
 
+// Dynamic DNS providers - domains hosted here are suspicious
+const DYNAMIC_DNS_PROVIDERS: string[] = [
+  'duckdns.org','no-ip.com','no-ip.org','noip.com',
+  'ddns.net','dynu.com','freedns.afraid.org',
+  'hopto.org','zapto.org','sytes.net','ddns.me',
+  'linkpc.net','n-e.kr','r-e.kr','e-e.kr',
+  'serveblog.net','servehttp.com','serveftp.com',
+  'redirectme.net','bounceme.net','myftp.biz',
+  'myftp.org','myvnc.com','synology.me',
+  'myds.me','diskstation.me','dscloud.biz',
+  'i234.me','myfritz.net','dyndns.org',
+  'dyndns.tv','dyndns.info','changeip.com',
+  'dns.army','dns.navy','ddnsking.com',
+  'publicvm.com','kozow.com','gotdns.ch',
+  'myddns.me','servecounterstrike.com',
+  'servehalflife.com','servequake.com',
+  'webhop.me','webredirect.org',
+  'blogsyte.com','brasilia.me','cable-modem.org',
+  'ciscofreak.com','collegefan.org',
+  'couchpotatofries.org','damnserver.com',
+  'ddns.info','ditchyourip.com','dnsfor.me',
+  'dnsforfamily.com','eat-organic.net',
+  'endofinternet.net','endofinternet.org',
+  'from-ak.com','from-al.com','from-ar.com',
+  'from-az.com','from-ca.com','from-co.com',
+  'game-host.org','game-server.cc',
+  'getmyip.com','giize.com','gleeze.com',
+  'mypets.ws','myphotos.cc','scrapper-site.net',
+  'twmail.cc','twmail.net','twmail.org',
+];
+
+// Suspicious TLDs commonly used in malware/phishing
+const SUSPICIOUS_TLDS: string[] = [
+  '.xyz','.top','.club','.work','.click',
+  '.link','.info','.biz','.cc','.ws',
+  '.tk','.ml','.ga','.cf','.gq',
+  '.pw','.buzz','.rest','.icu','.cam',
+  '.surf','.monster','.cyou','.cfd','.sbs',
+  '.uno','.best','.loan','.win','.bid',
+  '.stream','.racing','.download','.review',
+  '.accountant','.cricket','.date','.faith',
+  '.party','.science','.trade','.webcam',
+  '.run','.ltd','.vip','.life','.site',
+  '.online','.fun','.space','.host','.press',
+  '.website','.rocks','.lol','.wang','.kim',
+];
+
+// Country-code TLDs for regional classification
+const CCTLD_REGIONS: Record<string,string> = {
+  '.cn':'China','.hk':'Hong Kong','.tw':'Taiwan','.jp':'Japan',
+  '.kr':'South Korea','.sg':'Singapore','.my':'Malaysia',
+  '.th':'Thailand','.vn':'Vietnam','.ph':'Philippines',
+  '.in':'India','.au':'Australia','.nz':'New Zealand',
+  '.uk':'United Kingdom','.de':'Germany','.fr':'France',
+  '.it':'Italy','.es':'Spain','.nl':'Netherlands',
+  '.ru':'Russia','.br':'Brazil','.mx':'Mexico',
+  '.ca':'Canada','.us':'United States',
+};
+
+function isDynamicDNS(domain: string): boolean {
+  return DYNAMIC_DNS_PROVIDERS.some(p => domain === p || domain.endsWith('.' + p));
+}
+
+function hasSuspiciousTLD(domain: string): boolean {
+  const tld = '.' + domain.split('.').pop();
+  return SUSPICIOUS_TLDS.includes(tld);
+}
+
+function hasRandomLookingName(domain: string): boolean {
+  const name = domain.split('.')[0];
+  if (name.length < 3) return false;
+  const consonants = name.replace(/[aeiou0-9\-_]/gi, '').length;
+  const ratio = consonants / name.length;
+  const hasDigitMix = /[a-z].*\d|\d.*[a-z]/i.test(name) && /\d{2,}/.test(name);
+  return (ratio > 0.8 && name.length > 5) || hasDigitMix;
+}
+
+function getCountryFromCCTLD(domain: string): string | null {
+  for (const [tld, country] of Object.entries(CCTLD_REGIONS)) {
+    if (domain.endsWith(tld)) return country;
+  }
+  return null;
+}
+
 export function categorizeUrl(domain: string): string[] {
-    let d = domain.toLowerCase();
+  let d = domain.toLowerCase();
   if (d.startsWith('http')) { try { d = new URL(d).hostname; } catch {} }
   d = d.replace(/^www\./, '');
+
   const cats = new Set<string>();
+
+  // 1. Exact domain match
   if (DOMAIN_CATEGORIES[d]) {
     DOMAIN_CATEGORIES[d].forEach(c => cats.add(c));
     return [...cats];
   }
+
+  // 2. Parent domain match (e.g. sub.google.com -> google.com)
   for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) {
     if (d.endsWith('.' + key)) c.forEach(x => cats.add(x));
   }
   if (cats.size > 0) return [...cats];
+
+  // 3. Dynamic DNS detection (HIGH PRIORITY)
+  if (isDynamicDNS(d)) {
+    cats.add('Dynamic DNS');
+    cats.add('Suspicious');
+    // Still check keywords for additional context
+    const words = d.split(/[^a-z0-9]+/).join(' ');
+    for (const rule of CATEGORY_KEYWORDS) {
+      if (rule.keywords.some(kw => words.includes(kw))) {
+        rule.categories.forEach(c => cats.add(c));
+      }
+    }
+    return [...cats];
+  }
+
+  // 4. TLD-based categories
   for (const [tld, c] of Object.entries(TLD_CATEGORIES)) {
     if (d.endsWith(tld)) c.forEach(x => cats.add(x));
   }
+
+  // 5. Keyword-based categories
   const words = d.split(/[^a-z0-9]+/).join(' ');
   for (const rule of CATEGORY_KEYWORDS) {
     if (rule.keywords.some(kw => words.includes(kw))) {
       rule.categories.forEach(c => cats.add(c));
     }
   }
-  return cats.size > 0 ? [...cats] : ['Uncategorized'];
+
+  // 6. If suspicious TLD and no category yet, mark suspicious
+  if (hasSuspiciousTLD(d)) {
+    cats.add('Suspicious TLD');
+  }
+
+  // 7. Random-looking domain name detection
+  if (hasRandomLookingName(d)) {
+    cats.add('Suspicious');
+  }
+
+  // 8. Country/region from ccTLD
+  const country = getCountryFromCCTLD(d);
+  if (country) {
+    cats.add('Regional - ' + country);
+  }
+
+  // 9. Common infrastructure patterns
+  if (d.includes('cdn') || d.includes('cache') || d.includes('static') || d.includes('assets')) {
+    cats.add('CDN & Infrastructure');
+  }
+  if (d.includes('api') || d.includes('gateway') || d.includes('endpoint')) {
+    cats.add('API & Web Services');
+  }
+  if (d.includes('mail') || d.includes('smtp') || d.includes('mx')) {
+    cats.add('Email & Messaging');
+  }
+  if (d.includes('ftp') || d.includes('upload') || d.includes('download') || d.includes('file')) {
+    cats.add('File Sharing');
+  }
+  if (d.includes('login') || d.includes('auth') || d.includes('sso') || d.includes('account')) {
+    cats.add('Authentication');
+  }
+  if (d.includes('tracker') || d.includes('analytics') || d.includes('pixel') || d.includes('telemetry')) {
+    cats.add('Tracking & Analytics');
+  }
+  if (d.includes('ad') && (d.includes('server') || d.includes('network') || d.includes('click'))) {
+    cats.add('Advertising');
+  }
+
+  // 10. IP-based or numeric domains
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(d)) {
+    cats.add('IP Address');
+    cats.add('Suspicious');
+  }
+
+  // If we found any categories, return them
+  if (cats.size > 0) return [...cats];
+
+  // 11. Final fallback: classify based on general TLD type
+  const parts = d.split('.');
+  const tld = '.' + parts[parts.length - 1];
+  if (['.com','.net','.org','.co'].includes(tld)) {
+    return ['General Website'];
+  }
+
+  return ['Uncategorized'];
 }
