@@ -380,7 +380,6 @@ export function categorizeUrl(domain: string): string[] {
   }
 
   if (cats.size > 0) return [...cats];
-  }
 
   return ['Uncategorized'];
 }
