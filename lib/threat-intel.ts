@@ -1,4 +1,4 @@
-import { categorizeUrl } from './url-categories';
+import { categorizeUrl, categorizeUrlAsync } from './url-categories';
 // lib/threat-intel.ts
 // NextGuard OSINT Threat Intelligence Engine v4.2
 // Integrates: URLhaus, Phishing Army, OpenPhish, PhishTank,
@@ -402,12 +402,12 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
       sources.push({ name, hit: false });
     }
     // For whitelisted domains, use Local IOC or url-categories for categorization
-    const cats = localMatch ? localMatch[1].categories : categorizeUrl(cleanHostname);
+    const cats = localMatch ? localMatch[1].categories : await categorizeUrlAsync(cleanHostname);
     const riskLvl = localMatch ? localMatch[1].risk_level : 'clean';
     return {
       url: inputUrl, domain: hostname, risk_level: riskLvl,
       overall_score: Math.min(totalScore, 15),
-      categories: cats.length > 0 ? [...new Set(cats)] : categorizeUrl(cleanHostname),
+      categories: cats.length > 0 ? [...new Set(cats)] : await categorizeUrlAsync(cleanHostname),
       flags: [], sources,
       checked_at: new Date().toISOString(),
     };
@@ -499,7 +499,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
 
   return {
     url: inputUrl, domain: hostname, risk_level: riskLevel,
-    overall_score: overallScore, categories: allCategories.length > 0 ? [...new Set(allCategories)] : categorizeUrl(cleanHostname),
+    overall_score: overallScore, categories: allCategories.length > 0 ? [...new Set(allCategories)] : await categorizeUrlAsync(cleanHostname),
     flags: [...new Set(allFlags)], sources,
     checked_at: new Date().toISOString(),
   };
