@@ -69,6 +69,9 @@ const WHITELIST_DOMAINS = new Set([
   'salesforce.com', 'shopify.com', 'wordpress.com', 'wikipedia.org',
   'stackoverflow.com', 'cloudflare.com', 'aws.amazon.com', 'azure.microsoft.com',
   'yahoo.com', 'bing.com', 'duckduckgo.com', 'baidu.com', 'example.com',
+    'booking.com', 'airbnb.com', 'expedia.com', 'tripadvisor.com',
+  'chatgpt.com', 'gemini.google.com', 'copilot.microsoft.com',
+  'coinbase.com', 'binance.com', 'coursera.org', 'udemy.com',
 ]);
 
 function isWhitelistedDomain(hostname: string): boolean {
