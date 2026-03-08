@@ -135,7 +135,9 @@ const TLD_CATEGORIES: Record<string,string[]> = {
 };
 
 export function categorizeUrl(domain: string): string[] {
-  const d = domain.toLowerCase().replace(/^www\./, '');
+    let d = domain.toLowerCase();
+  if (d.startsWith('http')) { try { d = new URL(d).hostname; } catch {} }
+  d = d.replace(/^www\./, '');
   const cats = new Set<string>();
   if (DOMAIN_CATEGORIES[d]) {
     DOMAIN_CATEGORIES[d].forEach(c => cats.add(c));
