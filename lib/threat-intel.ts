@@ -430,6 +430,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
       flags: [...new Set(allFlags)], sources,
           checked_at: new Date().toISOString(),
 };
+}
 export async function checkUrlFast(inputUrl: string): Promise<ThreatIntelResult> {
   return checkUrl(inputUrl);
 }
