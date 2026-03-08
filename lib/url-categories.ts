@@ -255,7 +255,7 @@ function hasRandomLookingName(domain: string): boolean {
   const consonants = name.replace(/[aeiou0-9\-_]/gi, '').length;
   const ratio = consonants / name.length;
   const hasDigitMix = /[a-z].*\d|\d.*[a-z]/i.test(name) && /\d{2,}/.test(name);
-  return (ratio > 0.8 && name.length > 5) || hasDigitMix;
+  return (ratio > 0.7 && name.length >= 3) || hasDigitMix;
 }
 
 function getCountryFromCCTLD(domain: string): string | null {
@@ -359,11 +359,27 @@ export function categorizeUrl(domain: string): string[] {
   // If we found any categories, return them
   if (cats.size > 0) return [...cats];
 
-  // 11. Final fallback: classify based on general TLD type
-  const parts = d.split('.');
-  const tld = '.' + parts[parts.length - 1];
-  if (['.com','.net','.org','.co'].includes(tld)) {
-    return ['Uncategorized'];
+    const parts = d.split('.');    
+  // 11. Suspicious multi-level subdomain on unknown parent domain
+  // e.g. cacfn.despacito5.com, abc123.unknowndomain.com
+  if (parts.length >= 3) {
+    const parentDomain = parts.slice(-2).join('.');
+    if (!DOMAIN_CATEGORIES[parentDomain]) {
+      // Parent domain is not known - check if subdomain looks suspicious
+      const subdomain = parts.slice(0, -2).join('.');
+      if (hasRandomLookingName(d) || subdomain.length <= 6 || /\d/.test(subdomain)) {
+        cats.add('Suspicious Subdomain');
+        cats.add('Suspicious');
+      }
+    }
+  }
+
+  // 12. Unknown but has digits in domain name (common in DGA/malware)
+  if (cats.size === 0 && /\d{2,}/.test(parts.slice(0, -1).join('.'))) {
+    cats.add('Suspicious');
+  }
+
+  if (cats.size > 0) return [...cats];
   }
 
   return ['Uncategorized'];
