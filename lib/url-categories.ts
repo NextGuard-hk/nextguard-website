@@ -368,3 +368,168 @@ export function categorizeUrl(domain: string): string[] {
 
   return ['Uncategorized'];
 }
+
+
+// =============================================
+// Cloudflare Intel API Integration v4.0
+// Commercial-grade URL categorization via Cloudflare
+// =============================================
+
+interface CfConfig {
+  accountId: string;
+  apiToken: string;
+}
+
+interface CfCacheEntry {
+  categories: string[];
+  timestamp: number;
+}
+
+const CF_CACHE = new Map<string, CfCacheEntry>();
+const CF_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCfConfig(): CfConfig | null {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN;
+  if (!accountId || !apiToken) return null;
+  return { accountId, apiToken };
+}
+
+// Cloudflare category ID to human-readable name mapping
+const CF_CATEGORY_MAP: Record<number, string> = {
+  1: 'Technology', 2: 'Education', 3: 'Business & Economy',
+  4: 'Government', 5: 'News & Media', 6: 'Entertainment',
+  7: 'Shopping & E-Commerce', 8: 'Sports', 9: 'Health & Medicine',
+  10: 'Travel', 11: 'Society', 12: 'Finance & Banking',
+  13: 'Real Estate', 14: 'Reference', 15: 'Science',
+  16: 'Recreation', 17: 'Automotive', 18: 'Food & Dining',
+  19: 'Arts', 20: 'Fashion & Apparel', 21: 'Legal',
+  22: 'Religion & Spirituality', 23: 'Pets & Animals',
+  24: 'Weather', 25: 'Job Search', 26: 'Military',
+  27: 'Personal Sites & Blogs', 28: 'Photography & Images',
+  29: 'Home & Garden', 30: 'Kids & Family',
+  32: 'Gambling', 33: 'Dating', 34: 'Adult Content',
+  35: 'Alcohol & Tobacco', 36: 'Drugs', 37: 'Weapons',
+  38: 'Violence', 39: 'Hate & Discrimination',
+  40: 'Abortion', 41: 'Nudity',
+  64: 'Social Media', 65: 'Email & Messaging',
+  66: 'Streaming Media', 67: 'Gaming',
+  68: 'Software Development', 69: 'Cloud Services',
+  70: 'File Sharing', 71: 'VPN & Proxy',
+  72: 'Generative AI', 73: 'Cryptocurrency',
+  80: 'Search Engine', 81: 'Forum & Community',
+  82: 'Advertising', 83: 'CDN & Infrastructure',
+  84: 'URL Shortener', 85: 'Paste Site',
+  // Security categories
+  128: 'Malware', 129: 'Phishing', 130: 'Spam',
+  131: 'Spyware', 132: 'Botnet', 133: 'Dynamic DNS',
+  134: 'Newly Seen Domain', 135: 'Parked Domain',
+  136: 'Suspicious', 137: 'Command & Control',
+  138: 'DGA Domain',
+};
+
+async function queryCloudflareIntel(domain: string): Promise<string[]> {
+  const config = getCfConfig();
+  if (!config) return [];
+
+  // Check cache first
+  const cached = CF_CACHE.get(domain);
+  if (cached && (Date.now() - cached.timestamp) < CF_CACHE_TTL) {
+    return cached.categories;
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/intel/domain?domain=${encodeURIComponent(domain)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${config.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+
+    if (!res.ok) return [];
+    const data = await res.json();
+
+    const cats: string[] = [];
+    if (data?.result?.content_categories) {
+      for (const c of data.result.content_categories) {
+        const id = typeof c === 'number' ? c : c?.id;
+        if (id && CF_CATEGORY_MAP[id]) cats.push(CF_CATEGORY_MAP[id]);
+        else if (c?.name) cats.push(c.name);
+      }
+    }
+    if (data?.result?.risk_types) {
+      for (const r of data.result.risk_types) {
+        const id = typeof r === 'number' ? r : r?.id;
+        if (id && CF_CATEGORY_MAP[id]) cats.push(CF_CATEGORY_MAP[id]);
+        else if (r?.name) cats.push(r.name);
+      }
+    }
+    if (data?.result?.application?.name) {
+      cats.push(data.result.application.name);
+    }
+
+    // Cache the result
+    CF_CACHE.set(domain, { categories: cats, timestamp: Date.now() });
+    return cats;
+  } catch {
+    return [];
+  }
+}
+
+// Batch query Cloudflare Intel for multiple domains
+async function queryCloudflareIntelBatch(domains: string[]): Promise<Map<string, string[]>> {
+  const config = getCfConfig();
+  const result = new Map<string, string[]>();
+  if (!config) return result;
+
+  // Process in parallel batches of 10
+  const batchSize = 10;
+  for (let i = 0; i < domains.length; i += batchSize) {
+    const batch = domains.slice(i, i + batchSize);
+    const promises = batch.map(async (d) => {
+      const cats = await queryCloudflareIntel(d);
+      return { domain: d, categories: cats };
+    });
+    try {
+      const results = await Promise.allSettled(promises);
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value.categories.length > 0) {
+          result.set(r.value.domain, r.value.categories);
+        }
+      }
+    } catch { continue; }
+  }
+  return result;
+}
+
+// Main async categorization: Cloudflare API first, local fallback
+export async function categorizeUrlAsync(domain: string): Promise<string[]> {
+  let d = domain.toLowerCase();
+  if (d.startsWith('http')) { try { d = new URL(d).hostname; } catch {} }
+  d = d.replace(/^www\./, '');
+
+  // 1. Try local exact match first (instant, no API call needed)
+  if (DOMAIN_CATEGORIES[d]) return DOMAIN_CATEGORIES[d];
+  for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) {
+    if (d.endsWith('.' + key)) return c;
+  }
+
+  // 2. Try Cloudflare Intel API
+  const cfCats = await queryCloudflareIntel(d);
+  if (cfCats.length > 0) return cfCats;
+
+  // 3. Fallback to local heuristic categorization
+  return categorizeUrl(domain);
+}
+
+// Check if Cloudflare API is configured
+export function isCloudflareIntelConfigured(): boolean {
+  return getCfConfig() !== null;
+}
+
+// Export batch query for use in threat-intel
+export { queryCloudflareIntelBatch };
