@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       flags: result.flags,
       lookup_ms: lookupMs,
       checked_at: result.checked_at,
-      engine: 'osint-live-v4.3',
+      engine: 'osint-live-v4.7',
       // Full source details for dashboard
       source_details: result.sources,
     });
