@@ -1,15 +1,12 @@
 // components/threat-intel/enrichment-results.tsx
-// Phase 5 — Enrichment Results Display
+// Phase 5 — Enrichment Results Display (with URL Category)
 'use client';
-
 import React from 'react';
 import type { EnrichmentResult } from '@/lib/commercial-feeds';
 import RiskScoreCard from './risk-score-card';
-
 interface EnrichmentResultsProps {
   result: EnrichmentResult;
 }
-
 function SourceCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
     <div style={{
@@ -23,7 +20,6 @@ function SourceCard({ title, icon, children }: { title: string; icon: string; ch
     </div>
   );
 }
-
 function DataRow({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
@@ -32,7 +28,17 @@ function DataRow({ label, value, color }: { label: string; value: string | numbe
     </div>
   );
 }
-
+// Color coding for URL categories
+function getCategoryColor(cat: string): string {
+  const c = cat.toLowerCase();
+  if (c.includes('phishing') || c.includes('malware') || c.includes('suspicious') || c.includes('hacking') || c.includes('botnet') || c.includes('spam') || c.includes('c2') || c.includes('command')) return '#ef4444';
+  if (c.includes('adult') || c.includes('gambling') || c.includes('dating') || c.includes('piracy') || c.includes('torrent') || c.includes('weapons') || c.includes('violence') || c.includes('drugs')) return '#f97316';
+  if (c.includes('vpn') || c.includes('proxy') || c.includes('dynamic dns') || c.includes('url shortener') || c.includes('paste')) return '#eab308';
+  if (c.includes('social media') || c.includes('streaming') || c.includes('gaming') || c.includes('entertainment')) return '#a78bfa';
+  if (c.includes('finance') || c.includes('banking') || c.includes('crypto')) return '#22d3ee';
+  if (c.includes('education') || c.includes('government') || c.includes('healthcare')) return '#22c55e';
+  return '#6b7280';
+}
 export default function EnrichmentResults({ result }: EnrichmentResultsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -44,7 +50,39 @@ export default function EnrichmentResults({ result }: EnrichmentResultsProps) {
         iocType={result.ioc_type}
         queriedAt={result.queriedAt}
       />
-
+      {/* URL Category Section */}
+      {result.categories && result.categories.length > 0 && (
+        <div style={{
+          background: '#12122a', borderRadius: '8px', padding: '14px',
+          border: '1px solid #2a2a4a',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h4 style={{ color: '#aaa', margin: 0, fontSize: '13px' }}>🏷️ URL Category</h4>
+            {result.category_source && (
+              <span style={{
+                padding: '1px 8px', borderRadius: '4px', fontSize: '10px',
+                background: '#1a1a3a', color: '#555', border: '1px solid #333',
+              }}>
+                {result.category_source === 'turso-url-categories' ? 'DB' :
+                 result.category_source === 'turso-indicators' ? 'Threat DB' :
+                 result.category_source === 'live-osint' ? 'Live' : 'Heuristic'}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {result.categories.map((cat) => (
+              <span key={cat} style={{
+                padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '500',
+                background: getCategoryColor(cat) + '22',
+                border: `1px solid ${getCategoryColor(cat)}44`,
+                color: getCategoryColor(cat),
+              }}>
+                {cat}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Source Results Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
         {/* VirusTotal */}
@@ -64,7 +102,6 @@ export default function EnrichmentResults({ result }: EnrichmentResultsProps) {
             )}
           </SourceCard>
         )}
-
         {/* AbuseIPDB */}
         {result.abuseIPDB && (
           <SourceCard title="AbuseIPDB" icon="🚫">
@@ -75,7 +112,6 @@ export default function EnrichmentResults({ result }: EnrichmentResultsProps) {
             <DataRow label="Domain" value={result.abuseIPDB.domain || 'N/A'} />
           </SourceCard>
         )}
-
         {/* OTX */}
         {result.otx && (
           <SourceCard title="AlienVault OTX" icon="🔭">
@@ -95,7 +131,6 @@ export default function EnrichmentResults({ result }: EnrichmentResultsProps) {
             )}
           </SourceCard>
         )}
-
         {/* GreyNoise */}
         {result.greyNoise && (
           <SourceCard title="GreyNoise" icon="📡">
@@ -110,7 +145,6 @@ export default function EnrichmentResults({ result }: EnrichmentResultsProps) {
           </SourceCard>
         )}
       </div>
-
       {/* Errors */}
       {Object.keys(result.errors).length > 0 && (
         <div style={{ background: '#2a1a1a', borderRadius: '8px', padding: '12px', border: '1px solid #ef444433' }}>
