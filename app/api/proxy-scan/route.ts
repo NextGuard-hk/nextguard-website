@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkUrl, checkUrlFast, getFeedStatus } from '@/lib/threat-intel';
+import { lookupIndicator } from '@/lib/threat-intel-db';
 
 // DLP Pattern Definitions - Enterprise Grade
 const DLP_PATTERNS: Record<string, { regex: RegExp; severity: string; description: string }[]> = {
@@ -114,6 +115,31 @@ function inspectTLS(url: string) {
   }
 }
 
+// Helper: hybrid lookup using Turso DB first, fallback to live OSINT
+async function hybridUrlCheck(url: string) {
+  try {
+    const dbResult = await lookupIndicator(url);
+    if (dbResult.hits.length > 0) {
+      const topHit = dbResult.hits[0];
+      const allCategories = [...new Set(dbResult.hits.flatMap((h: any) => h.categories))];
+      return {
+        url,
+        domain: url,
+        risk_level: topHit.risk_level,
+        overall_score: topHit.confidence,
+        categories: allCategories,
+        flags: [],
+        sources: dbResult.hits.map((h: any) => ({ name: h.feed, hit: true, risk_level: h.risk_level, categories: h.categories })),
+        checked_at: new Date().toISOString(),
+        engine: 'turso-db-v5.0',
+      };
+    }
+  } catch {}
+  // DB miss or error - use live OSINT
+  const result = await checkUrlFast(url);
+  return { ...result, engine: 'osint-live-v4.7-fallback' };
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   try {
@@ -177,9 +203,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // MODE 3: URL Check - Multi-Source OSINT Threat Intelligence
+    // MODE 3: URL Check - Hybrid Turso DB + OSINT
     if (mode === 'url-check') {
-      const tiResult = await checkUrl(targetUrl || '');
+      const tiResult = await hybridUrlCheck(targetUrl || '');
       return NextResponse.json({
         url: targetUrl,
         domain: tiResult.domain,
@@ -192,10 +218,11 @@ export async function POST(request: NextRequest) {
         tlsInspection: inspectTLS(targetUrl || ''),
         checked_at: tiResult.checked_at,
         timestamp: new Date().toISOString(),
+        engine: (tiResult as any).engine || 'hybrid',
       });
     }
 
-    // MODE 4: Batch URL Check
+    // MODE 4: Batch URL Check - Hybrid Turso DB + OSINT fallback
     if (mode === 'batch-url-check') {
       const urls: string[] = body.urls || [];
       if (!Array.isArray(urls) || urls.length === 0) {
@@ -204,14 +231,14 @@ export async function POST(request: NextRequest) {
       if (urls.length > 5000) {
         return NextResponse.json({ error: 'Max 5000 URLs per batch' }, { status: 400 });
       }
-      // Process in chunks of 5 to avoid API rate limits
+      // Process in chunks of 50 using hybrid lookup
       const CHUNK_SIZE = 50;
       const results: any[] = [];
       for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
         const chunk = urls.slice(i, i + CHUNK_SIZE);
         const chunkResults = await Promise.all(
           chunk.map(async (url: string) => {
-            const tiResult = await checkUrlFast(url);
+            const tiResult = await hybridUrlCheck(url);
             return {
               url,
               domain: tiResult.domain,
@@ -219,7 +246,8 @@ export async function POST(request: NextRequest) {
               overall_score: tiResult.overall_score,
               categories: tiResult.categories,
               flags: tiResult.flags,
-              sources: tiResult.sources.filter(s => s.hit).map(s => s.name),
+              sources: tiResult.sources.filter((s: any) => s.hit).map((s: any) => s.name),
+              engine: (tiResult as any).engine || 'hybrid',
             };
           })
         );
@@ -231,8 +259,10 @@ export async function POST(request: NextRequest) {
         high_risk: results.filter(r => r.risk_level === 'high_risk').length,
         medium_risk: results.filter(r => r.risk_level === 'medium_risk').length,
         low_risk: results.filter(r => r.risk_level === 'low_risk').length,
-        clean: results.filter(r => r.risk_level === 'clean').length,       unknown: results.filter(r => r.risk_level === 'unknown').length,
-              unknown: results.filter(r => r.risk_level === 'unknown').length,
+        clean: results.filter(r => r.risk_level === 'clean').length,
+        unknown: results.filter(r => r.risk_level === 'unknown').length,
+        db_hits: results.filter(r => r.engine === 'turso-db-v5.0').length,
+        live_fallback: results.filter(r => r.engine?.includes('fallback')).length,
       };
       return NextResponse.json({
         mode: 'batch-url-check', summary, results,
@@ -250,8 +280,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     service: 'NextGuard Cloud SWG',
-    version: '2.2',
-    capabilities: ['forward-proxy', 'ssl-inspection', 'dlp-scan', 'url-filtering', 'threat-prevention', 'icap', 'network-dlp', 'osint-threat-intel', 'multi-source-aggregation'],
+    version: '2.3',
+    capabilities: ['forward-proxy', 'ssl-inspection', 'dlp-scan', 'url-filtering', 'threat-prevention', 'icap', 'network-dlp', 'osint-threat-intel', 'multi-source-aggregation', 'turso-db-lookup'],
     proxyNodes: [
       { id: 'hk-1', location: 'Hong Kong', status: 'active' },
       { id: 'sg-1', location: 'Singapore', status: 'active' },
@@ -260,7 +290,8 @@ export async function GET() {
     dlpPatterns: Object.keys(DLP_PATTERNS),
     urlCategories: Object.keys(URL_CATEGORIES),
     threatIntel: getFeedStatus(),
-    threatSources: ['urlhaus', 'phishing_army', 'openphish', 'phishtank', 'threatfox', 'feodo_tracker', 'c2_intel', 'ipsum', 'blocklist_de', 'emerging_threats', 'disposable_emails'],
+    threatSources: ['turso-db-persistent', 'urlhaus', 'phishing_army', 'openphish', 'phishtank', 'threatfox', 'feodo_tracker', 'c2_intel', 'ipsum', 'blocklist_de', 'emerging_threats', 'disposable_emails'],
+    lookupEngine: 'hybrid-turso-db-v5.0+osint-live-v4.7',
     status: 'operational',
     timestamp: new Date().toISOString(),
   });
