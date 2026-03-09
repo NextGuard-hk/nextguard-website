@@ -61,8 +61,128 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure",
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=malware",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=phishing",
+      "schedule": "5 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=mixed_adult",
+      "schedule": "10 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=gambling",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=social_networks",
+      "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=hacking",
+      "schedule": "25 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=vpn",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=warez",
+      "schedule": "35 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=dating",
+      "schedule": "40 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=games",
+      "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=shopping",
+      "schedule": "50 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=bank",
+      "schedule": "55 4 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=bitcoin",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=weapons",
+      "schedule": "5 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=drogue",
+      "schedule": "10 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=dynamic_dns",
+      "schedule": "15 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=filehosting",
+      "schedule": "20 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=cryptojacking",
+      "schedule": "25 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=press",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=forums",
+      "schedule": "35 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=sports",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=shortener",
+      "schedule": "45 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=webmail",
+      "schedule": "50 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=stalkerware",
+      "schedule": "55 5 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=ddos",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=chat",
+      "schedule": "5 6 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=fakenews",
+      "schedule": "10 6 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=redirector",
+      "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=agressif",
+      "schedule": "20 6 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=dangerous_material",
+      "schedule": "25 6 * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=lingerie",
+      "schedule": "30 6 * * *"
     }
   ]
 }
