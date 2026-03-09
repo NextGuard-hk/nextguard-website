@@ -82,6 +82,15 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'pornhub.com':['Adult Content'],'xvideos.com':['Adult Content'],
   'onlyfans.com':['Adult Content'],
   'bet365.com':['Gambling'],'draftkings.com':['Gambling'],
+  'hkjc.com':['Gambling','Sports'],'hkjc.com.hk':['Gambling','Sports'],
+  'macauslot.com':['Gambling'],'sbobet.com':['Gambling','Sports'],
+  'paddypower.com':['Gambling'],'williamhill.com':['Gambling'],
+  'ladbrokes.com':['Gambling'],'888.com':['Gambling'],
+  'pokerstars.com':['Gambling'],'betfair.com':['Gambling','Sports'],
+  'unibet.com':['Gambling'],'bwin.com':['Gambling'],
+  'betway.com':['Gambling'],'fanduel.com':['Gambling','Sports'],
+  'mark6.com.hk':['Gambling'],'melco-resorts.com':['Gambling','Entertainment'],
+  'galaxy-macau.com':['Gambling','Entertainment'],'venetianmacao.com':['Gambling','Entertainment'],
   'tinder.com':['Dating'],'match.com':['Dating'],'bumble.com':['Dating'],
   'nordvpn.com':['VPN & Proxy'],'expressvpn.com':['VPN & Proxy'],
   'torproject.org':['Privacy Tools'],
@@ -361,6 +370,29 @@ export function categorizeUrl(domain: string): string[] {
     return [...cats];
   }
 
+
+  // 2.5 Typosquatting detection for major brands
+  const TYPOSQUAT_BRANDS: Record<string, {patterns: RegExp[]; category: string[]}> = {
+    'google': {patterns: [/^g[o0]{1,3}g[e3]?l[e3]?\./, /^go+gle\./, /^googl[e3]\./], category: ['Search Engine','Suspicious','Typosquatting']},
+    'facebook': {patterns: [/^f[a4]c[e3]b[o0]{1,2}k\./, /^facebo+k\./], category: ['Social Media','Suspicious','Typosquatting']},
+    'amazon': {patterns: [/^[a4]m[a4]z[o0]n\./, /^amaz[o0]n[s5]?\./], category: ['Shopping & E-Commerce','Suspicious','Typosquatting']},
+    'microsoft': {patterns: [/^m[i1]cr[o0]s[o0]ft\./, /^micros[o0]ft\./], category: ['Technology','Suspicious','Typosquatting']},
+    'apple': {patterns: [/^[a4]pp[l1][e3]\./, /^aple\./], category: ['Technology','Suspicious','Typosquatting']},
+    'paypal': {patterns: [/^p[a4]yp[a4][l1]\./, /^paypa[l1]\./], category: ['Finance & Banking','Suspicious','Typosquatting']},
+    'netflix': {patterns: [/^n[e3]tf[l1][i1]x\./, /^netfl[i1]x\./], category: ['Streaming Media','Suspicious','Typosquatting']},
+  };
+  for (const [brand, info] of Object.entries(TYPOSQUAT_BRANDS)) {
+    const knownDomain = brand + '.com';
+    if (d !== knownDomain && d !== 'www.' + knownDomain) {
+      for (const pat of info.patterns) {
+        if (pat.test(d)) {
+          info.category.forEach(c => cats.add(c));
+          return [...cats];
+        }
+      }
+    }
+  }
+
   // 2. Parent domain match (e.g. sub.google.com -> google.com)
   for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) {
     if (d.endsWith('.' + key)) c.forEach(x => cats.add(x));
@@ -391,6 +423,22 @@ export function categorizeUrl(domain: string): string[] {
   for (const rule of CATEGORY_KEYWORDS) {
     if (rule.keywords.some(kw => kw.length >= 4 && new RegExp('\b' + kw + '\b').test(words))) {
       rule.categories.forEach(c => cats.add(c));
+
+  // 5.5 Substring-based matching for commonly embedded category terms
+  const SUBSTRING_RULES: Array<{substrings: string[]; categories: string[]}> = [
+    {substrings: ['slot','casino','poker','roulette','blackjack','jackpot','bingo','lottery','gambl','sportsbet','wager','betting'], categories: ['Gambling']},
+    {substrings: ['porn','xxx','nsfw','adult','erotic'], categories: ['Adult Content']},
+    {substrings: ['phish','scam','fraud'], categories: ['Phishing','Suspicious']},
+    {substrings: ['torrent','pirate','warez','crack','keygen'], categories: ['Torrent & P2P','Piracy']},
+    {substrings: ['vpngate','proxyfree','unblock'], categories: ['VPN & Proxy']},
+  ];
+  const domainBase = d.split('.').slice(0, -1).join('');
+  for (const rule of SUBSTRING_RULES) {
+    if (rule.substrings.some(s => domainBase.includes(s))) {
+      rule.categories.forEach(c => cats.add(c));
+    }
+  }
+
     }
   }
 
