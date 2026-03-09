@@ -3,19 +3,47 @@ import { lookupIndicator, ingestIndicators } from '@/lib/threat-intel-db';
 import { checkUrl } from '@/lib/threat-intel';
 import { categorizeUrl } from '@/lib/url-categories';
 import { initDB, getDB } from '@/lib/db';
+
+// ─── In-Memory Lookup Cache ──────────────────────────────────────────────────
+interface CacheEntry {
+  response: any;
+  timestamp: number;
+}
+const LOOKUP_CACHE = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_MAX_SIZE = 2000;
+
+function getCached(key: string): any | null {
+  const entry = LOOKUP_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    LOOKUP_CACHE.delete(key);
+    return null;
+  }
+  return entry.response;
+}
+
+function setCache(key: string, response: any): void {
+  if (LOOKUP_CACHE.size >= CACHE_MAX_SIZE) {
+    const oldest = LOOKUP_CACHE.keys().next().value;
+    if (oldest) LOOKUP_CACHE.delete(oldest);
+  }
+  LOOKUP_CACHE.set(key, { response, timestamp: Date.now() });
+}
+
 // ─── DB State ────────────────────────────────────────────────────────────────
 let dbInitialized = false;
 let initialIngestDone = false;
-let dbHealthy = true; // optimistic: assume DB healthy on start
-let dbLastFailAt = 0; // epoch ms of last DB failure
-const DB_RETRY_INTERVAL = 60_000; // 60 s cooldown before re-trying DB after failure
-// ─── Init ─────────────────────────────────────────────────────────────────────
+let dbHealthy = true;
+let dbLastFailAt = 0;
+const DB_RETRY_INTERVAL = 60_000;
+
 async function ensureInit() {
   if (!dbInitialized) {
     try { await initDB(); dbInitialized = true; dbHealthy = true; } catch { dbHealthy = false; }
   }
 }
-// Quick seed on first cold-start when DB is empty
+
 async function quickSeedIfEmpty() {
   if (initialIngestDone) return;
   initialIngestDone = true;
@@ -44,7 +72,7 @@ async function quickSeedIfEmpty() {
     }
   } catch {}
 }
-// ─── Risk helpers ─────────────────────────────────────────────────────────────
+
 function riskToVerdict(riskLevel: string): string {
   switch (riskLevel) {
     case 'critical': case 'high': case 'known_malicious': return 'malicious';
@@ -52,7 +80,7 @@ function riskToVerdict(riskLevel: string): string {
     default: return 'clean';
   }
 }
-// ─── DB failover helper ───────────────────────────────────────────────────────
+
 function isDbAvailable(): boolean {
   if (dbHealthy) return true;
   if (Date.now() - dbLastFailAt >= DB_RETRY_INTERVAL) {
@@ -61,12 +89,12 @@ function isDbAvailable(): boolean {
   }
   return false;
 }
+
 function markDbFailed() {
   dbHealthy = false;
   dbLastFailAt = Date.now();
 }
-// ─── URL Category DB lookup ───────────────────────────────────────────────────
-// Queries url_categories table for domain->category from UT1/Shallalist feeds
+
 async function lookupUrlCategory(domain: string): Promise<string[]> {
   try {
     const db = getDB();
@@ -80,7 +108,6 @@ async function lookupUrlCategory(domain: string): Promise<string[]> {
     if (result.rows.length > 0) {
       return [...new Set(result.rows.map(r => r.category as string))];
     }
-    // Try parent domain (e.g. sub.example.com -> example.com)
     const parts = d.split('.');
     if (parts.length > 2) {
       const parent = parts.slice(-2).join('.');
@@ -97,18 +124,17 @@ async function lookupUrlCategory(domain: string): Promise<string[]> {
     return [];
   }
 }
-// ─── Live OSINT fallback (shared) ─────────────────────────────────────────────
+
 async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix = '') {
   const result = await checkUrl(trimmed);
   const lookupMs = Date.now() - startTime;
   const verdict = riskToVerdict(result.risk_level);
   const sourcesHit = result.sources.filter(s => s.hit).map(s => s.name);
-  // Merge: live categories + DB url_categories + local heuristic
   const dbCats = isDbAvailable() ? await lookupUrlCategory(result.domain || trimmed) : [];
   const liveCats = result.categories.length > 0 ? result.categories : [];
   const heuristicCats = categorizeUrl(result.domain || trimmed);
   const categories = [...new Set([...dbCats, ...liveCats, ...(dbCats.length === 0 && liveCats.length === 0 ? heuristicCats : [])])];
-  return NextResponse.json({
+  const response = {
     indicator: trimmed, type: 'url', verdict,
     risk_level: result.risk_level, confidence: result.overall_score,
     categories, sources_hit: sourcesHit, sources_checked: result.sources.length,
@@ -117,9 +143,11 @@ async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix 
     engine: `osint-live-v4.8${engineSuffix}`,
     source_details: result.sources,
     category_source: dbCats.length > 0 ? 'turso-url-categories' : (liveCats.length > 0 ? 'live-osint' : 'heuristic'),
-  });
+  };
+  setCache(`${trimmed}:live`, response);
+  return NextResponse.json(response);
 }
-// ─── DB lookup (shared) ───────────────────────────────────────────────────────
+
 async function dbLookupResponse(trimmed: string, startTime: number) {
   const dbResult = await lookupIndicator(trimmed);
   const lookupMs = Date.now() - startTime;
@@ -128,11 +156,10 @@ async function dbLookupResponse(trimmed: string, startTime: number) {
   const verdict = riskToVerdict(riskLevel);
   const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
   const sourcesHit = dbResult.hits.map(h => h.feed);
-  // Enrich categories from url_categories table
   const urlCats = await lookupUrlCategory(trimmed);
   const mergedCats = [...new Set([...allCategories, ...urlCats])];
   const finalCats = mergedCats.length > 0 ? mergedCats : categorizeUrl(trimmed);
-  return NextResponse.json({
+  const response = {
     indicator: trimmed, type: 'url', verdict, risk_level: riskLevel,
     confidence: topHit?.confidence ?? 0,
     categories: finalCats,
@@ -145,9 +172,11 @@ async function dbLookupResponse(trimmed: string, startTime: number) {
     })),
     db_hits: dbResult.hits.length,
     category_source: urlCats.length > 0 ? 'turso-url-categories' : (allCategories.length > 0 ? 'turso-indicators' : 'heuristic'),
-  });
+  };
+  setCache(`${trimmed}:db`, response);
+  return NextResponse.json(response);
 }
-// ─── Main route ───────────────────────────────────────────────────────────────
+
 export async function GET(request: Request) {
   try {
     const startTime = Date.now();
@@ -162,6 +191,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'indicator parameter required' }, { status: 400 });
     }
     const trimmed = indicator.trim();
+    const cacheKey = `${trimmed}:${mode}`;
+
+    // ── Cache check ────────────────────────────────────────────────────────────
+    const cached = getCached(cacheKey);
+    if (cached) {
+      return NextResponse.json({
+        ...cached,
+        lookup_ms: Date.now() - startTime,
+        cache_hit: true,
+      });
+    }
+
     // ── Mode: db-only ──────────────────────────────────────────────────────────
     if (mode === 'db') {
       if (!isDbAvailable()) {
@@ -174,11 +215,13 @@ export async function GET(request: Request) {
         return liveOsintLookup(trimmed, startTime, '-db-failover');
       }
     }
+
     // ── Mode: live ─────────────────────────────────────────────────────────────
     if (mode === 'live') {
       return liveOsintLookup(trimmed, startTime);
     }
-    // ── Mode: hybrid (default) — DB first, auto-failover to live ───────────────
+
+    // ── Mode: hybrid (default) ─────────────────────────────────────────────────
     if (dbInitialized && isDbAvailable()) {
       quickSeedIfEmpty().catch(() => {});
     }
@@ -192,11 +235,10 @@ export async function GET(request: Request) {
           const verdict = riskToVerdict(riskLevel);
           const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
           const sourcesHit = dbResult.hits.map(h => h.feed);
-          // Enrich with url_categories
           const urlCats = await lookupUrlCategory(trimmed);
           const mergedCats = [...new Set([...allCategories, ...urlCats])];
           const finalCats = mergedCats.length > 0 ? mergedCats : categorizeUrl(trimmed);
-          return NextResponse.json({
+          const response = {
             indicator: trimmed, type: type || 'url', verdict, risk_level: riskLevel,
             confidence: topHit.confidence,
             categories: finalCats,
@@ -208,13 +250,14 @@ export async function GET(request: Request) {
               categories: h.categories, detail: `First seen: ${h.first_seen}`
             })),
             category_source: urlCats.length > 0 ? 'turso-url-categories' : (allCategories.length > 0 ? 'turso-indicators' : 'heuristic'),
-          });
+          };
+          setCache(cacheKey, response);
+          return NextResponse.json(response);
         }
       } catch (dbErr: any) {
         markDbFailed();
       }
     }
-    // DB miss OR DB down — fall back to live OSINT feeds
     const engineSuffix = !isDbAvailable() ? '-db-failover' : '-fallback';
     return liveOsintLookup(trimmed, startTime, engineSuffix);
   } catch (e: any) {
