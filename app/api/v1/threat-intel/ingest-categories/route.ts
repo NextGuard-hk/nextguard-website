@@ -1,13 +1,14 @@
 // app/api/v1/threat-intel/ingest-categories/route.ts
-// NextGuard URL Category Ingestion v1.3
+// NextGuard URL Category Ingestion v1.4
 // Uses GitHub mirror of UT1 Toulouse blacklists (olbat/ut1-blacklists)
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 
 const BASE = 'https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists';
 
+// Only categories with plain text 'domains' files (not .gz)
 const UT1_FEEDS: Record<string, string> = {
-  'pornography':      `${BASE}/pornography/domains`,
+  'mixed_adult':      `${BASE}/mixed_adult/domains`,
   'gambling':         `${BASE}/gambling/domains`,
   'malware':          `${BASE}/malware/domains`,
   'phishing':         `${BASE}/phishing/domains`,
@@ -25,39 +26,53 @@ const UT1_FEEDS: Record<string, string> = {
   'press':            `${BASE}/press/domains`,
   'sports':           `${BASE}/sports/domains`,
   'bank':             `${BASE}/bank/domains`,
-  'crypto':           `${BASE}/cryptojacking/domains`,
+  'cryptojacking':    `${BASE}/cryptojacking/domains`,
   'warez':            `${BASE}/warez/domains`,
   'dynamic_dns':      `${BASE}/dynamic-dns/domains`,
   'shortener':        `${BASE}/shortener/domains`,
   'webmail':          `${BASE}/webmail/domains`,
   'agressif':         `${BASE}/agressif/domains`,
+  'fakenews':         `${BASE}/fakenews/domains`,
+  'stalkerware':      `${BASE}/stalkerware/domains`,
+  'dangerous_material': `${BASE}/dangerous_material/domains`,
+  'ddos':             `${BASE}/ddos/domains`,
+  'redirector':       `${BASE}/redirector/domains`,
+  'lingerie':         `${BASE}/lingerie/domains`,
+  'chat':             `${BASE}/chat/domains`,
 };
 
 const CATEGORY_DISPLAY: Record<string, string> = {
-  'pornography':    'Adult Content',
-  'gambling':       'Gambling',
-  'malware':        'Malware',
-  'phishing':       'Phishing',
-  'social_networks':'Social Media',
-  'forums':         'Forum & Community',
-  'games':          'Gaming',
-  'dating':         'Dating',
-  'bitcoin':        'Cryptocurrency',
-  'weapons':        'Weapons',
-  'drogue':         'Drugs',
-  'hacking':        'Hacking',
-  'vpn':            'VPN & Proxy',
-  'filehosting':    'File Sharing',
-  'shopping':       'Shopping & E-Commerce',
-  'press':          'News & Media',
-  'sports':         'Sports',
-  'bank':           'Finance & Banking',
-  'crypto':         'Cryptocurrency',
-  'warez':          'Piracy',
-  'dynamic_dns':    'Dynamic DNS',
-  'shortener':      'URL Shortener',
-  'webmail':        'Email & Messaging',
-  'agressif':       'Violence & Aggression',
+  'mixed_adult':       'Adult Content',
+  'gambling':          'Gambling',
+  'malware':           'Malware',
+  'phishing':          'Phishing',
+  'social_networks':   'Social Media',
+  'forums':            'Forum & Community',
+  'games':             'Gaming',
+  'dating':            'Dating',
+  'bitcoin':           'Cryptocurrency',
+  'weapons':           'Weapons',
+  'drogue':            'Drugs',
+  'hacking':           'Hacking',
+  'vpn':               'VPN & Proxy',
+  'filehosting':       'File Sharing',
+  'shopping':          'Shopping & E-Commerce',
+  'press':             'News & Media',
+  'sports':            'Sports',
+  'bank':              'Finance & Banking',
+  'cryptojacking':     'Cryptojacking',
+  'warez':             'Piracy',
+  'dynamic_dns':       'Dynamic DNS',
+  'shortener':         'URL Shortener',
+  'webmail':           'Email & Messaging',
+  'agressif':          'Violence & Aggression',
+  'fakenews':          'Fake News',
+  'stalkerware':       'Stalkerware',
+  'dangerous_material':'Dangerous Material',
+  'ddos':              'DDoS & Stresser',
+  'redirector':        'Redirector',
+  'lingerie':          'Lingerie & Adult Fashion',
+  'chat':              'Chat & Messaging',
 };
 
 function isAuthorized(request: NextRequest): boolean {
@@ -92,7 +107,7 @@ async function fetchDomainList(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(25000),
-      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.3' },
+      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.4' },
     });
     if (!res.ok) return [];
     const text = await res.text();
