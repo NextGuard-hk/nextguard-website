@@ -4,6 +4,8 @@ import "./globals.css"
 import { LanguageProvider } from "@/lib/language-context"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 const _jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" })
@@ -77,6 +79,8 @@ export default function RootLayout({
           <main className="min-h-screen">{children}</main>
           <Footer />
         </LanguageProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
