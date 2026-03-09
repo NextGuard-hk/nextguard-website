@@ -1,13 +1,15 @@
 // lib/threat-intel-db.ts
-// NextGuard Threat Intelligence Engine v5.1 - DB Persistent Edition
-// FIXED: lookupIndicator now checks full URL path AND hostname for PhishTank-style URLs
+// NextGuard Threat Intelligence Engine v5.2 - DB Persistent Edition
+// FIXED v2: lookupIndicator uses is_active (not enabled) for feeds count
 import { getDB, generateIndicatorId, normalizeValue } from './db';
 import type { RiskLevel, ThreatIntelResult, SourceHit } from './threat-intel';
+
 const FEED_CONFIDENCE: Record<string, number> = {
   urlhaus: 95, phishing_army: 85, openphish: 90, phishtank: 88,
   threatfox: 92, feodo_tracker: 95, c2_intel: 88, ipsum: 80,
   blocklist_de: 78, emerging_threats: 82, disposable_emails: 70, local_ioc: 99,
 };
+
 const FEED_RISK: Record<string, RiskLevel> = {
   urlhaus: 'known_malicious', phishing_army: 'known_malicious',
   openphish: 'known_malicious', phishtank: 'known_malicious',
@@ -16,6 +18,7 @@ const FEED_RISK: Record<string, RiskLevel> = {
   blocklist_de: 'high_risk', emerging_threats: 'high_risk',
   disposable_emails: 'low_risk',
 };
+
 const FEED_CATEGORIES: Record<string, string[]> = {
   urlhaus: ['malware', 'malware_distribution'], phishing_army: ['phishing'],
   openphish: ['phishing'], phishtank: ['phishing'],
@@ -25,15 +28,18 @@ const FEED_CATEGORIES: Record<string, string[]> = {
   emerging_threats: ['compromised', 'exploit'],
   disposable_emails: ['disposable_email', 'spam'],
 };
+
 const FEED_TTL_DAYS: Record<string, number> = {
   urlhaus: 30, phishing_army: 7, openphish: 3, phishtank: 30,
   threatfox: 90, feodo_tracker: 60, c2_intel: 30, ipsum: 7,
   blocklist_de: 14, emerging_threats: 7,
   disposable_emails: 365, local_ioc: 3650,
 };
+
 function ensureDB() {
   return getDB();
 }
+
 export async function ingestIndicators(
   feedId: string,
   indicators: Array<{ value: string; type: string; description?: string; threat_actor?: string; campaign?: string }>
@@ -69,12 +75,13 @@ export async function ingestIndicators(
   }
   await db.execute({
     sql: `UPDATE feeds SET entries_count = (SELECT COUNT(*) FROM indicators WHERE source_feed = ? AND is_active = 1),
-    total_ingested = total_ingested + ?, last_success = datetime('now'), last_refresh = datetime('now'),
-    status = 'active', updated_at = datetime('now') WHERE id = ?`,
+      total_ingested = total_ingested + ?, last_success = datetime('now'), last_refresh = datetime('now'),
+      status = 'active', updated_at = datetime('now') WHERE id = ?`,
     args: [feedId, added + updated, feedId],
   });
   return { added, updated };
 }
+
 export async function expireOldIndicators(feedId?: string): Promise<number> {
   const db = ensureDB();
   const result = await db.execute({
@@ -85,51 +92,37 @@ export async function expireOldIndicators(feedId?: string): Promise<number> {
   });
   return result.rowsAffected;
 }
+
 export async function lookupIndicator(value: string): Promise<{
   hits: Array<{ feed: string; risk_level: RiskLevel; confidence: number; categories: string[]; first_seen: string; last_seen: string }>;
   totalChecked: number;
 }> {
   const db = ensureDB();
   const v = value.toLowerCase().trim();
-
-  // Build a comprehensive list of values to check:
-  // 1. The raw normalized value (strip www)
-  // 2. The hostname only (for domain lookups)
-  // 3. hostname + path (for URL lookups like PhishTank)
-  // 4. Full URL normalized
   const valuesToCheck = new Set<string>();
-
-  // Strip www prefix
   const stripped = v.replace(/^www\./, '');
   valuesToCheck.add(stripped);
-
   try {
     const urlObj = new URL(v.startsWith('http') ? v : `https://${v}`);
     const hostname = urlObj.hostname.toLowerCase().replace(/^www\./, '');
     valuesToCheck.add(hostname);
-
-    // Full path (hostname + path, no trailing slash)
     if (urlObj.pathname && urlObj.pathname !== '/') {
       const withPath = hostname + urlObj.pathname.replace(/\/$/, '');
       valuesToCheck.add(withPath);
-      // Also with query string
       if (urlObj.search) {
         valuesToCheck.add(withPath + urlObj.search);
       }
     }
   } catch {}
-
   const finalValues = [...valuesToCheck].filter(Boolean);
   const placeholders = finalValues.map(() => '?').join(',');
-
   const result = await db.execute({
     sql: `SELECT source_feed, risk_level, confidence, categories, first_seen, last_seen
-          FROM indicators
-          WHERE value_normalized IN (${placeholders}) AND is_active = 1
-          ORDER BY confidence DESC`,
+      FROM indicators
+      WHERE value_normalized IN (${placeholders}) AND is_active = 1
+      ORDER BY confidence DESC`,
     args: finalValues,
   });
-
   const hits = result.rows.map(row => ({
     feed: row.source_feed as string,
     risk_level: row.risk_level as RiskLevel,
@@ -138,26 +131,24 @@ export async function lookupIndicator(value: string): Promise<{
     first_seen: row.first_seen as string,
     last_seen: row.last_seen as string,
   }));
-
-  const feedCount = await db.execute(`SELECT COUNT(*) as cnt FROM feeds WHERE enabled = 1 AND status = 'active'`);
+  // FIXED: use is_active (not enabled) for feed count
+  const feedCount = await db.execute(`SELECT COUNT(*) as cnt FROM feeds WHERE is_active = 1 AND status = 'active'`);
   const totalChecked = (feedCount.rows[0]?.cnt as number) || 11;
-
   try {
     await db.execute({
       sql: `INSERT INTO lookup_log (indicator_value, result_risk_level, sources_hit, sources_checked) VALUES (?, ?, ?, ?)`,
       args: [stripped, hits[0]?.risk_level ?? 'clean', hits.length, totalChecked],
     });
   } catch {}
-
   if (hits.length > 0) {
     await db.execute({
       sql: `UPDATE indicators SET hit_count = hit_count + 1, last_hit_at = datetime('now') WHERE value_normalized IN (${placeholders}) AND is_active = 1`,
       args: finalValues,
     });
   }
-
   return { hits, totalChecked };
 }
+
 export async function getFeedStatusFromDB() {
   const db = ensureDB();
   const result = await db.execute(`SELECT id, name, status, entries_count, last_success, last_error, last_refresh, feed_type FROM feeds ORDER BY name ASC`);
@@ -173,6 +164,7 @@ export async function getFeedStatusFromDB() {
     feedErrors: feeds.filter(f => f.status === 'error').map(f => f.name),
   };
 }
+
 export async function getThreatIntelStats() {
   const db = ensureDB();
   const [byRisk, byFeed, recentLookups, topHits] = await Promise.all([
