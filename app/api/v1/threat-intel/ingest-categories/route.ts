@@ -1,12 +1,13 @@
 // app/api/v1/threat-intel/ingest-categories/route.ts
-// NextGuard URL Category Ingestion v1.5
+// NextGuard URL Category Ingestion v1.6
 // Uses GitHub mirror of UT1 Toulouse blacklists (olbat/ut1-blacklists)
+// v1.6: Use single bulk INSERT per batch to minimize Turso round-trips
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 
 const BASE = 'https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists';
 
-// Only categories with plain text 'domains' files (not .gz)
+// Only categories with plain text 'domains' files (verified)
 const UT1_FEEDS: Record<string, string> = {
   'mixed_adult':      `${BASE}/mixed_adult/domains`,
   'gambling':         `${BASE}/gambling/domains`,
@@ -75,6 +76,11 @@ const CATEGORY_DISPLAY: Record<string, string> = {
   'chat':              'Chat & Messaging',
 };
 
+// Max domains to ingest per category per run (to avoid timeouts)
+const MAX_DOMAINS_PER_CATEGORY = 5000;
+// Domains per single SQL statement (VALUES row count)
+const BATCH_SIZE = 500;
+
 function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
@@ -103,54 +109,51 @@ async function ensureUrlCategoriesTable(): Promise<void> {
   } catch { /* table already exists */ }
 }
 
-async function fetchDomainList(url: string): Promise<string[]> {
+async function fetchDomainList(url: string, limit: number): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(25000),
-      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.4' },
+      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.6' },
     });
     if (!res.ok) return [];
     const text = await res.text();
-    return text
+    const all = text
       .split('\n')
       .map(l => l.trim().toLowerCase())
       .filter(l => l && !l.startsWith('#') && l.includes('.') && l.length > 3 && l.length < 255);
+    // Return only up to limit to avoid timeout
+    return all.slice(0, limit);
   } catch {
     return [];
   }
 }
 
 async function ingestCategoryFeed(
-  categoryKey: string,
   displayName: string,
-  url: string,
-  batchSize = 500
-): Promise<{ added: number; errors: number }> {
+  url: string
+): Promise<{ added: number; total_in_feed: number; errors: number }> {
   const db = getDB();
-  const domains = await fetchDomainList(url);
-  if (domains.length === 0) return { added: 0, errors: 1 };
+  const domains = await fetchDomainList(url, MAX_DOMAINS_PER_CATEGORY);
+  if (domains.length === 0) return { added: 0, total_in_feed: 0, errors: 1 };
   let added = 0;
   let errors = 0;
-  for (let i = 0; i < domains.length; i += batchSize) {
-    const batch = domains.slice(i, i + batchSize);
+  // Use single bulk INSERT per batch - much faster than db.batch()
+  for (let i = 0; i < domains.length; i += BATCH_SIZE) {
+    const batch = domains.slice(i, i + BATCH_SIZE);
     try {
-      await db.batch(
-        batch.map(domain => ({
-          sql: `INSERT INTO url_categories (domain, category, source, updated_at)
-                VALUES (?, ?, 'ut1', datetime('now'))
-                ON CONFLICT(domain, source) DO UPDATE SET
-                  category = excluded.category,
-                  updated_at = datetime('now')`,
-          args: [domain, displayName],
-        })),
-        'write'
-      );
+      const placeholders = batch.map(() => `(?, ?, 'ut1', datetime('now'), datetime('now'))`).join(',');
+      const args = batch.flatMap(d => [d, displayName]);
+      await db.execute({
+        sql: `INSERT OR IGNORE INTO url_categories (domain, category, source, created_at, updated_at)
+              VALUES ${placeholders}`,
+        args,
+      });
       added += batch.length;
     } catch {
       errors++;
     }
   }
-  return { added, errors };
+  return { added, total_in_feed: domains.length, errors };
 }
 
 export async function GET(request: NextRequest) {
@@ -178,19 +181,26 @@ export async function GET(request: NextRequest) {
   for (const [key, url] of Object.entries(feedsToRun)) {
     const displayName = CATEGORY_DISPLAY[key] || key;
     try {
-      const result = await ingestCategoryFeed(key, displayName, url);
-      results[key] = { category: displayName, domains: result.added, errors: result.errors };
+      const result = await ingestCategoryFeed(displayName, url);
+      results[key] = {
+        category: displayName,
+        domains_ingested: result.added,
+        domains_in_feed: result.total_in_feed,
+        limit_applied: result.total_in_feed >= MAX_DOMAINS_PER_CATEGORY,
+        errors: result.errors
+      };
     } catch (e: any) {
-      results[key] = { category: displayName, domains: 0, error: e.message };
+      results[key] = { category: displayName, domains_ingested: 0, error: e.message };
     }
   }
 
-  const totalDomains = Object.values(results).reduce((sum: number, r: any) => sum + (r.domains || 0), 0);
+  const totalDomains = Object.values(results).reduce((sum: number, r: any) => sum + (r.domains_ingested || 0), 0);
 
   return NextResponse.json({
     success: true,
     message: 'URL category ingestion complete',
     source: 'UT1 Toulouse via olbat/ut1-blacklists GitHub mirror',
+    note: `Max ${MAX_DOMAINS_PER_CATEGORY} domains per category per run`,
     results,
     total_domains_ingested: totalDomains,
     categories_processed: Object.keys(results).length,
