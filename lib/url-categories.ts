@@ -91,6 +91,11 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'betway.com':['Gambling'],'fanduel.com':['Gambling','Sports'],
   'mark6.com.hk':['Gambling'],'melco-resorts.com':['Gambling','Entertainment'],
   'galaxy-macau.com':['Gambling','Entertainment'],'venetianmacao.com':['Gambling','Entertainment'],
+  'sjmresorts.com':['Gambling','Entertainment','Travel'],'sjmholdings.com':['Gambling','Entertainment'],
+  'wynnresorts.com':['Gambling','Entertainment','Travel'],'wynnmacau.com':['Gambling','Entertainment'],
+  'mgm.com':['Gambling','Entertainment'],'mgmresorts.com':['Gambling','Entertainment','Travel'],
+  'sandschina.com':['Gambling','Entertainment'],'cotaistrip.com':['Gambling','Entertainment'],
+  'studiocity-macau.com':['Gambling','Entertainment'],'grandlisboa.com':['Gambling','Entertainment'],
   'tinder.com':['Dating'],'match.com':['Dating'],'bumble.com':['Dating'],
   'nordvpn.com':['VPN & Proxy'],'expressvpn.com':['VPN & Proxy'],
   'torproject.org':['Privacy Tools'],
@@ -438,6 +443,7 @@ export function categorizeUrl(domain: string): string[] {
       rule.categories.forEach(c => cats.add(c));
     }
   }
+venetianmacao.com
 
     }
   }
