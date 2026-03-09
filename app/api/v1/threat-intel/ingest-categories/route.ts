@@ -1,34 +1,41 @@
 // app/api/v1/threat-intel/ingest-categories/route.ts
-// NextGuard URL Category Ingestion v1.0
-// Ingests domain->category mappings from UT1 Toulouse blacklists (HTTP text files)
-// Stores into Turso url_categories table for fast lookup
+// NextGuard URL Category Ingestion v1.1
+// Uses GitHub mirror of UT1 Toulouse blacklists (olbat/ut1-blacklists)
+// Raw domain files accessible via GitHub raw URLs - no tar.gz needed
 import { NextRequest, NextResponse } from 'next/server';
 import { initDB, getDB } from '@/lib/db';
 
-// UT1 Toulouse category feeds (plain text, one domain per line)
-// Available via direct HTTP - no tar.gz parsing needed
+// GitHub mirror of UT1 Toulouse blacklists
+// Source: https://github.com/olbat/ut1-blacklists
+const BASE = 'https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists';
+
 const UT1_FEEDS: Record<string, string> = {
-  'adult':         'https://dsi.ut-capitole.fr/blacklists/download/adult/domains',
-  'gambling':      'https://dsi.ut-capitole.fr/blacklists/download/gambling/domains',
-  'malware':       'https://dsi.ut-capitole.fr/blacklists/download/malware/domains',
-  'phishing':      'https://dsi.ut-capitole.fr/blacklists/download/phishing/domains',
-  'social_networks': 'https://dsi.ut-capitole.fr/blacklists/download/social_networks/domains',
-  'forums':        'https://dsi.ut-capitole.fr/blacklists/download/forums/domains',
-  'games':         'https://dsi.ut-capitole.fr/blacklists/download/games/domains',
-  'dating':        'https://dsi.ut-capitole.fr/blacklists/download/dating/domains',
-  'crypto':        'https://dsi.ut-capitole.fr/blacklists/download/crypto/domains',
-  'weapons':       'https://dsi.ut-capitole.fr/blacklists/download/weapons/domains',
-  'drugs':         'https://dsi.ut-capitole.fr/blacklists/download/drugs/domains',
-  'hacking':       'https://dsi.ut-capitole.fr/blacklists/download/hacking/domains',
-  'vpn':           'https://dsi.ut-capitole.fr/blacklists/download/vpn/domains',
-  'streaming':     'https://dsi.ut-capitole.fr/blacklists/download/streaming/domains',
-  'filehosting':   'https://dsi.ut-capitole.fr/blacklists/download/filehosting/domains',
-  'shopping':      'https://dsi.ut-capitole.fr/blacklists/download/shopping/domains',
-  'news':          'https://dsi.ut-capitole.fr/blacklists/download/news/domains',
-  'sports':        'https://dsi.ut-capitole.fr/blacklists/download/sports/domains',
+  'adult':           `${BASE}/adult/domains`,
+  'gambling':        `${BASE}/gambling/domains`,
+  'malware':         `${BASE}/malware/domains`,
+  'phishing':        `${BASE}/phishing/domains`,
+  'social_networks': `${BASE}/social_networks/domains`,
+  'forums':          `${BASE}/forums/domains`,
+  'games':           `${BASE}/games/domains`,
+  'dating':          `${BASE}/dating/domains`,
+  'bitcoin':         `${BASE}/bitcoin/domains`,
+  'weapons':         `${BASE}/weapons/domains`,
+  'drogue':          `${BASE}/drogue/domains`,
+  'hacking':         `${BASE}/hacking/domains`,
+  'vpn':             `${BASE}/vpn/domains`,
+  'filehosting':     `${BASE}/filehosting/domains`,
+  'shopping':        `${BASE}/shopping/domains`,
+  'press':           `${BASE}/press/domains`,
+  'sports':          `${BASE}/sports/domains`,
+  'bank':            `${BASE}/bank/domains`,
+  'crypto':          `${BASE}/cryptojacking/domains`,
+  'warez':           `${BASE}/warez/domains`,
+  'dynamic_dns':     `${BASE}/dynamic-dns/domains`,
+  'shortener':       `${BASE}/shortener/domains`,
+  'webmail':         `${BASE}/webmail/domains`,
+  'redirector':      `${BASE}/redirector/domains`,
 };
 
-// Category name normalization
 const CATEGORY_DISPLAY: Record<string, string> = {
   'adult': 'Adult Content',
   'gambling': 'Gambling',
@@ -38,16 +45,22 @@ const CATEGORY_DISPLAY: Record<string, string> = {
   'forums': 'Forum & Community',
   'games': 'Gaming',
   'dating': 'Dating',
-  'crypto': 'Cryptocurrency',
+  'bitcoin': 'Cryptocurrency',
   'weapons': 'Weapons',
-  'drugs': 'Drugs',
+  'drogue': 'Drugs',
   'hacking': 'Hacking',
   'vpn': 'VPN & Proxy',
-  'streaming': 'Streaming Media',
   'filehosting': 'File Sharing',
   'shopping': 'Shopping & E-Commerce',
-  'news': 'News & Media',
+  'press': 'News & Media',
   'sports': 'Sports',
+  'bank': 'Finance & Banking',
+  'crypto': 'Cryptocurrency',
+  'warez': 'Piracy',
+  'dynamic_dns': 'Dynamic DNS',
+  'shortener': 'URL Shortener',
+  'webmail': 'Email & Messaging',
+  'redirector': 'Redirector',
 };
 
 function isAuthorized(request: NextRequest): boolean {
@@ -65,7 +78,7 @@ async function fetchDomainList(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(25000),
-      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.0' },
+      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.1' },
     });
     if (!res.ok) return [];
     const text = await res.text();
@@ -83,7 +96,7 @@ async function ingestCategoryFeed(
   categoryKey: string,
   displayName: string,
   url: string,
-  batchSize = 500
+  batchSize = 200
 ): Promise<{ added: number; errors: number }> {
   const domains = await fetchDomainList(url);
   if (domains.length === 0) return { added: 0, errors: 1 };
@@ -91,7 +104,6 @@ async function ingestCategoryFeed(
   let added = 0;
   let errors = 0;
 
-  // Batch upserts for performance
   for (let i = 0; i < domains.length; i += batchSize) {
     const batch = domains.slice(i, i + batchSize);
     try {
@@ -122,7 +134,6 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const categoryParam = request.nextUrl.searchParams.get('category');
 
-  // Ensure DB and url_categories table exist
   try {
     await initDB();
   } catch (e: any) {
@@ -132,18 +143,17 @@ export async function GET(request: NextRequest) {
   const db = getDB();
   const results: Record<string, any> = {};
 
-  // Determine which categories to run
-  const feedsToRun = categoryParam
-    ? { [categoryParam]: UT1_FEEDS[categoryParam] }
-    : UT1_FEEDS;
-
   if (categoryParam && !UT1_FEEDS[categoryParam]) {
     return NextResponse.json({
       error: `Unknown category '${categoryParam}'. Available: ${Object.keys(UT1_FEEDS).join(', ')}`
     }, { status: 400 });
   }
 
-  // Run feeds sequentially to avoid DB overload
+  const feedsToRun = categoryParam
+    ? { [categoryParam]: UT1_FEEDS[categoryParam] }
+    : UT1_FEEDS;
+
+  // Run feeds sequentially to avoid DB overload + Vercel timeout
   for (const [key, url] of Object.entries(feedsToRun)) {
     const displayName = CATEGORY_DISPLAY[key] || key;
     try {
@@ -159,6 +169,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     message: 'URL category ingestion complete',
+    source: 'UT1 Toulouse via olbat/ut1-blacklists GitHub mirror',
     results,
     total_domains_ingested: totalDomains,
     categories_processed: Object.keys(results).length,
