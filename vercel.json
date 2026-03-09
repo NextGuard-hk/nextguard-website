@@ -59,6 +59,10 @@
     {
       "path": "/api/v1/threat-intel/health",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure",
+      "schedule": "0 4 * * *"
     }
   ]
 }
