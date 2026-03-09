@@ -1,12 +1,9 @@
 // app/api/v1/threat-intel/ingest-categories/route.ts
-// NextGuard URL Category Ingestion v1.1
+// NextGuard URL Category Ingestion v1.2
 // Uses GitHub mirror of UT1 Toulouse blacklists (olbat/ut1-blacklists)
-// Raw domain files accessible via GitHub raw URLs - no tar.gz needed
 import { NextRequest, NextResponse } from 'next/server';
-import { initDB, getDB } from '@/lib/db';
+import { getDB } from '@/lib/db';
 
-// GitHub mirror of UT1 Toulouse blacklists
-// Source: https://github.com/olbat/ut1-blacklists
 const BASE = 'https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists';
 
 const UT1_FEEDS: Record<string, string> = {
@@ -33,7 +30,6 @@ const UT1_FEEDS: Record<string, string> = {
   'dynamic_dns':     `${BASE}/dynamic-dns/domains`,
   'shortener':       `${BASE}/shortener/domains`,
   'webmail':         `${BASE}/webmail/domains`,
-  'redirector':      `${BASE}/redirector/domains`,
 };
 
 const CATEGORY_DISPLAY: Record<string, string> = {
@@ -60,7 +56,6 @@ const CATEGORY_DISPLAY: Record<string, string> = {
   'dynamic_dns': 'Dynamic DNS',
   'shortener': 'URL Shortener',
   'webmail': 'Email & Messaging',
-  'redirector': 'Redirector',
 };
 
 function isAuthorized(request: NextRequest): boolean {
@@ -74,11 +69,28 @@ function isAuthorized(request: NextRequest): boolean {
   return false;
 }
 
+async function ensureUrlCategoriesTable(): Promise<void> {
+  const db = getDB();
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS url_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      domain TEXT NOT NULL,
+      category TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'ut1',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_urlcat_domain_source ON url_categories(domain, source)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_urlcat_domain ON url_categories(domain)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_urlcat_category ON url_categories(category)`);
+  } catch { /* table already exists */ }
+}
+
 async function fetchDomainList(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(25000),
-      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.1' },
+      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.2' },
     });
     if (!res.ok) return [];
     const text = await res.text();
@@ -92,12 +104,12 @@ async function fetchDomainList(url: string): Promise<string[]> {
 }
 
 async function ingestCategoryFeed(
-  db: ReturnType<typeof getDB>,
   categoryKey: string,
   displayName: string,
   url: string,
   batchSize = 200
 ): Promise<{ added: number; errors: number }> {
+  const db = getDB();
   const domains = await fetchDomainList(url);
   if (domains.length === 0) return { added: 0, errors: 1 };
 
@@ -134,18 +146,14 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const categoryParam = request.nextUrl.searchParams.get('category');
 
-  try {
-    await initDB();
-  } catch (e: any) {
-    return NextResponse.json({ error: 'DB init failed', detail: e.message }, { status: 500 });
-  }
+  // Ensure url_categories table exists (lightweight - single CREATE IF NOT EXISTS)
+  await ensureUrlCategoriesTable();
 
-  const db = getDB();
   const results: Record<string, any> = {};
 
   if (categoryParam && !UT1_FEEDS[categoryParam]) {
     return NextResponse.json({
-      error: `Unknown category '${categoryParam}'. Available: ${Object.keys(UT1_FEEDS).join(', ')}`
+      error: `Unknown category. Available: ${Object.keys(UT1_FEEDS).join(', ')}`
     }, { status: 400 });
   }
 
@@ -153,11 +161,10 @@ export async function GET(request: NextRequest) {
     ? { [categoryParam]: UT1_FEEDS[categoryParam] }
     : UT1_FEEDS;
 
-  // Run feeds sequentially to avoid DB overload + Vercel timeout
   for (const [key, url] of Object.entries(feedsToRun)) {
     const displayName = CATEGORY_DISPLAY[key] || key;
     try {
-      const result = await ingestCategoryFeed(db, key, displayName, url);
+      const result = await ingestCategoryFeed(key, displayName, url);
       results[key] = { category: displayName, domains: result.added, errors: result.errors };
     } catch (e: any) {
       results[key] = { category: displayName, domains: 0, error: e.message };
