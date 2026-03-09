@@ -1,15 +1,49 @@
 import { NextResponse } from 'next/server';
-import { lookupIndicator } from '@/lib/threat-intel-db';
+import { lookupIndicator, ingestIndicators } from '@/lib/threat-intel-db';
 import { checkUrl } from '@/lib/threat-intel';
 import { categorizeUrl } from '@/lib/url-categories';
 import { initDB } from '@/lib/db';
 
-// Auto-initialize DB schema on first load (idempotent - uses CREATE IF NOT EXISTS)
+// Auto-initialize DB schema on first load (idempotent)
 let dbInitialized = false;
+let ingestTriggered = false;
+
 async function ensureInit() {
   if (!dbInitialized) {
     try { await initDB(); dbInitialized = true; } catch {}
   }
+  // Background ingest on first cold start (non-blocking)
+  if (dbInitialized && !ingestTriggered) {
+    ingestTriggered = true;
+    triggerBackgroundIngest();
+  }
+}
+
+// Lightweight background ingest of top phishing feeds (non-blocking)
+function triggerBackgroundIngest() {
+  (async () => {
+    try {
+      const feeds = [
+        { id: 'phishtank', url: 'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt', type: 'domain' },
+        { id: 'phishing_army', url: 'https://phishing.army/download/phishing_army_blocklist.txt', type: 'domain' },
+        { id: 'openphish', url: 'https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt', type: 'domain' },
+      ];
+      for (const feed of feeds) {
+        try {
+          const res = await fetch(feed.url, { headers: { 'User-Agent': 'NextGuard/1.0' }, signal: AbortSignal.timeout(25000) });
+          if (!res.ok) continue;
+          const text = await res.text();
+          const lines = text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#') && l.includes('.'));
+          const indicators = lines.slice(0, 500).map(v => {
+            let value = v.replace(/^www\./, '');
+            try { value = new URL(v.startsWith('http') ? v : `https://${v}`).hostname.replace(/^www\./, ''); } catch {}
+            return { value, type: feed.type };
+          });
+          await ingestIndicators(feed.id, indicators);
+        } catch {}
+      }
+    } catch {}
+  })();
 }
 
 // Normalize risk level from DB to verdict
@@ -36,12 +70,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const indicator = searchParams.get('indicator');
     const type = searchParams.get('type');
-    const mode = searchParams.get('mode') || 'hybrid'; // 'db', 'live', 'hybrid'
+    const mode = searchParams.get('mode') || 'hybrid';
     if (!indicator) {
       return NextResponse.json({ error: 'indicator parameter required' }, { status: 400 });
     }
     const trimmed = indicator.trim();
-    // Mode: db-only (fast, uses Turso persistent store)
+    // Mode: db-only
     if (mode === 'db') {
       const dbResult = await lookupIndicator(trimmed);
       const lookupMs = Date.now() - startTime;
@@ -63,7 +97,7 @@ export async function GET(request: Request) {
         })),
       });
     }
-    // Mode: live (original in-memory OSINT feeds)
+    // Mode: live
     if (mode === 'live') {
       const result = await checkUrl(trimmed);
       const lookupMs = Date.now() - startTime;
@@ -82,7 +116,6 @@ export async function GET(request: Request) {
     // Mode: hybrid (default) - DB first, fall back to live if DB has no data
     const dbResult = await lookupIndicator(trimmed);
     if (dbResult.hits.length > 0) {
-      // DB has data - fast path (should be <50ms)
       const lookupMs = Date.now() - startTime;
       const topHit = dbResult.hits[0];
       const riskLevel = topHit.risk_level;
