@@ -466,7 +466,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
   if (localMatch) {
     sources.push({ name: 'Local IOC', hit: true, risk_level: localMatch[1].risk_level, categories: localMatch[1].categories, detail: `Matched: ${localMatch[0]}` });
     allCategories.push(...localMatch[1].categories);
-    totalScore += localMatch[1].risk_level === 'known_malicious' ? 90 : localMatch[1].risk_level === 'high_risk' ? 70 : localMatch[1].risk_level === 'medium_risk' ? 40 : 10;
+    totalScore += localMatch[1].risk_level === 'known_malicious' ? 90 : localMatch[1].risk_level === 'high_risk' ? 70 : localMatch[1].risk_level === 'medium_risk' ? 40 : localMatch[1].risk_level === 'clean' ? 0 : 10;
   } else {
     sources.push({ name: 'Local IOC', hit: false });
   }
@@ -477,7 +477,7 @@ export async function checkUrl(inputUrl: string): Promise<ThreatIntelResult> {
     for (const name of feedNames) { sources.push({ name, hit: false }); }
     const cats = localMatch ? localMatch[1].categories : await categorizeUrlAsync(cleanHostname);
     const riskLvl = 'clean';
-    return { url: inputUrl, domain: hostname, risk_level: riskLvl, overall_score: Math.min(totalScore, 15), categories: cats.length > 0 ? [...new Set(cats)] : await categorizeUrlAsync(cleanHostname), flags: [], sources, checked_at: new Date().toISOString() };
+    return { url: inputUrl, domain: hostname, risk_level: riskLvl, overall_score: 0, categories: cats.length > 0 ? [...new Set(cats)] : await categorizeUrlAsync(cleanHostname), flags: [], sources, checked_at: new Date().toISOString() };
   }
 
   // URLhaus
