@@ -2,48 +2,48 @@ import { NextResponse } from 'next/server';
 import { lookupIndicator, ingestIndicators } from '@/lib/threat-intel-db';
 import { checkUrl } from '@/lib/threat-intel';
 import { categorizeUrl } from '@/lib/url-categories';
-import { initDB } from '@/lib/db';
+import { initDB, getDB } from '@/lib/db';
 
 // Auto-initialize DB schema on first load (idempotent)
 let dbInitialized = false;
-let ingestTriggered = false;
+let initialIngestDone = false;
 
 async function ensureInit() {
   if (!dbInitialized) {
     try { await initDB(); dbInitialized = true; } catch {}
   }
-  // Background ingest on first cold start (non-blocking)
-  if (dbInitialized && !ingestTriggered) {
-    ingestTriggered = true;
-    triggerBackgroundIngest();
-  }
 }
 
-// Lightweight background ingest of top phishing feeds (non-blocking)
-function triggerBackgroundIngest() {
-  (async () => {
-    try {
-      const feeds = [
-        { id: 'phishtank', url: 'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt', type: 'domain' },
-        { id: 'phishing_army', url: 'https://phishing.army/download/phishing_army_blocklist.txt', type: 'domain' },
-        { id: 'openphish', url: 'https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt', type: 'domain' },
-      ];
-      for (const feed of feeds) {
-        try {
-          const res = await fetch(feed.url, { headers: { 'User-Agent': 'NextGuard/1.0' }, signal: AbortSignal.timeout(25000) });
-          if (!res.ok) continue;
-          const text = await res.text();
-          const lines = text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#') && l.includes('.'));
-          const indicators = lines.slice(0, 500).map(v => {
-            let value = v.replace(/^www\./, '');
-            try { value = new URL(v.startsWith('http') ? v : `https://${v}`).hostname.replace(/^www\./, ''); } catch {}
-            return { value, type: feed.type };
-          });
-          await ingestIndicators(feed.id, indicators);
-        } catch {}
-      }
-    } catch {}
-  })();
+// Quick seed ingest: fetch phishtank + phishing_army synchronously (200 entries max)
+// Called only once per cold start to ensure DB has some data
+async function quickSeedIfEmpty() {
+  if (initialIngestDone) return;
+  initialIngestDone = true;
+  try {
+    const db = getDB();
+    const count = await db.execute(`SELECT COUNT(*) as cnt FROM indicators WHERE is_active = 1`);
+    if ((count.rows[0]?.cnt as number) > 0) return; // Already have data
+    // DB is empty - do a quick ingest of top phishing feeds
+    const feeds = [
+      { id: 'phishtank', url: 'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt', type: 'domain' },
+      { id: 'phishing_army', url: 'https://phishing.army/download/phishing_army_blocklist.txt', type: 'domain' },
+      { id: 'openphish', url: 'https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt', type: 'domain' },
+    ];
+    for (const feed of feeds) {
+      try {
+        const res = await fetch(feed.url, { headers: { 'User-Agent': 'NextGuard/1.0' }, signal: AbortSignal.timeout(15000) });
+        if (!res.ok) continue;
+        const text = await res.text();
+        const lines = text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l && !l.startsWith('#') && l.includes('.') && l.length > 3);
+        const indicators = lines.slice(0, 200).map(v => {
+          let value = v.replace(/^www\./, '');
+          try { value = new URL(v.startsWith('http') ? v : `https://${v}`).hostname.replace(/^www\./, ''); } catch {}
+          return { value, type: feed.type };
+        }).filter(i => i.value && i.value.length > 3);
+        if (indicators.length > 0) await ingestIndicators(feed.id, indicators);
+      } catch {}
+    }
+  } catch {}
 }
 
 // Normalize risk level from DB to verdict
@@ -114,6 +114,8 @@ export async function GET(request: Request) {
       });
     }
     // Mode: hybrid (default) - DB first, fall back to live if DB has no data
+    // On first run with empty DB, do a quick seed ingest before lookup
+    if (dbInitialized) await quickSeedIfEmpty();
     const dbResult = await lookupIndicator(trimmed);
     if (dbResult.hits.length > 0) {
       const lookupMs = Date.now() - startTime;
