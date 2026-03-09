@@ -1,9 +1,25 @@
 import { NextResponse } from 'next/server';
-import { lookupIndicator, getFeedStatusFromDB } from '@/lib/threat-intel-db';
-import { checkUrl, getFeedStatus } from '@/lib/threat-intel';
+import { lookupIndicator } from '@/lib/threat-intel-db';
+import { checkUrl } from '@/lib/threat-intel';
 import { categorizeUrl } from '@/lib/url-categories';
 
-// Hybrid lookup: Try Turso DB first (persistent, fast), fall back to in-memory OSINT feeds
+// Normalize risk level from DB (critical/high/medium/low/clean) to verdict
+function riskToVerdict(riskLevel: string): string {
+  switch (riskLevel) {
+    case 'critical':
+    case 'high':
+    case 'known_malicious':
+      return 'malicious';
+    case 'medium':
+    case 'high_risk':
+    case 'medium_risk':
+      return 'suspicious';
+    default:
+      return 'clean';
+  }
+}
+
+// Hybrid lookup: Try Turso DB first (persistent, fast), fall back to live OSINT feeds
 export async function GET(request: Request) {
   try {
     const startTime = Date.now();
@@ -24,9 +40,7 @@ export async function GET(request: Request) {
       const lookupMs = Date.now() - startTime;
       const topHit = dbResult.hits[0];
       const riskLevel = topHit?.risk_level ?? 'clean';
-      const verdict = riskLevel === 'known_malicious' ? 'malicious'
-        : riskLevel === 'high_risk' || riskLevel === 'medium_risk' ? 'suspicious'
-        : 'clean';
+      const verdict = riskToVerdict(riskLevel);
       const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
       const sourcesHit = dbResult.hits.map(h => h.feed);
       return NextResponse.json({
@@ -35,7 +49,7 @@ export async function GET(request: Request) {
         categories: allCategories.length > 0 ? allCategories : categorizeUrl(trimmed),
         sources_hit: sourcesHit, sources_checked: dbResult.totalChecked,
         flags: [], lookup_ms: lookupMs,
-        checked_at: new Date().toISOString(), engine: 'turso-db-v5.0',
+        checked_at: new Date().toISOString(), engine: 'turso-db-v5.1',
         source_details: dbResult.hits.map(h => ({
           name: h.feed, hit: true, risk_level: h.risk_level,
           categories: h.categories, detail: `First seen: ${h.first_seen}`
@@ -47,9 +61,7 @@ export async function GET(request: Request) {
     if (mode === 'live') {
       const result = await checkUrl(trimmed);
       const lookupMs = Date.now() - startTime;
-      const verdict = result.risk_level === 'known_malicious' ? 'malicious'
-        : result.risk_level === 'high_risk' || result.risk_level === 'medium_risk' ? 'suspicious'
-        : 'clean';
+      const verdict = riskToVerdict(result.risk_level);
       const sourcesHit = result.sources.filter(s => s.hit).map(s => s.name);
       const categories = result.categories.length > 0 ? result.categories : categorizeUrl(result.domain);
       return NextResponse.json({
@@ -64,15 +76,12 @@ export async function GET(request: Request) {
 
     // Mode: hybrid (default) - DB first, enrich with live if DB has no hits
     const dbResult = await lookupIndicator(trimmed);
-
     if (dbResult.hits.length > 0) {
       // DB has data - use it (fast path)
       const lookupMs = Date.now() - startTime;
       const topHit = dbResult.hits[0];
       const riskLevel = topHit.risk_level;
-      const verdict = riskLevel === 'known_malicious' ? 'malicious'
-        : riskLevel === 'high_risk' || riskLevel === 'medium_risk' ? 'suspicious'
-        : 'clean';
+      const verdict = riskToVerdict(riskLevel);
       const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
       const sourcesHit = dbResult.hits.map(h => h.feed);
       return NextResponse.json({
@@ -81,7 +90,7 @@ export async function GET(request: Request) {
         categories: allCategories.length > 0 ? allCategories : categorizeUrl(trimmed),
         sources_hit: sourcesHit, sources_checked: dbResult.totalChecked,
         flags: [], lookup_ms: lookupMs,
-        checked_at: new Date().toISOString(), engine: 'turso-db-v5.0',
+        checked_at: new Date().toISOString(), engine: 'turso-db-v5.1',
         source_details: dbResult.hits.map(h => ({
           name: h.feed, hit: true, risk_level: h.risk_level,
           categories: h.categories, detail: `First seen: ${h.first_seen}`
@@ -92,9 +101,7 @@ export async function GET(request: Request) {
     // DB miss - fall back to live OSINT feeds
     const result = await checkUrl(trimmed);
     const lookupMs = Date.now() - startTime;
-    const verdict = result.risk_level === 'known_malicious' ? 'malicious'
-      : result.risk_level === 'high_risk' || result.risk_level === 'medium_risk' ? 'suspicious'
-      : 'clean';
+    const verdict = riskToVerdict(result.risk_level);
     const sourcesHit = result.sources.filter(s => s.hit).map(s => s.name);
     const categories = result.categories.length > 0 ? result.categories : categorizeUrl(result.domain);
     return NextResponse.json({
