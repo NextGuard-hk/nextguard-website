@@ -13,8 +13,64 @@
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/cron/ingest-feeds",
+      "comment": "High-frequency phishing feeds: openphish + phishtank + phishing_army — every 15 min",
+      "path": "/api/v1/threat-intel/ingest?feed=openphish&key=nextguard-ti-admin-2024-secure",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "comment": "High-frequency phishing feed: phishtank — every 15 min (offset 5 min)",
+      "path": "/api/v1/threat-intel/ingest?feed=phishtank&key=nextguard-ti-admin-2024-secure",
+      "schedule": "5-59/15 * * * *"
+    },
+    {
+      "comment": "High-frequency: phishing_army — every 15 min (offset 10 min)",
+      "path": "/api/v1/threat-intel/ingest?feed=phishing_army&key=nextguard-ti-admin-2024-secure",
+      "schedule": "10-59/15 * * * *"
+    },
+    {
+      "comment": "URLhaus + ThreatFox malware feeds — every hour",
+      "path": "/api/v1/threat-intel/ingest?feed=urlhaus&key=nextguard-ti-admin-2024-secure",
+      "schedule": "0 * * * *"
+    },
+    {
+      "comment": "ThreatFox C2 domains — every hour (offset 10 min)",
+      "path": "/api/v1/threat-intel/ingest?feed=threatfox&key=nextguard-ti-admin-2024-secure",
+      "schedule": "10 * * * *"
+    },
+    {
+      "comment": "IP threat feeds: ipsum + blocklist_de + emerging_threats — every 6 hours",
+      "path": "/api/v1/threat-intel/ingest?feed=ipsum&key=nextguard-ti-admin-2024-secure",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "comment": "blocklist.de — every 6 hours (offset 15 min)",
+      "path": "/api/v1/threat-intel/ingest?feed=blocklist_de&key=nextguard-ti-admin-2024-secure",
+      "schedule": "15 */6 * * *"
+    },
+    {
+      "comment": "Emerging Threats — every 6 hours (offset 30 min)",
+      "path": "/api/v1/threat-intel/ingest?feed=emerging_threats&key=nextguard-ti-admin-2024-secure",
+      "schedule": "30 */6 * * *"
+    },
+    {
+      "comment": "C2 Intel IPs — every 6 hours (offset 45 min)",
+      "path": "/api/v1/threat-intel/ingest?feed=c2_intel&key=nextguard-ti-admin-2024-secure",
+      "schedule": "45 */6 * * *"
+    },
+    {
+      "comment": "Feodo Tracker C2 IPs — once daily at 02:00 UTC",
+      "path": "/api/v1/threat-intel/ingest?feed=feodo_tracker&key=nextguard-ti-admin-2024-secure",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "comment": "Disposable emails list — once daily at 03:00 UTC",
+      "path": "/api/v1/threat-intel/ingest?feed=disposable_emails&key=nextguard-ti-admin-2024-secure",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "comment": "DB health check — every 5 min (circuit-breaker reset probe)",
+      "path": "/api/v1/threat-intel/health",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
