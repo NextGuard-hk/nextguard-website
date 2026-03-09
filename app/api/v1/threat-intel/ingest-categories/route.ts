@@ -1,5 +1,5 @@
 // app/api/v1/threat-intel/ingest-categories/route.ts
-// NextGuard URL Category Ingestion v1.4
+// NextGuard URL Category Ingestion v1.5
 // Uses GitHub mirror of UT1 Toulouse blacklists (olbat/ut1-blacklists)
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
@@ -124,7 +124,7 @@ async function ingestCategoryFeed(
   categoryKey: string,
   displayName: string,
   url: string,
-  batchSize = 200
+  batchSize = 500
 ): Promise<{ added: number; errors: number }> {
   const db = getDB();
   const domains = await fetchDomainList(url);
