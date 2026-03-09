@@ -2,9 +2,7 @@
 // Turso (libSQL) database client for NextGuard Threat Intelligence
 // Provides persistent IOC storage with STIX 2.1 compatible schema
 import { createClient, type Client } from '@libsql/client';
-
 let client: Client | null = null;
-
 export function getDB(): Client {
   if (!client) {
     const url = process.env.TURSO_DATABASE_URL;
@@ -14,10 +12,8 @@ export function getDB(): Client {
   }
   return client;
 }
-
 // Alias for v1 API routes
 export const getDb = getDB;
-
 // Initialize database schema (idempotent - safe to call multiple times)
 export async function initDB(): Promise<void> {
   const db = getDB();
@@ -155,15 +151,24 @@ export async function initDB(): Promise<void> {
       checked_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE INDEX IF NOT EXISTS idx_la_checked ON lookup_audit(checked_at)`,
+    // URL Categories table - stores domain->category mappings from Shallalist/UT1
+    `CREATE TABLE IF NOT EXISTS url_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      domain TEXT NOT NULL,
+      category TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'shallalist',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_urlcat_domain_source ON url_categories(domain, source)`,
+    `CREATE INDEX IF NOT EXISTS idx_urlcat_domain ON url_categories(domain)`,
+    `CREATE INDEX IF NOT EXISTS idx_urlcat_category ON url_categories(category)`,
   ], 'write');
-
   // Run migrations to add missing columns to existing tables
   await runMigrations(db);
-
   // Seed default feed configurations
   await seedFeeds(db);
 }
-
 async function runMigrations(db: Client): Promise<void> {
   // Migration: add is_active and enabled columns to feeds if missing
   const migrations = [
@@ -183,7 +188,6 @@ async function runMigrations(db: Client): Promise<void> {
     try { await db.execute(sql); } catch { /* column already exists */ }
   }
 }
-
 async function seedFeeds(db: Client): Promise<void> {
   const feeds = [
     { id: 'urlhaus', name: 'URLhaus', url: 'https://urlhaus.abuse.ch/downloads/text_online/', type: 'domain', parser: 'urlhaus' },
@@ -197,6 +201,8 @@ async function seedFeeds(db: Client): Promise<void> {
     { id: 'blocklist_de', name: 'blocklist.de', url: 'https://lists.blocklist.de/lists/all.txt', type: 'ipv4-addr', parser: 'text_lines' },
     { id: 'emerging_threats', name: 'Emerging Threats', url: 'https://rules.emergingthreats.net/blockrules/compromised-ips.txt', type: 'ipv4-addr', parser: 'text_lines' },
     { id: 'disposable_emails', name: 'Disposable Emails', url: 'https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf', type: 'email-addr', parser: 'text_lines' },
+    { id: 'shallalist', name: 'Shallalist URL Categories', url: 'https://shallalist.de/Downloads/shallalist.tar.gz', type: 'domain', parser: 'shallalist' },
+    { id: 'ut1_categories', name: 'UT1 URL Categories', url: 'https://dsi.ut-capitole.fr/blacklists/download/blacklists.tar.gz', type: 'domain', parser: 'ut1' },
   ];
   for (const f of feeds) {
     await db.execute({
@@ -210,13 +216,11 @@ async function seedFeeds(db: Client): Promise<void> {
     });
   }
 }
-
 // Helper: generate STIX-style indicator ID
 export function generateIndicatorId(type: string, value: string, source: string): string {
   const hash = Buffer.from(`${type}:${value}:${source}`).toString('base64url').slice(0, 16);
   return `indicator--${source}-${hash}`;
 }
-
 // Helper: normalize indicator value for consistent lookup
 export function normalizeValue(value: string, type: string): string {
   let v = value.toLowerCase().trim();
