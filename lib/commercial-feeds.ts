@@ -1,7 +1,7 @@
 // lib/commercial-feeds.ts
 // Phase 4 — Commercial Feed Integration
 // Paid threat intelligence sources: VirusTotal, AlienVault OTX, AbuseIPDB, GreyNoise
-
+import { categorizeUrl } from './url-categories';
 export interface VirusTotalResult {
   malicious: number;
   suspicious: number;
@@ -11,7 +11,6 @@ export interface VirusTotalResult {
   reputation: number;
   tags: string[];
 }
-
 export interface AbuseIPDBResult {
   ipAddress: string;
   isPublic: boolean;
@@ -23,7 +22,6 @@ export interface AbuseIPDBResult {
   lastReportedAt: string;
   categories: number[];
 }
-
 export interface OTXResult {
   pulseCount: number;
   reputation: number;
@@ -32,7 +30,6 @@ export interface OTXResult {
   pulses: { id: string; name: string; created: string }[];
   malwareFamilies: string[];
 }
-
 export interface GreyNoiseResult {
   ip: string;
   noise: boolean;
@@ -42,7 +39,6 @@ export interface GreyNoiseResult {
   lastSeen: string;
   tags: string[];
 }
-
 export interface EnrichmentResult {
   ioc: string;
   ioc_type: string;
@@ -54,13 +50,14 @@ export interface EnrichmentResult {
   riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'info';
   errors: Record<string, string>;
   queriedAt: string;
+  // URL Category fields
+  categories?: string[];
+  category_source?: string;
 }
-
 const VT_API = 'https://www.virustotal.com/api/v3';
 const ABUSEIPDB_API = 'https://api.abuseipdb.com/api/v2';
 const OTX_API = 'https://otx.alienvault.com/api/v1';
 const GREYNOISE_API = 'https://api.greynoise.io/v3/community';
-
 // ----- VirusTotal -----
 export async function queryVirusTotal(ioc: string, type: string): Promise<VirusTotalResult | null> {
   const key = process.env.VIRUSTOTAL_API_KEY;
@@ -89,7 +86,6 @@ export async function queryVirusTotal(ioc: string, type: string): Promise<VirusT
     };
   } catch (e: any) { throw new Error(`VirusTotal: ${e.message}`); }
 }
-
 // ----- AbuseIPDB -----
 export async function queryAbuseIPDB(ip: string): Promise<AbuseIPDBResult | null> {
   const key = process.env.ABUSEIPDB_API_KEY;
@@ -115,7 +111,6 @@ export async function queryAbuseIPDB(ip: string): Promise<AbuseIPDBResult | null
     };
   } catch (e: any) { throw new Error(`AbuseIPDB: ${e.message}`); }
 }
-
 // ----- AlienVault OTX -----
 export async function queryOTX(ioc: string, type: string): Promise<OTXResult | null> {
   const key = process.env.OTX_API_KEY;
@@ -140,7 +135,6 @@ export async function queryOTX(ioc: string, type: string): Promise<OTXResult | n
     };
   } catch (e: any) { throw new Error(`OTX: ${e.message}`); }
 }
-
 // ----- GreyNoise -----
 export async function queryGreyNoise(ip: string): Promise<GreyNoiseResult | null> {
   const key = process.env.GREYNOISE_API_KEY;
@@ -163,7 +157,6 @@ export async function queryGreyNoise(ip: string): Promise<GreyNoiseResult | null
     };
   } catch (e: any) { throw new Error(`GreyNoise: ${e.message}`); }
 }
-
 // ----- IOC Type Detection -----
 export function detectIOCType(ioc: string): string {
   if (/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(ioc)) return 'ipv4-addr';
@@ -173,7 +166,33 @@ export function detectIOCType(ioc: string): string {
   if (ioc.includes('@')) return 'email-addr';
   return 'domain';
 }
-
+// ----- URL Category lookup via threat-intel lookup API -----
+async function fetchUrlCategories(ioc: string, type: string): Promise<{ categories: string[]; category_source: string }> {
+  // Only meaningful for url/domain types
+  if (type !== 'url' && type !== 'domain') {
+    return { categories: [], category_source: 'none' };
+  }
+  try {
+    const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://www.next-guard.com';
+    const res = await fetch(
+      `${base}/api/v1/threat-intel/lookup?indicator=${encodeURIComponent(ioc)}&mode=db`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) throw new Error('lookup failed');
+    const data = await res.json();
+    return {
+      categories: Array.isArray(data.categories) && data.categories.length > 0
+        ? data.categories
+        : categorizeUrl(ioc),
+      category_source: data.category_source || 'heuristic',
+    };
+  } catch {
+    // Fallback to local heuristic
+    return { categories: categorizeUrl(ioc), category_source: 'heuristic' };
+  }
+}
 // ----- Unified Enrichment (all sources) -----
 export async function enrichIOC(ioc: string, iocType?: string): Promise<EnrichmentResult> {
   const type = iocType ?? detectIOCType(ioc);
@@ -184,14 +203,14 @@ export async function enrichIOC(ioc: string, iocType?: string): Promise<Enrichme
   let abuse: AbuseIPDBResult | null = null;
   let otx: OTXResult | null = null;
   let gn: GreyNoiseResult | null = null;
-
   tasks.push(queryVirusTotal(ioc, type).then(r => { vt = r; }).catch(e => { errors.virusTotal = e.message; }));
   if (isIP) tasks.push(queryAbuseIPDB(ioc).then(r => { abuse = r; }).catch(e => { errors.abuseIPDB = e.message; }));
   tasks.push(queryOTX(ioc, type).then(r => { otx = r; }).catch(e => { errors.otx = e.message; }));
   if (isIP) tasks.push(queryGreyNoise(ioc).then(r => { gn = r; }).catch(e => { errors.greyNoise = e.message; }));
-
+  // Fetch URL categories in parallel
+  const catPromise = fetchUrlCategories(ioc, type);
   await Promise.allSettled(tasks);
-
+  const { categories, category_source } = await catPromise;
   const riskScore = calculateRiskScore(vt, abuse, otx, gn);
   return {
     ioc,
@@ -204,9 +223,10 @@ export async function enrichIOC(ioc: string, iocType?: string): Promise<Enrichme
     riskLevel: riskScore >= 80 ? 'critical' : riskScore >= 60 ? 'high' : riskScore >= 40 ? 'medium' : riskScore >= 20 ? 'low' : 'info',
     errors,
     queriedAt: new Date().toISOString(),
+    categories: categories.length > 0 ? categories : undefined,
+    category_source: categories.length > 0 ? category_source : undefined,
   };
 }
-
 // ----- Risk Score Calculation -----
 function calculateRiskScore(
   vt: VirusTotalResult | null,
@@ -216,7 +236,6 @@ function calculateRiskScore(
 ): number {
   let score = 0;
   let factors = 0;
-
   if (vt) {
     const total = vt.malicious + vt.suspicious + vt.harmless + vt.undetected;
     if (total > 0) {
@@ -239,6 +258,5 @@ function calculateRiskScore(
     else score += 30;
     factors++;
   }
-
   return factors > 0 ? Math.round(score / factors) : 0;
 }
