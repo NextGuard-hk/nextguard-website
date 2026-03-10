@@ -1,5 +1,5 @@
 // app/dashboard/threat-intel/page.tsx
-// Phase 5 — Threat Intelligence Dashboard
+// Phase 6 — Enhanced Threat Intelligence Dashboard with Platform Stats
 'use client';
 
 import React from 'react';
@@ -7,7 +7,7 @@ import { useEnrichIOC, useFeedStatus, useInitStatus, useEnrichHistory } from '@/
 import IOCEnrichmentForm from '@/components/threat-intel/ioc-enrichment-form';
 import EnrichmentResults from '@/components/threat-intel/enrichment-results';
 import FeedStatusPanel from '@/components/threat-intel/feed-status-panel';
-import RiskScoreCard from '@/components/threat-intel/risk-score-card';
+import PlatformStats from '@/components/threat-intel/platform-stats';
 
 export default function ThreatIntelDashboard() {
   const { result, loading, error, enrich } = useEnrichIOC();
@@ -18,7 +18,6 @@ export default function ThreatIntelDashboard() {
     await enrich(ioc, iocType);
   };
 
-  // Add to history when result changes
   React.useEffect(() => {
     if (result) add(result);
   }, [result, add]);
@@ -33,7 +32,7 @@ export default function ThreatIntelDashboard() {
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 4px 0' }}>
-          🔍 Threat Intelligence Dashboard
+          Threat Intelligence Dashboard
         </h1>
         <p style={{ color: '#888', margin: 0, fontSize: '14px' }}>
           {initStatus ? `${initStatus.name} v${initStatus.version} — ${initStatus.status}` : 'Loading...'}
@@ -53,14 +52,14 @@ export default function ThreatIntelDashboard() {
               color: phase.status === 'completed' ? '#22c55e' : '#eab308',
               fontSize: '11px',
             }}>
-              {phase.status === 'completed' ? '✓' : '○'} {phase.name}
+              {phase.status === 'completed' ? '\u2713' : '\u25CB'} {phase.name}
             </div>
           ))}
         </div>
       )}
 
       {/* Main Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px' }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Search Form */}
@@ -72,7 +71,7 @@ export default function ThreatIntelDashboard() {
               background: '#2a1a1a', borderRadius: '8px', padding: '12px',
               border: '1px solid #ef444444', color: '#ef4444', fontSize: '13px',
             }}>
-              ⚠️ {error}
+              {error}
             </div>
           )}
 
@@ -86,7 +85,7 @@ export default function ThreatIntelDashboard() {
               border: '1px solid #333',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ color: '#e0e0e0', margin: 0, fontSize: '15px' }}>📜 Recent Lookups</h3>
+                <h3 style={{ color: '#e0e0e0', margin: 0, fontSize: '15px' }}>Recent Lookups</h3>
                 <button onClick={clear} style={{
                   padding: '2px 10px', borderRadius: '4px', border: '1px solid #444',
                   background: 'transparent', color: '#888', fontSize: '11px', cursor: 'pointer',
@@ -115,10 +114,39 @@ export default function ThreatIntelDashboard() {
               </div>
             </div>
           )}
+
+          {/* API Documentation Card */}
+          <div style={{
+            background: '#1a1a2e', borderRadius: '12px', padding: '16px',
+            border: '1px solid #333',
+          }}>
+            <h3 style={{ color: '#e0e0e0', margin: '0 0 12px 0', fontSize: '15px' }}>API Endpoints</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { method: 'GET', path: '/api/v1/threat-intel/lookup?indicator=...', desc: 'Single IOC lookup' },
+                { method: 'POST', path: '/api/v1/threat-intel/batch-lookup', desc: 'Batch lookup (up to 100)' },
+                { method: 'GET', path: '/api/v1/threat-intel/health', desc: 'Platform health check' },
+                { method: 'GET', path: '/api/v1/threat-intel/stats', desc: 'Threat intel statistics' },
+                { method: 'GET', path: '/api/v1/threat-intel/export?format=csv', desc: 'Export IOCs' },
+              ].map((ep, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                  <span style={{
+                    padding: '1px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold',
+                    background: ep.method === 'POST' ? '#eab30822' : '#22c55e22',
+                    color: ep.method === 'POST' ? '#eab308' : '#22c55e',
+                    fontFamily: 'monospace',
+                  }}>{ep.method}</span>
+                  <span style={{ color: '#60a5fa', fontSize: '11px', fontFamily: 'monospace' }}>{ep.path}</span>
+                  <span style={{ color: '#666', fontSize: '10px', marginLeft: 'auto' }}>{ep.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Right Sidebar */}
+        {/* Right Sidebar — Platform Stats */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <PlatformStats />
           <FeedStatusPanel />
         </div>
       </div>
