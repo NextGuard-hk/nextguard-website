@@ -10,6 +10,8 @@ const providerIcons: Record<string, string> = {
   abuseipdb: '🚫',
   otx: '🔭',
   greynoise: '📡',
+    google_safe_browsing: '🔒',
+  cloudflare_radar: '☁️',
 };
 
 const fspStyles = `
