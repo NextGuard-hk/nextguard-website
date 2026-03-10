@@ -33,7 +33,7 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'skysports.com':['Sports','News & Media'],
   'bleacherreport.com':['Sports','News & Media'],
   'goal.com':['Sports'],'formula1.com':['Sports'],'ufc.com':['Sports'],
-  'olympics.com':['Sports'],'cricinfo.com':['Sports'],
+  'olympics.com':['Sports'],'cricinfo.com':['Sports'],'livescore.com':['Sports'],'7m.com':['Gambling','Sports'],
   'netflix.com':['Streaming Media','Entertainment'],
   'youtube.com':['Streaming Media','Video'],
   'hulu.com':['Streaming Media','Entertainment'],
