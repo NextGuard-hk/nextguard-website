@@ -26,23 +26,23 @@ export function Footer() {
           </div>
 
           {/* Quick Links */}
-          <div>
-            <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <nav aria-label="Quick Links">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {t.footer.quickLinks}
-            </h4>
+            </p>
             <div className="flex flex-col gap-2.5">
               <Link href="/company" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.aboutUs}</Link>
-                            <Link href="/products" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.products}</Link>
+              <Link href="/products" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.products}</Link>
               <Link href="/solutions" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.solutions}</Link>
               <Link href="/contact" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{t.nav.contact}</Link>
             </div>
-          </div>
+          </nav>
 
           {/* Resources */}
           <div>
-            <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {t.footer.resources} <span className="text-yellow-400 text-xs font-normal normal-case tracking-normal">(In Progress)</span>
-            </h4>
+            </p>
             <div className="flex flex-col gap-2.5">
               <span className="text-sm text-muted-foreground">{t.footer.documentation}</span>
               <span className="text-sm text-muted-foreground">{t.footer.apiReference}</span>
@@ -53,9 +53,9 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {t.footer.legal} <span className="text-yellow-400 text-xs font-normal normal-case tracking-normal">(In Progress)</span>
-            </h4>
+            </p>
             <div className="flex flex-col gap-2.5">
               <span className="text-sm text-muted-foreground">{t.footer.privacy}</span>
               <span className="text-sm text-muted-foreground">{t.footer.terms}</span>
