@@ -1,6 +1,6 @@
 // lib/commercial-feeds.ts
 // Phase 4 — Commercial Feed Integration
-// Paid threat intelligence sources: VirusTotal, AlienVault OTX, AbuseIPDB, GreyNoise
+// Paid threat intelligence sources: VirusTotal, AlienVault OTX, AbuseIPDB, GreyNoise, Google Safe Browsing, Cloudflare Radar
 import { categorizeUrl } from './url-categories';
 export interface VirusTotalResult {
   malicious: number;
@@ -39,6 +39,17 @@ export interface GreyNoiseResult {
   lastSeen: string;
   tags: string[];
 }
+export interface GoogleSafeBrowsingResult {
+  threatFound: boolean;
+  threats: { threatType: string; platformType: string; url: string }[];
+  cacheDuration: string;
+}
+export interface CloudflareRadarResult {
+  malicious: boolean;
+  categories: string[];
+  rank: number;
+  scanId: string;
+}
 export interface EnrichmentResult {
   ioc: string;
   ioc_type: string;
@@ -46,6 +57,8 @@ export interface EnrichmentResult {
   abuseIPDB?: AbuseIPDBResult;
   otx?: OTXResult;
   greyNoise?: GreyNoiseResult;
+  googleSafeBrowsing?: GoogleSafeBrowsingResult;
+  cloudflareRadar?: CloudflareRadarResult;
   riskScore: number;
   riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'info';
   errors: Record<string, string>;
@@ -58,6 +71,8 @@ const VT_API = 'https://www.virustotal.com/api/v3';
 const ABUSEIPDB_API = 'https://api.abuseipdb.com/api/v2';
 const OTX_API = 'https://otx.alienvault.com/api/v1';
 const GREYNOISE_API = 'https://api.greynoise.io/v3/community';
+const GOOGLE_SB_API = 'https://safebrowsing.googleapis.com/v4/threatMatches:find';
+const CLOUDFLARE_RADAR_API = 'https://api.cloudflare.com/client/v4/url_scanner/scan';
 // ----- VirusTotal -----
 export async function queryVirusTotal(ioc: string, type: string): Promise<VirusTotalResult | null> {
   const key = process.env.VIRUSTOTAL_API_KEY;
@@ -157,6 +172,74 @@ export async function queryGreyNoise(ip: string): Promise<GreyNoiseResult | null
     };
   } catch (e: any) { throw new Error(`GreyNoise: ${e.message}`); }
 }
+// ----- Google Safe Browsing -----
+export async function queryGoogleSafeBrowsing(url: string): Promise<GoogleSafeBrowsingResult | null> {
+  const key = process.env.GOOGLE_SAFE_BROWSING_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(`${GOOGLE_SB_API}?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client: { clientId: 'nextguard', clientVersion: '1.0' },
+        threatInfo: {
+          threatTypes: ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE', 'POTENTIALLY_HARMFUL_APPLICATION'],
+          platformTypes: ['ANY_PLATFORM'],
+          threatEntryTypes: ['URL'],
+          threatEntries: [{ url: url.startsWith('http') ? url : `https://${url}` }],
+        },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`Google SB ${res.status}`);
+    const d = await res.json();
+    const matches = d.matches || [];
+    return {
+      threatFound: matches.length > 0,
+      threats: matches.map((m: any) => ({
+        threatType: m.threatType || '',
+        platformType: m.platformType || '',
+        url: m.threat?.url || '',
+      })),
+      cacheDuration: matches[0]?.cacheDuration || '',
+    };
+  } catch (e: any) { throw new Error(`Google Safe Browsing: ${e.message}`); }
+}
+// ----- Cloudflare Radar URL Scanner -----
+export async function queryCloudflareRadar(url: string): Promise<CloudflareRadarResult | null> {
+  const key = process.env.CLOUDFLARE_API_TOKEN;
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (!key || !accountId) return null;
+  try {
+    // Submit scan
+    const scanRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/urlscanner/scan`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url.startsWith('http') ? url : `https://${url}`, visibility: 'unlisted' }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!scanRes.ok) throw new Error(`Cloudflare Radar ${scanRes.status}`);
+    const scanData = await scanRes.json();
+    const scanId = scanData.result?.uuid || '';
+    if (!scanId) return { malicious: false, categories: [], rank: 0, scanId: '' };
+    // Wait for scan to complete (poll with timeout)
+    await new Promise(r => setTimeout(r, 5000));
+    const resultRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/urlscanner/scan/${scanId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resultRes.ok) return { malicious: false, categories: [], rank: 0, scanId };
+    const resultData = await resultRes.json();
+    const verdict = resultData.result?.scan?.verdicts?.overall || {};
+    const cats = verdict.categories || resultData.result?.scan?.categories || [];
+    return {
+      malicious: verdict.malicious || false,
+      categories: Array.isArray(cats) ? cats.map((c: any) => typeof c === 'string' ? c : c.name || '') : [],
+      rank: resultData.result?.scan?.page?.rank || 0,
+      scanId,
+    };
+  } catch (e: any) { throw new Error(`Cloudflare Radar: ${e.message}`); }
+}
 // ----- IOC Type Detection -----
 export function detectIOCType(ioc: string): string {
   if (/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(ioc)) return 'ipv4-addr';
@@ -168,7 +251,6 @@ export function detectIOCType(ioc: string): string {
 }
 // ----- URL Category lookup via threat-intel lookup API -----
 async function fetchUrlCategories(ioc: string, type: string): Promise<{ categories: string[]; category_source: string }> {
-  // Only meaningful for url/domain types
   if (type !== 'url' && type !== 'domain') {
     return { categories: [], category_source: 'none' };
   }
@@ -189,7 +271,6 @@ async function fetchUrlCategories(ioc: string, type: string): Promise<{ categori
       category_source: data.category_source || 'heuristic',
     };
   } catch {
-    // Fallback to local heuristic
     return { categories: categorizeUrl(ioc), category_source: 'heuristic' };
   }
 }
@@ -198,20 +279,27 @@ export async function enrichIOC(ioc: string, iocType?: string): Promise<Enrichme
   const type = iocType ?? detectIOCType(ioc);
   const errors: Record<string, string> = {};
   const isIP = type === 'ipv4-addr' || type === 'ipv6-addr';
+  const isDomainOrUrl = type === 'domain' || type === 'url';
   const tasks: Promise<void>[] = [];
   let vt: VirusTotalResult | null = null;
   let abuse: AbuseIPDBResult | null = null;
   let otx: OTXResult | null = null;
   let gn: GreyNoiseResult | null = null;
+  let gsb: GoogleSafeBrowsingResult | null = null;
+  let cfr: CloudflareRadarResult | null = null;
   tasks.push(queryVirusTotal(ioc, type).then(r => { vt = r; }).catch(e => { errors.virusTotal = e.message; }));
   if (isIP) tasks.push(queryAbuseIPDB(ioc).then(r => { abuse = r; }).catch(e => { errors.abuseIPDB = e.message; }));
   tasks.push(queryOTX(ioc, type).then(r => { otx = r; }).catch(e => { errors.otx = e.message; }));
   if (isIP) tasks.push(queryGreyNoise(ioc).then(r => { gn = r; }).catch(e => { errors.greyNoise = e.message; }));
+  // Google Safe Browsing - works for domains and URLs
+  if (isDomainOrUrl) tasks.push(queryGoogleSafeBrowsing(ioc).then(r => { gsb = r; }).catch(e => { errors.googleSafeBrowsing = e.message; }));
+  // Cloudflare Radar - works for domains and URLs
+  if (isDomainOrUrl) tasks.push(queryCloudflareRadar(ioc).then(r => { cfr = r; }).catch(e => { errors.cloudflareRadar = e.message; }));
   // Fetch URL categories in parallel
   const catPromise = fetchUrlCategories(ioc, type);
   await Promise.allSettled(tasks);
   const { categories, category_source } = await catPromise;
-  const riskScore = calculateRiskScore(vt, abuse, otx, gn);
+  const riskScore = calculateRiskScore(vt, abuse, otx, gn, gsb, cfr);
   return {
     ioc,
     ioc_type: type,
@@ -219,6 +307,8 @@ export async function enrichIOC(ioc: string, iocType?: string): Promise<Enrichme
     abuseIPDB: abuse ?? undefined,
     otx: otx ?? undefined,
     greyNoise: gn ?? undefined,
+    googleSafeBrowsing: gsb ?? undefined,
+    cloudflareRadar: cfr ?? undefined,
     riskScore,
     riskLevel: riskScore >= 80 ? 'critical' : riskScore >= 60 ? 'high' : riskScore >= 40 ? 'medium' : riskScore >= 20 ? 'low' : 'info',
     errors,
@@ -232,7 +322,9 @@ function calculateRiskScore(
   vt: VirusTotalResult | null,
   abuse: AbuseIPDBResult | null,
   otx: OTXResult | null,
-  gn: GreyNoiseResult | null
+  gn: GreyNoiseResult | null,
+  gsb: GoogleSafeBrowsingResult | null,
+  cfr: CloudflareRadarResult | null
 ): number {
   let score = 0;
   let factors = 0;
@@ -256,6 +348,16 @@ function calculateRiskScore(
     if (gn.classification === 'malicious') score += 90;
     else if (gn.classification === 'benign' || gn.riot) score += 5;
     else score += 30;
+    factors++;
+  }
+  if (gsb) {
+    if (gsb.threatFound) score += 95;
+    else score += 0;
+    factors++;
+  }
+  if (cfr) {
+    if (cfr.malicious) score += 90;
+    else score += 5;
     factors++;
   }
   return factors > 0 ? Math.round(score / factors) : 0;
