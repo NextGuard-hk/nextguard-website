@@ -10,10 +10,24 @@ import FeedStatusPanel from '@/components/threat-intel/feed-status-panel';
 import PlatformStats from '@/components/threat-intel/platform-stats';
 
 const responsiveStyles = `
-  .ti-dashboard { min-height: 100vh; background: #0a0a1a; padding: 24px; color: #e0e0e0; }
-  .ti-main-grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; }
+  .ti-dashboard {
+    min-height: 100vh;
+    background: #0a0a1a;
+    padding: 80px 24px 24px 24px;
+    color: #e0e0e0;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .ti-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
   .ti-left-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .ti-right-col { display: flex; flex-direction: column; gap: 16px; }
+  .ti-right-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .ti-phase-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
   .ti-header h1 { font-size: 24px; font-weight: bold; margin: 0 0 4px 0; }
   .ti-header p { color: #888; margin: 0; font-size: 14px; }
@@ -21,20 +35,21 @@ const responsiveStyles = `
   .ti-history-card { background: #1a1a2e; border-radius: 12px; padding: 16px; border: 1px solid #333; }
   .ti-history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .ti-history-list { display: flex; flex-direction: column; gap: 8px; }
-  .ti-history-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 6px; background: #12122a; cursor: pointer; }
-  .ti-api-card { background: #1a1a2e; border-radius: 12px; padding: 16px; border: 1px solid #333; }
+  .ti-history-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 6px; background: #12122a; cursor: pointer; flex-wrap: wrap; gap: 4px; }
+  .ti-api-card { background: #1a1a2e; border-radius: 12px; padding: 16px; border: 1px solid #333; overflow: hidden; }
   .ti-api-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; flex-wrap: wrap; }
-  .ti-api-method { padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; font-family: monospace; white-space: nowrap; }
-  .ti-api-path { color: #60a5fa; font-size: 11px; font-family: monospace; word-break: break-all; }
+  .ti-api-method { padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; font-family: monospace; white-space: nowrap; flex-shrink: 0; }
+  .ti-api-path { color: #60a5fa; font-size: 11px; font-family: monospace; word-break: break-all; min-width: 0; }
   .ti-api-desc { color: #666; font-size: 10px; margin-left: auto; white-space: nowrap; }
   @media (max-width: 900px) {
     .ti-main-grid { grid-template-columns: 1fr; }
-    .ti-dashboard { padding: 16px; }
+    .ti-dashboard { padding: 72px 16px 16px 16px; }
   }
   @media (max-width: 480px) {
-    .ti-dashboard { padding: 12px; }
+    .ti-dashboard { padding: 68px 12px 12px 12px; }
     .ti-header h1 { font-size: 20px; }
     .ti-api-desc { display: none; }
+    .ti-phase-bar { gap: 6px; }
   }
 `;
 
@@ -72,7 +87,7 @@ export default function ThreatIntelDashboard() {
                 background: phase.status === 'completed' ? '#22c55e22' : '#eab30822',
                 border: `1px solid ${phase.status === 'completed' ? '#22c55e44' : '#eab30844'}`,
                 color: phase.status === 'completed' ? '#22c55e' : '#eab308',
-                fontSize: '11px',
+                fontSize: '11px', whiteSpace: 'nowrap',
               }}>
                 {phase.status === 'completed' ? '\u2713' : '\u25CB'} {phase.name}
               </div>
@@ -103,7 +118,7 @@ export default function ThreatIntelDashboard() {
                 <div className="ti-history-list">
                   {history.slice(0, 10).map((h, i) => (
                     <div key={i} className="ti-history-item" onClick={() => enrich(h.ioc, h.ioc_type)}>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <span style={{ color: '#e0e0e0', fontSize: '13px', fontFamily: 'monospace', wordBreak: 'break-all' }}>{h.ioc}</span>
                         <span style={{ color: '#666', fontSize: '11px', marginLeft: '8px' }}>{h.ioc_type}</span>
                       </div>
