@@ -1,113 +1,76 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 
-const feedNameMap: Record<string, string[]> = {
-  'URLhaus': ['urlhaus'],
-  'PhishTank': ['phishtank', 'phishing_army'],
-  'C2IntelFeeds': ['c2_intel'],
-  'OpenPhish': ['openphish'],
-  'FeodoTracker': ['feodo_tracker'],
-  'ThreatFox-IOCs': ['threatfox'],
-  'AlienVault-OTX': ['ipsum', 'blocklist_de'],
-  'EmergingThreats': ['emerging_threats', 'disposable_emails'],
-};
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const active = searchParams.get('active');
-    const debug = searchParams.get('debug');
     const db = getDB();
 
-    let feedQuery = 'SELECT * FROM threat_feeds';
-    const params: any[] = [];
-    if (active !== null) {
-      feedQuery += ' WHERE is_active = ?';
-      params.push(active === 'true' ? 1 : 0);
-    }
-    feedQuery += ' ORDER BY name ASC';
-    const feedsResult = await db.execute({ sql: feedQuery, args: params });
+    // Query from 'feeds' table (Phase 2 STIX) - where ingestIndicators writes
+    const feedsResult = await db.execute('SELECT * FROM feeds ORDER BY name ASC');
 
+    // Get indicator counts from 'indicators' table (Phase 2 STIX)
     const countsResult = await db.execute(
-      'SELECT source_feed, COUNT(*) as cnt, MAX(created_at) as last_at FROM threat_indicators WHERE is_active = 1 GROUP BY source_feed'
+      'SELECT source_feed, COUNT(*) as cnt, MAX(updated_at) as last_at FROM indicators WHERE is_active = 1 GROUP BY source_feed'
     );
-
     const countMap: Record<string, { count: number; lastAt: string | null }> = {};
     for (const row of countsResult.rows) {
       const r = row as any;
-      const feed = r.source_feed || r[0];
-      const cnt = r.cnt || r[1] || 0;
-      const lastAt = r.last_at || r[2] || null;
-      if (feed) countMap[feed] = { count: Number(cnt), lastAt };
+      if (r.source_feed) countMap[r.source_feed] = { count: Number(r.cnt), lastAt: r.last_at };
     }
 
     const feedList = (feedsResult.rows as any[]).map((row) => {
-      const mappedSources = feedNameMap[row.name] || [row.name.toLowerCase().replace(/[^a-z0-9]/g, '_')];
-      let indicatorCount = 0;
-      let lastIndicatorAt: string | null = null;
-      for (const src of mappedSources) {
-        const info = countMap[src];
-        if (info) {
-          indicatorCount += info.count;
-          if (info.lastAt && (!lastIndicatorAt || info.lastAt > lastIndicatorAt)) {
-            lastIndicatorAt = info.lastAt;
-          }
-        }
-      }
-
-      const lastFetch = row.last_fetch;
-      const now = Date.now();
-      const intervalMs = (row.fetch_interval_minutes || 60) * 60 * 1000;
+      const feedId = row.id as string;
+      const countInfo = countMap[feedId];
+      const indicatorCount = row.entries_count || countInfo?.count || 0;
+      const lastIndicatorAt = countInfo?.lastAt || null;
 
       let health = 'never_fetched';
-      if (indicatorCount > 0) {
+      if (row.status === 'active' && indicatorCount > 0) {
         health = 'healthy';
+      } else if (row.status === 'error') {
+        health = 'error';
+      } else if (row.status === 'active') {
+        health = 'warning';
       }
-      if (lastFetch) {
-        const age = now - new Date(lastFetch).getTime();
-        if (age < intervalMs * 2 && !row.last_error) health = 'healthy';
-        else if (age < intervalMs * 4) health = 'warning';
-        else health = 'stale';
-      }
-      if (row.last_error) health = 'error';
       if (!row.is_active) health = 'disabled';
 
       return {
-        id: row.id,
-        name: row.name,
-        url: row.url,
-        type: row.type,
-        format: row.format,
+        id: feedId,
+        name: row.name || feedId,
+        url: row.feed_url || '',
+        type: row.feed_type || 'unknown',
+        format: row.format || 'txt',
         is_active: Boolean(row.is_active),
-        last_fetch: lastFetch,
-        next_fetch: row.next_fetch,
-        fetch_interval_minutes: row.fetch_interval_minutes || 60,
+        last_fetch: row.last_success || null,
+        next_fetch: row.last_refresh || null,
+        fetch_interval_minutes: 60,
         indicator_count: indicatorCount,
         last_indicator_at: lastIndicatorAt,
         health,
       };
     });
 
-    const activeFeeds = feedList.filter(f => f.is_active);
-    const healthyFeeds = feedList.filter(f => f.health === 'healthy');
-    const totalIndicators = feedList.reduce((s, f) => s + f.indicator_count, 0);
+    // Filter by active if requested
+    const filtered = active !== null
+      ? feedList.filter(f => f.is_active === (active === 'true'))
+      : feedList;
 
-    const response: any = {
-      feeds: feedList,
+    const activeFeeds = filtered.filter(f => f.is_active);
+    const healthyFeeds = filtered.filter(f => f.health === 'healthy');
+    const totalIndicators = filtered.reduce((s, f) => s + f.indicator_count, 0);
+
+    return NextResponse.json({
+      feeds: filtered,
       summary: {
-        total: feedList.length,
+        total: filtered.length,
         active: activeFeeds.length,
         healthy: healthyFeeds.length,
         total_indicators: totalIndicators,
         last_updated: new Date().toISOString(),
       },
-    };
-
-    if (debug) {
-      response._debug = { countMap, feedNames: (feedsResult.rows as any[]).map(r => r.name) };
-    }
-
-    return NextResponse.json(response);
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
