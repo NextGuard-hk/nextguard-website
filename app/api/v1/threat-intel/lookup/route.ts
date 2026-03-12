@@ -3,6 +3,7 @@ import { lookupIndicator, ingestIndicators } from '@/lib/threat-intel-db';
 import { checkUrl } from '@/lib/threat-intel';
 import { categorizeUrl } from '@/lib/url-categories';
 import { initDB, getDB } from '@/lib/db';
+import { getCategoriesFromRadar } from '@/lib/cloudflare-radar';
 
 // ─── In-Memory Lookup Cache ──────────────────────────────────────────────────
 interface CacheEntry {
@@ -125,18 +126,41 @@ async function lookupUrlCategory(domain: string): Promise<string[]> {
   }
 }
 
+// Resolve categories with priority: manual override > Cloudflare Radar > live OSINT > heuristic
+async function resolveCategories(domain: string, liveCats: string[]): Promise<{ categories: string[]; source: string }> {
+  // 1. Manual override from DB (highest priority)
+  const dbCats = isDbAvailable() ? await lookupUrlCategory(domain) : [];
+  if (dbCats.length > 0) {
+    return { categories: dbCats, source: 'manual-override' };
+  }
+
+  // 2. Cloudflare Radar
+  try {
+    const radarCats = await getCategoriesFromRadar(domain);
+    if (radarCats.length > 0 && radarCats[0] !== 'Uncategorized') {
+      return { categories: radarCats, source: 'cloudflare-radar' };
+    }
+  } catch {}
+
+  // 3. Live OSINT categories
+  if (liveCats.length > 0) {
+    return { categories: liveCats, source: 'live-osint' };
+  }
+
+  // 4. Heuristic fallback
+  const heuristicCats = categorizeUrl(domain);
+  return { categories: heuristicCats, source: 'heuristic' };
+}
+
 async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix = '') {
   const result = await checkUrl(trimmed);
   const lookupMs = Date.now() - startTime;
   const verdict = riskToVerdict(result.risk_level);
   const sourcesHit = result.sources.filter(s => s.hit).map(s => s.name);
-  const dbCats = isDbAvailable() ? await lookupUrlCategory(result.domain || trimmed) : [];
+
   const liveCats = result.categories.length > 0 ? result.categories : [];
-  const heuristicCats = categorizeUrl(result.domain || trimmed);
-  // DB override takes priority — if manual category exists, use it exclusively
-  const categories = dbCats.length > 0
-    ? dbCats
-    : (liveCats.length > 0 ? liveCats : heuristicCats);
+  const { categories, source: categorySource } = await resolveCategories(result.domain || trimmed, liveCats);
+
   const response = {
     indicator: trimmed, type: 'url', verdict,
     risk_level: result.risk_level, confidence: result.overall_score,
@@ -145,7 +169,7 @@ async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix 
     checked_at: result.checked_at,
     engine: `osint-live-v4.9${engineSuffix}`,
     source_details: result.sources,
-    category_source: dbCats.length > 0 ? 'turso-url-categories' : (liveCats.length > 0 ? 'live-osint' : 'heuristic'),
+    category_source: categorySource,
   };
   setCache(`${trimmed}:live`, response);
   return NextResponse.json(response);
@@ -159,9 +183,9 @@ async function dbLookupResponse(trimmed: string, startTime: number) {
   const verdict = riskToVerdict(riskLevel);
   const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
   const sourcesHit = dbResult.hits.map(h => h.feed);
-  const urlCats = await lookupUrlCategory(trimmed);
-  // DB override takes priority
-  const finalCats = urlCats.length > 0 ? urlCats : (allCategories.length > 0 ? allCategories : categorizeUrl(trimmed));
+
+  const { categories: finalCats, source: categorySource } = await resolveCategories(trimmed, allCategories);
+
   const response = {
     indicator: trimmed, type: 'url', verdict, risk_level: riskLevel,
     confidence: topHit?.confidence ?? 0,
@@ -174,7 +198,7 @@ async function dbLookupResponse(trimmed: string, startTime: number) {
       categories: h.categories, detail: `First seen: ${h.first_seen}`
     })),
     db_hits: dbResult.hits.length,
-    category_source: urlCats.length > 0 ? 'turso-url-categories' : (allCategories.length > 0 ? 'turso-indicators' : 'heuristic'),
+    category_source: categorySource,
   };
   setCache(`${trimmed}:db`, response);
   return NextResponse.json(response);
@@ -195,7 +219,8 @@ export async function GET(request: Request) {
     }
     const trimmed = indicator.trim();
     const cacheKey = `${trimmed}:${mode}`;
-    // ── Cache check ────────────────────────────────────────────────────────────
+
+    // Cache check
     const cached = getCached(cacheKey);
     if (cached) {
       return NextResponse.json({
@@ -204,7 +229,8 @@ export async function GET(request: Request) {
         cache_hit: true,
       });
     }
-    // ── Mode: db-only ──────────────────────────────────────────────────────────
+
+    // Mode: db-only
     if (mode === 'db') {
       if (!isDbAvailable()) {
         return liveOsintLookup(trimmed, startTime, '-db-failover');
@@ -216,11 +242,13 @@ export async function GET(request: Request) {
         return liveOsintLookup(trimmed, startTime, '-db-failover');
       }
     }
-    // ── Mode: live ─────────────────────────────────────────────────────────────
+
+    // Mode: live
     if (mode === 'live') {
       return liveOsintLookup(trimmed, startTime);
     }
-    // ── Mode: hybrid (default) ─────────────────────────────────────────────────
+
+    // Mode: hybrid (default)
     if (dbInitialized && isDbAvailable()) {
       quickSeedIfEmpty().catch(() => {});
     }
@@ -234,9 +262,9 @@ export async function GET(request: Request) {
           const verdict = riskToVerdict(riskLevel);
           const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
           const sourcesHit = dbResult.hits.map(h => h.feed);
-          const urlCats = await lookupUrlCategory(trimmed);
-          // DB override takes priority
-          const finalCats = urlCats.length > 0 ? urlCats : (allCategories.length > 0 ? allCategories : categorizeUrl(trimmed));
+
+          const { categories: finalCats, source: categorySource } = await resolveCategories(trimmed, allCategories);
+
           const response = {
             indicator: trimmed, type: type || 'url', verdict, risk_level: riskLevel,
             confidence: topHit.confidence,
@@ -248,7 +276,7 @@ export async function GET(request: Request) {
               name: h.feed, hit: true, risk_level: h.risk_level,
               categories: h.categories, detail: `First seen: ${h.first_seen}`
             })),
-            category_source: urlCats.length > 0 ? 'turso-url-categories' : (allCategories.length > 0 ? 'turso-indicators' : 'heuristic'),
+            category_source: categorySource,
           };
           setCache(cacheKey, response);
           return NextResponse.json(response);
