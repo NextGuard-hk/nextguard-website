@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 interface BatchResult {
   domain: string;
   verdict: string;
-  riskScore: number;
+  riskLevel: string;
   categories: string[];
   sources: string[];
   error?: string;
@@ -31,21 +31,24 @@ export default function BatchUrlCheck() {
       const url = urls[i];
       try {
         const res = await fetch(
-          `/api/v1/threat-intel/lookup?domain=${encodeURIComponent(url)}`
+          `/api/v1/threat-intel/lookup?indicator=${encodeURIComponent(url)}`
         );
         const data = await res.json();
+        const sources = (data.source_details || [])
+          .filter((s: { hit: boolean }) => s.hit)
+          .map((s: { name: string }) => s.name);
         batchResults.push({
           domain: url,
           verdict: data.verdict || 'Unknown',
-          riskScore: data.riskScore ?? 0,
+          riskLevel: data.risk_level || 'unknown',
           categories: data.categories || [],
-          sources: data.sources || [],
+          sources: sources.length > 0 ? sources : (data.sources_hit || []),
         });
       } catch {
         batchResults.push({
           domain: url,
           verdict: 'Error',
-          riskScore: 0,
+          riskLevel: 'unknown',
           categories: [],
           sources: [],
           error: 'Failed to fetch',
@@ -58,12 +61,12 @@ export default function BatchUrlCheck() {
   };
 
   const exportCSV = () => {
-    const header = 'Domain,Verdict,Risk Score,Categories,Sources';
+    const header = 'Domain,Verdict,Risk Level,Categories,Sources';
     const rows = results.map((r) =>
       [
         r.domain,
         r.verdict,
-        r.riskScore,
+        r.riskLevel,
         r.categories.join('; '),
         r.sources.join('; '),
       ].join(',')
@@ -82,6 +85,17 @@ export default function BatchUrlCheck() {
     switch (verdict.toLowerCase()) {
       case 'malicious': return '#ff4444';
       case 'suspicious': return '#ffaa00';
+      case 'clean': return '#00cc66';
+      default: return '#888888';
+    }
+  };
+
+  const getRiskColor = (level: string) => {
+    switch (level.toLowerCase()) {
+      case 'critical': return '#ff4444';
+      case 'high': return '#ff6600';
+      case 'medium': return '#ffaa00';
+      case 'low': return '#00cc66';
       case 'clean': return '#00cc66';
       default: return '#888888';
     }
@@ -161,7 +175,7 @@ export default function BatchUrlCheck() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #21262d' }}>
-                {['Domain', 'Verdict', 'Risk Score', 'Categories', 'Sources'].map((h) => (
+                {['Domain', 'Verdict', 'Risk Level', 'Categories', 'Sources'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#8b949e', fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
@@ -171,14 +185,13 @@ export default function BatchUrlCheck() {
                 <tr key={i} style={{ borderBottom: '1px solid #161b22' }}>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{r.domain}</td>
                   <td style={{ padding: '8px 12px' }}>
-                    <span style={{
-                      color: getVerdictColor(r.verdict),
-                      fontWeight: 600,
-                    }}>{r.verdict}</span>
+                    <span style={{ color: getVerdictColor(r.verdict), fontWeight: 600 }}>
+                      {r.verdict}
+                    </span>
                   </td>
                   <td style={{ padding: '8px 12px' }}>
-                    <span style={{ color: r.riskScore > 70 ? '#ff4444' : r.riskScore > 40 ? '#ffaa00' : '#00cc66' }}>
-                      {r.riskScore}
+                    <span style={{ color: getRiskColor(r.riskLevel), fontWeight: 500 }}>
+                      {r.riskLevel}
                     </span>
                   </td>
                   <td style={{ padding: '8px 12px', color: '#8b949e' }}>
