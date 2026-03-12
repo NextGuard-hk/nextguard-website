@@ -5,8 +5,8 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 
-const MAX_PER_FEED = 500;
-const BATCH_SIZE = 50;
+const MAX_PER_FEED = 500000;
+const BATCH_SIZE = 200;
 
 // Feed ID -> risk_level mapping
 const FEED_RISK: Record<string, string> = {
@@ -21,12 +21,22 @@ const FEED_RISK: Record<string, string> = {
   emerging_threats: 'high_risk',
   ipsum: 'high_risk',
   disposable_emails: 'low_risk',
+    spamhaus_dbl: 'known_malicious', spamhaus_drop: 'known_malicious',
+  abuse_ch_ssl: 'known_malicious', malwaredomains: 'known_malicious',
+  dshield: 'high_risk', cinsscore: 'high_risk', stopforumspam: 'medium_risk',
+  urlhaus_full: 'known_malicious', phishing_db: 'known_malicious',
+  botvrij: 'known_malicious', openbl: 'high_risk', greensnow: 'high_risk',
+  alienvault_otx: 'known_malicious', talos: 'high_risk',
 };
 
 const FEED_CONFIDENCE: Record<string, number> = {
   phishtank: 88, openphish: 90, urlhaus: 95, phishing_army: 85,
   threatfox: 92, feodo_tracker: 95, c2_intel: 88,
   blocklist_de: 78, emerging_threats: 82, ipsum: 80, disposable_emails: 70,
+    spamhaus_dbl: 95, spamhaus_drop: 95, abuse_ch_ssl: 90, malwaredomains: 88,
+  dshield: 85, cinsscore: 82, stopforumspam: 75, urlhaus_full: 95,
+  phishing_db: 90, botvrij: 88, openbl: 85, greensnow: 80,
+  alienvault_otx: 88, talos: 90,
 };
 
 const FEED_CATEGORIES: Record<string, string[]> = {
@@ -36,11 +46,29 @@ const FEED_CATEGORIES: Record<string, string[]> = {
   c2_intel: ['c2', 'botnet'], blocklist_de: ['attack_source', 'brute_force'],
   emerging_threats: ['compromised', 'exploit'], ipsum: ['threat_ip', 'scanner'],
   disposable_emails: ['disposable_email', 'spam'],
+    spamhaus_dbl: ['phishing', 'malware', 'spam'],
+  spamhaus_drop: ['botnet', 'threat_ip'],
+  abuse_ch_ssl: ['malware', 'c2'],
+  malwaredomains: ['malware'],
+  dshield: ['attack_source', 'scanner'],
+  cinsscore: ['threat_ip', 'botnet'],
+  stopforumspam: ['spam', 'phishing'],
+  urlhaus_full: ['malware', 'malware_distribution'],
+  phishing_db: ['phishing'],
+  botvrij: ['malware', 'c2'],
+  openbl: ['attack_source', 'brute_force'],
+  greensnow: ['attack_source'],
+  alienvault_otx: ['malware', 'threat_ip', 'c2'],
+  talos: ['spam', 'threat_ip'],
 };
 
 const FEED_TTL_DAYS: Record<string, number> = {
   phishtank: 30, openphish: 3, urlhaus: 30, phishing_army: 7,
   threatfox: 90, feodo_tracker: 60, c2_intel: 30, ipsum: 7,
+    spamhaus_dbl: 1, spamhaus_drop: 1, abuse_ch_ssl: 30, malwaredomains: 7,
+  dshield: 1, cinsscore: 7, stopforumspam: 30, urlhaus_full: 1,
+  phishing_db: 7, botvrij: 30, openbl: 1, greensnow: 7,
+  alienvault_otx: 30, talos: 1,
   blocklist_de: 14, emerging_threats: 7, disposable_emails: 365,
 };
 
