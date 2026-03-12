@@ -17,6 +17,7 @@ const DOMAIN_CATEGORIES: Record<string, string[]> = {
   'whatsapp.com':['Email & Messaging'],'signal.org':['Email & Messaging','Privacy Tools'],
   'zoom.us':['Email & Messaging','Business & Economy'],
   'gmail.com':['Email & Messaging'],'outlook.com':['Email & Messaging'],
+    'office.com':['Email & Messaging','Cloud Services'],'office365.com':['Email & Messaging','Cloud Services'],
   'protonmail.com':['Email & Messaging','Privacy Tools'],
   'cnn.com':['News & Media'],'bbc.com':['News & Media'],
   'nytimes.com':['News & Media'],'reuters.com':['News & Media'],
