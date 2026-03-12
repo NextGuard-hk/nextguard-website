@@ -116,3 +116,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
+
+// POST: Alias for PUT (for easier browser/curl usage)
+export async function POST(request: NextRequest) {
+  return PUT(request);
+}
