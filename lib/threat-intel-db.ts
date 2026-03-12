@@ -1,18 +1,22 @@
 // lib/threat-intel-db.ts
-// NextGuard Threat Intelligence Engine v5.2 - DB Persistent Edition
+// NextGuard Threat Intelligence Engine v5.3 - DB Persistent Edition
 // FIXED v2: lookupIndicator uses is_active (not enabled) for feeds count
+// v5.3: Added PhishStats feed support, increased ingest limit to 5000
+
 import { getDB, generateIndicatorId, normalizeValue } from './db';
 import type { RiskLevel, ThreatIntelResult, SourceHit } from './threat-intel';
 
 const FEED_CONFIDENCE: Record<string, number> = {
   urlhaus: 95, phishing_army: 85, openphish: 90, phishtank: 88,
-  threatfox: 92, feodo_tracker: 95, c2_intel: 88, ipsum: 80,
-  blocklist_de: 78, emerging_threats: 82, disposable_emails: 70, local_ioc: 99,
+  phishstats: 86, threatfox: 92, feodo_tracker: 95, c2_intel: 88,
+  ipsum: 80, blocklist_de: 78, emerging_threats: 82,
+  disposable_emails: 70, local_ioc: 99,
 };
 
 const FEED_RISK: Record<string, RiskLevel> = {
   urlhaus: 'known_malicious', phishing_army: 'known_malicious',
   openphish: 'known_malicious', phishtank: 'known_malicious',
+  phishstats: 'known_malicious',
   threatfox: 'known_malicious', feodo_tracker: 'known_malicious',
   c2_intel: 'known_malicious', ipsum: 'high_risk',
   blocklist_de: 'high_risk', emerging_threats: 'high_risk',
@@ -22,6 +26,7 @@ const FEED_RISK: Record<string, RiskLevel> = {
 const FEED_CATEGORIES: Record<string, string[]> = {
   urlhaus: ['malware', 'malware_distribution'], phishing_army: ['phishing'],
   openphish: ['phishing'], phishtank: ['phishing'],
+  phishstats: ['phishing'],
   threatfox: ['malware', 'c2'], feodo_tracker: ['botnet', 'c2', 'banking_trojan'],
   c2_intel: ['c2', 'botnet'], ipsum: ['threat_ip', 'scanner'],
   blocklist_de: ['attack_source', 'brute_force'],
@@ -31,6 +36,7 @@ const FEED_CATEGORIES: Record<string, string[]> = {
 
 const FEED_TTL_DAYS: Record<string, number> = {
   urlhaus: 30, phishing_army: 7, openphish: 3, phishtank: 30,
+  phishstats: 7,
   threatfox: 90, feodo_tracker: 60, c2_intel: 30, ipsum: 7,
   blocklist_de: 14, emerging_threats: 7,
   disposable_emails: 365, local_ioc: 3650,
@@ -45,7 +51,8 @@ export async function ingestIndicators(
   indicators: Array<{ value: string; type: string; description?: string; threat_actor?: string; campaign?: string }>
 ): Promise<{ added: number; updated: number }> {
   const db = ensureDB();
-  const limitedIndicators = indicators.slice(0, 500);
+  // v5.3: increased from 500 to 5000 for better feed coverage
+  const limitedIndicators = indicators.slice(0, 5000);
   const ttlDays = FEED_TTL_DAYS[feedId] ?? 30;
   const validUntil = new Date(Date.now() + ttlDays * 86400000).toISOString();
   const confidence = FEED_CONFIDENCE[feedId] ?? 70;
@@ -61,8 +68,8 @@ export async function ingestIndicators(
       const id = generateIndicatorId(ind.type, normalized, feedId);
       return {
         sql: `INSERT INTO indicators (id, type, value, value_normalized, risk_level, confidence, categories, description, source_feed, valid_from, valid_until, threat_actor, campaign, is_active, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 1, datetime('now'))
-        ON CONFLICT(id) DO UPDATE SET last_seen = datetime('now'), is_active = 1, updated_at = datetime('now'), confidence = excluded.confidence`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 1, datetime('now'))
+          ON CONFLICT(id) DO UPDATE SET last_seen = datetime('now'), is_active = 1, updated_at = datetime('now'), confidence = excluded.confidence`,
         args: [id, ind.type, ind.value, normalized, riskLevel, confidence, categories, ind.description ?? null, feedId, validUntil, ind.threat_actor ?? null, ind.campaign ?? null],
       };
     });
@@ -133,7 +140,7 @@ export async function lookupIndicator(value: string): Promise<{
   }));
   // FIXED: use is_active (not enabled) for feed count
   const feedCount = await db.execute(`SELECT COUNT(*) as cnt FROM feeds WHERE is_active = 1 AND status = 'active'`);
-  const totalChecked = (feedCount.rows[0]?.cnt as number) || 11;
+  const totalChecked = (feedCount.rows[0]?.cnt as number) || 12;
   try {
     await db.execute({
       sql: `INSERT INTO lookup_log (indicator_value, result_risk_level, sources_hit, sources_checked) VALUES (?, ?, ?, ?)`,
