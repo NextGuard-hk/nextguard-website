@@ -1,9 +1,10 @@
 // app/dashboard/threat-intel/page.tsx
 // Phase 8 — Enterprise Threat Intelligence Dashboard with Role-Based Views
+// Uses ThreatIntelProvider to deduplicate API calls
 'use client';
-
 import React, { useState } from 'react';
 import { useEnrichIOC, useFeedStatus, useInitStatus, useEnrichHistory } from '@/lib/threat-intel-hooks';
+import { ThreatIntelProvider } from '@/lib/threat-intel-context';
 import IOCEnrichmentForm from '@/components/threat-intel/ioc-enrichment-form';
 import EnrichmentResults from '@/components/threat-intel/enrichment-results';
 import FeedStatusPanel from '@/components/threat-intel/feed-status-panel';
@@ -15,7 +16,6 @@ import PyramidOfPain from '@/components/threat-intel/pyramid-of-pain';
 import LiveActivityFeed from '@/components/threat-intel/live-activity-feed';
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
-
 const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'soc', label: 'SOC Analyst', desc: 'Full operational view' },
   { key: 'ciso', label: 'CISO', desc: 'Strategic overview' },
@@ -56,19 +56,18 @@ export default function ThreatIntelDashboard() {
   const { result, loading, error, enrich } = useEnrichIOC();
   const { status: initStatus } = useInitStatus();
   const { history, add, clear } = useEnrichHistory();
-
   const handleEnrich = async (ioc: string, iocType?: string) => { await enrich(ioc, iocType); };
   React.useEffect(() => { if (result) add(result); }, [result, add]);
 
   return (
-    <>
+    <ThreatIntelProvider>
       <style>{dashStyles}</style>
       <div className="ti-dashboard">
         {/* Header + Role Switcher */}
         <div className="ti-header">
           <div>
             <h1>Threat Intelligence Dashboard</h1>
-            <p>{initStatus ? `${initStatus.name} v${initStatus.version} — ${initStatus.status}` : 'Loading...'}</p>
+            <p>{initStatus ? `${initStatus.name} v${initStatus.version} \u2014 ${initStatus.status}` : 'Loading...'}</p>
           </div>
           <div className="ti-role-bar">
             {ROLES.map(r => (
@@ -96,28 +95,20 @@ export default function ThreatIntelDashboard() {
           </div>
         )}
 
-        {/* KPI Cards — visible to all roles */}
+        {/* KPI Cards */}
         <KPICards />
 
         {/* Main Layout */}
         <div className="ti-main-grid">
-          {/* Left Column */}
           <div className="ti-left-col">
-            {/* Trend Chart — CISO, SOC, Admin */}
             {(role === 'ciso' || role === 'soc' || role === 'admin') && <ThreatTrendChart />}
-
-            {/* Two-column: Pyramid + Activity */}
             {(role === 'ciso' || role === 'soc') && (
               <div className="ti-two-col">
                 <PyramidOfPain />
                 <LiveActivityFeed />
               </div>
             )}
-
-            {/* Admin: Activity Feed full width */}
             {role === 'admin' && <LiveActivityFeed />}
-
-            {/* SOC: IOC Enrichment */}
             {(role === 'soc' || role === 'compliance') && (
               <>
                 <IOCEnrichmentForm onEnrich={handleEnrich} loading={loading} />
@@ -125,8 +116,6 @@ export default function ThreatIntelDashboard() {
                 {result && <EnrichmentResults result={result} />}
               </>
             )}
-
-            {/* SOC: History */}
             {role === 'soc' && history.length > 0 && (
               <div className="ti-history-card">
                 <div className="ti-history-header">
@@ -150,11 +139,7 @@ export default function ThreatIntelDashboard() {
                 </div>
               </div>
             )}
-
-            {/* SOC: Batch URL Check */}
             {role === 'soc' && <BatchUrlCheck />}
-
-            {/* API Docs — Admin, SOC */}
             {(role === 'admin' || role === 'soc') && (
               <div className="ti-api-card">
                 <h3 style={{ color: '#e0e0e0', margin: '0 0 12px 0', fontSize: '15px' }}>API Endpoints</h3>
@@ -176,8 +161,6 @@ export default function ThreatIntelDashboard() {
               </div>
             )}
           </div>
-
-          {/* Right Sidebar */}
           <div className="ti-right-col">
             <PlatformStats />
             {(role === 'admin' || role === 'soc' || role === 'compliance') && <FeedStatusPanel />}
@@ -185,6 +168,6 @@ export default function ThreatIntelDashboard() {
           </div>
         </div>
       </div>
-    </>
+    </ThreatIntelProvider>
   );
 }
