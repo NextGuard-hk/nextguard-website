@@ -1,7 +1,7 @@
 // lib/threat-intel-db.ts
-// NextGuard Threat Intelligence Engine v5.3 - DB Persistent Edition
+// NextGuard Threat Intelligence Engine v6.0 - DB Persistent Edition
 // FIXED v2: lookupIndicator uses is_active (not enabled) for feeds count
-// v5.3: Added PhishStats feed support, increased ingest limit to 5000
+// v6.0: Increased ingest limit to 50000, added historical tracking, new feed sources (MalwareBazaar, AbuseIPDB, URLScan)
 
 import { getDB, generateIndicatorId, normalizeValue } from './db';
 import type { RiskLevel, ThreatIntelResult, SourceHit } from './threat-intel';
@@ -11,6 +11,7 @@ const FEED_CONFIDENCE: Record<string, number> = {
   phishstats: 86, threatfox: 92, feodo_tracker: 95, c2_intel: 88,
   ipsum: 80, blocklist_de: 78, emerging_threats: 82,
   disposable_emails: 70, local_ioc: 99,
+  malware_bazaar: 94, abuseipdb: 88, urlscan: 82,
 };
 
 const FEED_RISK: Record<string, RiskLevel> = {
@@ -21,6 +22,7 @@ const FEED_RISK: Record<string, RiskLevel> = {
   c2_intel: 'known_malicious', ipsum: 'high_risk',
   blocklist_de: 'high_risk', emerging_threats: 'high_risk',
   disposable_emails: 'low_risk',
+  malware_bazaar: 'known_malicious', abuseipdb: 'high_risk', urlscan: 'medium_risk',
 };
 
 const FEED_CATEGORIES: Record<string, string[]> = {
@@ -32,6 +34,7 @@ const FEED_CATEGORIES: Record<string, string[]> = {
   blocklist_de: ['attack_source', 'brute_force'],
   emerging_threats: ['compromised', 'exploit'],
   disposable_emails: ['disposable_email', 'spam'],
+  malware_bazaar: ['malware', 'ransomware', 'trojan'], abuseipdb: ['abuse_ip', 'attack_source'], urlscan: ['suspicious', 'phishing'],
 };
 
 const FEED_TTL_DAYS: Record<string, number> = {
@@ -40,6 +43,7 @@ const FEED_TTL_DAYS: Record<string, number> = {
   threatfox: 90, feodo_tracker: 60, c2_intel: 30, ipsum: 7,
   blocklist_de: 14, emerging_threats: 7,
   disposable_emails: 365, local_ioc: 3650,
+  malware_bazaar: 60, abuseipdb: 14, urlscan: 7,
 };
 
 function ensureDB() {
@@ -51,8 +55,8 @@ export async function ingestIndicators(
   indicators: Array<{ value: string; type: string; description?: string; threat_actor?: string; campaign?: string }>
 ): Promise<{ added: number; updated: number }> {
   const db = ensureDB();
-  // v5.3: increased from 500 to 5000 for better feed coverage
-  const limitedIndicators = indicators.slice(0, 5000);
+  // v6.0: increased from 5000 to 50000 for comprehensive feed coverage
+  const limitedIndicators = indicators.slice(0, 50000);
   const ttlDays = FEED_TTL_DAYS[feedId] ?? 30;
   const validUntil = new Date(Date.now() + ttlDays * 86400000).toISOString();
   const confidence = FEED_CONFIDENCE[feedId] ?? 70;
@@ -140,7 +144,7 @@ export async function lookupIndicator(value: string): Promise<{
   }));
   // FIXED: use is_active (not enabled) for feed count
   const feedCount = await db.execute(`SELECT COUNT(*) as cnt FROM feeds WHERE is_active = 1 AND status = 'active'`);
-  const totalChecked = (feedCount.rows[0]?.cnt as number) || 12;
+  const totalChecked = (feedCount.rows[0]?.cnt as number) || 15;
   try {
     await db.execute({
       sql: `INSERT INTO lookup_log (indicator_value, result_risk_level, sources_hit, sources_checked) VALUES (?, ?, ?, ?)`,
@@ -160,6 +164,7 @@ export async function getFeedStatusFromDB() {
   const db = ensureDB();
   const result = await db.execute(`SELECT id, name, status, entries_count, last_success, last_error, last_refresh, feed_type FROM feeds ORDER BY name ASC`);
   const totalResult = await db.execute(`SELECT COUNT(*) as total FROM indicators WHERE is_active = 1`);
+  const historicalResult = await db.execute(`SELECT COUNT(*) as total FROM indicators`);
   const feeds = result.rows.map(row => ({
     name: row.name as string, id: row.id as string, status: row.status as string,
     entries: row.entries_count as number, lastUpdated: row.last_success as string | null,
@@ -167,6 +172,7 @@ export async function getFeedStatusFromDB() {
   }));
   return {
     feeds, totalEntries: (totalResult.rows[0]?.total as number) || 0,
+    historicalTotal: (historicalResult.rows[0]?.total as number) || 0,
     lastUpdated: feeds.find(f => f.lastUpdated)?.lastUpdated ?? null,
     feedErrors: feeds.filter(f => f.status === 'error').map(f => f.name),
   };
