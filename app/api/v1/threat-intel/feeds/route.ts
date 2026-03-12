@@ -7,23 +7,23 @@ export async function GET(request: Request) {
     const active = searchParams.get('active');
     const db = getDB();
 
-    // Query from the actual 'feeds' table (where ingest writes) + JOIN indicators for counts
+    // Query from threat_feeds table (created by init) + JOIN threat_indicators for counts
     let query = `
       SELECT
         f.id,
         f.name,
-        f.feed_url as url,
-        f.feed_type as type,
+        f.url,
+        f.type,
         f.format,
         f.is_active,
-        f.status,
-        f.last_success as last_fetch,
-        f.last_refresh as next_fetch,
-        f.last_error,
-        f.entries_count as indicator_count,
+        f.last_fetch,
+        f.next_fetch,
         f.fetch_interval_minutes,
-        f.last_success as last_indicator_at
-      FROM feeds f
+        f.last_error,
+        COUNT(i.id) as indicator_count,
+        MAX(i.created_at) as last_indicator_at
+      FROM threat_feeds f
+      LEFT JOIN threat_indicators i ON i.source_feed = f.name
     `;
 
     const params: any[] = [];
@@ -32,43 +32,36 @@ export async function GET(request: Request) {
       params.push(active === 'true' ? 1 : 0);
     }
 
-    query += ` ORDER BY f.name ASC`;
+    query += ` GROUP BY f.id ORDER BY f.name ASC`;
 
     const feeds = await db.execute({ sql: query, args: params });
 
-    // Also get actual indicator counts per feed from indicators table
-    const indicatorCounts = await db.execute({
-      sql: `SELECT source_feed, COUNT(*) as cnt FROM indicators WHERE is_active = 1 GROUP BY source_feed`,
-      args: [],
-    });
-    const countMap: Record<string, number> = {};
-    for (const row of indicatorCounts.rows) {
-      countMap[row.source_feed as string] = row.cnt as number;
-    }
-
     const feedList = feeds.rows.map((row: any) => {
-      const feedId = row.id as string;
-      const actualCount = countMap[feedId] || Number(row.indicator_count || 0);
-      const lastFetch = row.last_fetch as string | null;
-      const status = row.status as string;
+      const lastFetch = row.last_fetch;
+      const now = Date.now();
+      const lastFetchTime = lastFetch ? new Date(lastFetch).getTime() : 0;
+      const intervalMs = (row.fetch_interval_minutes || 60) * 60 * 1000;
+      const actualCount = row.indicator_count || 0;
 
-      // Determine health based on status and last fetch time
-      let health = 'unknown';
-      if (status === 'active' && lastFetch) {
-        const hoursSinceLastFetch = (Date.now() - new Date(lastFetch).getTime()) / 3600000;
-        if (hoursSinceLastFetch < 2) health = 'healthy';
-        else if (hoursSinceLastFetch < 24) health = 'warning';
-        else health = 'stale';
-      } else if (status === 'active' && !lastFetch) {
-        health = 'never_fetched';
-      } else if (status === 'error') {
+      let health = 'never_fetched';
+      if (lastFetch) {
+        const age = now - lastFetchTime;
+        if (age < intervalMs * 2 && !row.last_error) {
+          health = 'healthy';
+        } else if (age < intervalMs * 4) {
+          health = 'warning';
+        } else {
+          health = 'stale';
+        }
+      }
+      if (row.last_error) {
         health = 'error';
       } else if (!row.is_active) {
         health = 'disabled';
       }
 
       return {
-        id: feedId,
+        id: row.id,
         name: row.name,
         url: row.url,
         type: row.type,
@@ -83,9 +76,9 @@ export async function GET(request: Request) {
       };
     });
 
-    const totalIndicators = Object.values(countMap).reduce((s, c) => s + c, 0);
     const activeFeeds = feedList.filter(f => f.is_active);
     const healthyFeeds = feedList.filter(f => f.health === 'healthy');
+    const totalIndicators = feedList.reduce((s, f) => s + f.indicator_count, 0);
 
     return NextResponse.json({
       feeds: feedList,
