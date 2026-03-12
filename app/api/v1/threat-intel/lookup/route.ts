@@ -133,14 +133,17 @@ async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix 
   const dbCats = isDbAvailable() ? await lookupUrlCategory(result.domain || trimmed) : [];
   const liveCats = result.categories.length > 0 ? result.categories : [];
   const heuristicCats = categorizeUrl(result.domain || trimmed);
-  const categories = [...new Set([...dbCats, ...liveCats, ...(dbCats.length === 0 && liveCats.length === 0 ? heuristicCats : [])])];
+  // DB override takes priority — if manual category exists, use it exclusively
+  const categories = dbCats.length > 0
+    ? dbCats
+    : (liveCats.length > 0 ? liveCats : heuristicCats);
   const response = {
     indicator: trimmed, type: 'url', verdict,
     risk_level: result.risk_level, confidence: result.overall_score,
     categories, sources_hit: sourcesHit, sources_checked: result.sources.length,
     flags: result.flags, lookup_ms: lookupMs,
     checked_at: result.checked_at,
-    engine: `osint-live-v4.8${engineSuffix}`,
+    engine: `osint-live-v4.9${engineSuffix}`,
     source_details: result.sources,
     category_source: dbCats.length > 0 ? 'turso-url-categories' : (liveCats.length > 0 ? 'live-osint' : 'heuristic'),
   };
@@ -157,15 +160,15 @@ async function dbLookupResponse(trimmed: string, startTime: number) {
   const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
   const sourcesHit = dbResult.hits.map(h => h.feed);
   const urlCats = await lookupUrlCategory(trimmed);
-  const mergedCats = [...new Set([...allCategories, ...urlCats])];
-  const finalCats = mergedCats.length > 0 ? mergedCats : categorizeUrl(trimmed);
+  // DB override takes priority
+  const finalCats = urlCats.length > 0 ? urlCats : (allCategories.length > 0 ? allCategories : categorizeUrl(trimmed));
   const response = {
     indicator: trimmed, type: 'url', verdict, risk_level: riskLevel,
     confidence: topHit?.confidence ?? 0,
     categories: finalCats,
     sources_hit: sourcesHit, sources_checked: dbResult.totalChecked,
     flags: [], lookup_ms: lookupMs,
-    checked_at: new Date().toISOString(), engine: 'turso-db-v5.3',
+    checked_at: new Date().toISOString(), engine: 'turso-db-v5.4',
     source_details: dbResult.hits.map(h => ({
       name: h.feed, hit: true, risk_level: h.risk_level,
       categories: h.categories, detail: `First seen: ${h.first_seen}`
@@ -192,7 +195,6 @@ export async function GET(request: Request) {
     }
     const trimmed = indicator.trim();
     const cacheKey = `${trimmed}:${mode}`;
-
     // ── Cache check ────────────────────────────────────────────────────────────
     const cached = getCached(cacheKey);
     if (cached) {
@@ -202,7 +204,6 @@ export async function GET(request: Request) {
         cache_hit: true,
       });
     }
-
     // ── Mode: db-only ──────────────────────────────────────────────────────────
     if (mode === 'db') {
       if (!isDbAvailable()) {
@@ -215,12 +216,10 @@ export async function GET(request: Request) {
         return liveOsintLookup(trimmed, startTime, '-db-failover');
       }
     }
-
     // ── Mode: live ─────────────────────────────────────────────────────────────
     if (mode === 'live') {
       return liveOsintLookup(trimmed, startTime);
     }
-
     // ── Mode: hybrid (default) ─────────────────────────────────────────────────
     if (dbInitialized && isDbAvailable()) {
       quickSeedIfEmpty().catch(() => {});
@@ -236,15 +235,15 @@ export async function GET(request: Request) {
           const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
           const sourcesHit = dbResult.hits.map(h => h.feed);
           const urlCats = await lookupUrlCategory(trimmed);
-          const mergedCats = [...new Set([...allCategories, ...urlCats])];
-          const finalCats = mergedCats.length > 0 ? mergedCats : categorizeUrl(trimmed);
+          // DB override takes priority
+          const finalCats = urlCats.length > 0 ? urlCats : (allCategories.length > 0 ? allCategories : categorizeUrl(trimmed));
           const response = {
             indicator: trimmed, type: type || 'url', verdict, risk_level: riskLevel,
             confidence: topHit.confidence,
             categories: finalCats,
             sources_hit: sourcesHit, sources_checked: dbResult.totalChecked,
             flags: [], lookup_ms: lookupMs,
-            checked_at: new Date().toISOString(), engine: 'turso-db-v5.3',
+            checked_at: new Date().toISOString(), engine: 'turso-db-v5.4',
             source_details: dbResult.hits.map(h => ({
               name: h.feed, hit: true, risk_level: h.risk_level,
               categories: h.categories, detail: `First seen: ${h.first_seen}`
