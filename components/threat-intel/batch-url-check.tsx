@@ -8,6 +8,7 @@ interface BatchResult {
   riskLevel: string;
   categories: string[];
   sources: string[];
+  categorySource: string;
   error?: string;
 }
 
@@ -43,6 +44,7 @@ export default function BatchUrlCheck() {
           riskLevel: data.risk_level || 'unknown',
           categories: data.categories || [],
           sources: sources.length > 0 ? sources : (data.sources_hit || []),
+          categorySource: data.category_source || 'unknown',
         });
       } catch {
         batchResults.push({
@@ -51,6 +53,7 @@ export default function BatchUrlCheck() {
           riskLevel: 'unknown',
           categories: [],
           sources: [],
+          categorySource: 'error',
           error: 'Failed to fetch',
         });
       }
@@ -61,13 +64,14 @@ export default function BatchUrlCheck() {
   };
 
   const exportCSV = () => {
-    const header = 'Domain,Verdict,Risk Level,Categories,Sources';
+    const header = 'Domain,Verdict,Risk Level,Categories,Category Source,Sources';
     const rows = results.map((r) =>
       [
         r.domain,
         r.verdict,
         r.riskLevel,
         r.categories.join('; '),
+        r.categorySource,
         r.sources.join('; '),
       ].join(',')
     );
@@ -101,6 +105,28 @@ export default function BatchUrlCheck() {
     }
   };
 
+  const getSourceBadgeColor = (src: string) => {
+    switch (src) {
+      case 'manual-override': return '#da3633';
+      case 'cloudflare-radar': return '#f78166';
+      case 'live-osint': return '#3fb950';
+      case 'heuristic': return '#8b949e';
+      default: return '#6e7681';
+    }
+  };
+
+  const getSourceLabel = (src: string) => {
+    switch (src) {
+      case 'manual-override': return 'Manual Override';
+      case 'cloudflare-radar': return 'Cloudflare Radar';
+      case 'live-osint': return 'Live OSINT';
+      case 'turso-url-categories': return 'DB Override';
+      case 'turso-indicators': return 'Turso DB';
+      case 'heuristic': return 'Heuristic';
+      default: return src;
+    }
+  };
+
   return (
     <div style={{
       background: '#0d1117',
@@ -127,7 +153,7 @@ export default function BatchUrlCheck() {
           fontSize: '13px',
           fontFamily: 'monospace',
           resize: 'vertical',
-          boxSizing: 'border-box',
+          boxSizing: 'border-box' as const,
         }}
       />
       <div style={{ display: 'flex', gap: '12px', marginTop: '12px', alignItems: 'center' }}>
@@ -175,7 +201,7 @@ export default function BatchUrlCheck() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #21262d' }}>
-                {['Domain', 'Verdict', 'Risk Level', 'Categories', 'Sources'].map((h) => (
+                {['Domain', 'Verdict', 'Risk Level', 'Categories', 'Category Source', 'Sources'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#8b949e', fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
@@ -196,6 +222,18 @@ export default function BatchUrlCheck() {
                   </td>
                   <td style={{ padding: '8px 12px', color: '#8b949e' }}>
                     {r.categories.join(', ') || '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <span style={{
+                      background: getSourceBadgeColor(r.categorySource),
+                      color: '#fff',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}>
+                      {getSourceLabel(r.categorySource)}
+                    </span>
                   </td>
                   <td style={{ padding: '8px 12px', color: '#8b949e' }}>
                     {r.error ? <span style={{ color: '#ff4444' }}>{r.error}</span> : r.sources.join(', ') || '-'}
