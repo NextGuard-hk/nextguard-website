@@ -1,20 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDB } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const active = searchParams.get('active');
+    const db = getDB();
 
-    const db = getDb();
-
+    // Query from the actual 'feeds' table (where ingest writes) + JOIN indicators for counts
     let query = `
-      SELECT 
-        f.*,
-        COUNT(i.id) as indicator_count,
-        MAX(i.created_at) as last_indicator_at
-      FROM threat_feeds f
-      LEFT JOIN threat_indicators i ON i.source_feed = f.name
+      SELECT
+        f.id,
+        f.name,
+        f.feed_url as url,
+        f.feed_type as type,
+        f.format,
+        f.is_active,
+        f.status,
+        f.last_success as last_fetch,
+        f.last_refresh as next_fetch,
+        f.last_error,
+        f.entries_count as indicator_count,
+        f.fetch_interval_minutes,
+        f.last_success as last_indicator_at
+      FROM feeds f
     `;
 
     const params: any[] = [];
@@ -23,98 +32,72 @@ export async function GET(request: Request) {
       params.push(active === 'true' ? 1 : 0);
     }
 
-    query += ` GROUP BY f.id ORDER BY f.last_fetch DESC`;
+    query += ` ORDER BY f.name ASC`;
 
     const feeds = await db.execute({ sql: query, args: params });
 
-    const feedList = feeds.rows.map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      url: row.url,
-      type: row.type,
-      format: row.format,
-      is_active: Boolean(row.is_active),
-      last_fetch: row.last_fetch,
-      next_fetch: row.next_fetch,
-      fetch_interval_minutes: row.fetch_interval_minutes,
-      indicator_count: Number(row.indicator_count || 0),
-      last_indicator_at: row.last_indicator_at,
-      health: getHealthStatus(row),
-    }));
+    // Also get actual indicator counts per feed from indicators table
+    const indicatorCounts = await db.execute({
+      sql: `SELECT source_feed, COUNT(*) as cnt FROM indicators WHERE is_active = 1 GROUP BY source_feed`,
+      args: [],
+    });
+    const countMap: Record<string, number> = {};
+    for (const row of indicatorCounts.rows) {
+      countMap[row.source_feed as string] = row.cnt as number;
+    }
 
-    // Summary stats
-    const totalActive = feedList.filter((f: any) => f.is_active).length;
-    const totalIndicators = feedList.reduce((sum: number, f: any) => sum + f.indicator_count, 0);
-    const healthyFeeds = feedList.filter((f: any) => f.health === 'healthy').length;
+    const feedList = feeds.rows.map((row: any) => {
+      const feedId = row.id as string;
+      const actualCount = countMap[feedId] || Number(row.indicator_count || 0);
+      const lastFetch = row.last_fetch as string | null;
+      const status = row.status as string;
+
+      // Determine health based on status and last fetch time
+      let health = 'unknown';
+      if (status === 'active' && lastFetch) {
+        const hoursSinceLastFetch = (Date.now() - new Date(lastFetch).getTime()) / 3600000;
+        if (hoursSinceLastFetch < 2) health = 'healthy';
+        else if (hoursSinceLastFetch < 24) health = 'warning';
+        else health = 'stale';
+      } else if (status === 'active' && !lastFetch) {
+        health = 'never_fetched';
+      } else if (status === 'error') {
+        health = 'error';
+      } else if (!row.is_active) {
+        health = 'disabled';
+      }
+
+      return {
+        id: feedId,
+        name: row.name,
+        url: row.url,
+        type: row.type,
+        format: row.format,
+        is_active: Boolean(row.is_active),
+        last_fetch: lastFetch,
+        next_fetch: row.next_fetch,
+        fetch_interval_minutes: row.fetch_interval_minutes || 60,
+        indicator_count: actualCount,
+        last_indicator_at: row.last_indicator_at,
+        health,
+      };
+    });
+
+    const totalIndicators = Object.values(countMap).reduce((s, c) => s + c, 0);
+    const activeFeeds = feedList.filter(f => f.is_active);
+    const healthyFeeds = feedList.filter(f => f.health === 'healthy');
 
     return NextResponse.json({
       feeds: feedList,
       summary: {
         total: feedList.length,
-        active: totalActive,
-        healthy: healthyFeeds,
+        active: activeFeeds.length,
+        healthy: healthyFeeds.length,
         total_indicators: totalIndicators,
         last_updated: new Date().toISOString(),
-      }
+      },
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
-}
-
-export async function PATCH(request: Request) {
-  try {
-    const body = await request.json();
-    const { feed_name, is_active, fetch_interval_minutes } = body;
-
-    if (!feed_name) {
-      return NextResponse.json({ error: 'feed_name required' }, { status: 400 });
-    }
-
-    const db = getDb();
-    const updates: string[] = [];
-    const params: any[] = [];
-
-    if (typeof is_active === 'boolean') {
-      updates.push('is_active = ?');
-      params.push(is_active ? 1 : 0);
-    }
-
-    if (fetch_interval_minutes) {
-      updates.push('fetch_interval_minutes = ?');
-      params.push(fetch_interval_minutes);
-
-      // Recalculate next_fetch
-      updates.push("next_fetch = datetime('now', '+' || ? || ' minutes')");
-      params.push(fetch_interval_minutes);
-    }
-
-    if (updates.length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
-    }
-
-    params.push(feed_name);
-    await db.execute({
-      sql: `UPDATE threat_feeds SET ${updates.join(', ')} WHERE name = ?`,
-      args: params,
-    });
-
-    return NextResponse.json({ success: true, feed_name, updated: updates.length });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
-
-function getHealthStatus(row: any): string {
-  if (!row.is_active) return 'disabled';
-  if (!row.last_fetch) return 'never_fetched';
-
-  const lastFetch = new Date(row.last_fetch);
-  const now = new Date();
-  const minutesSinceLastFetch = (now.getTime() - lastFetch.getTime()) / 60000;
-  const expectedInterval = row.fetch_interval_minutes || 60;
-
-  if (minutesSinceLastFetch > expectedInterval * 3) return 'stale';
-  if (minutesSinceLastFetch > expectedInterval * 1.5) return 'warning';
-  return 'healthy';
 }
