@@ -8,6 +8,7 @@ import IOCEnrichmentForm from '@/components/threat-intel/ioc-enrichment-form';
 import EnrichmentResults from '@/components/threat-intel/enrichment-results';
 import FeedStatusPanel from '@/components/threat-intel/feed-status-panel';
 import PlatformStats from '@/components/threat-intel/platform-stats';
+import BatchUrlCheck from '@/components/threat-intel/batch-url-check';
 
 const responsiveStyles = `
   .ti-dashboard {
@@ -136,6 +137,8 @@ export default function ThreatIntelDashboard() {
               </div>
             )}
 
+                      {/* Batch URL Check */}
+                      <BatchUrlCheck />
             {/* API Documentation Card */}
             <div className="ti-api-card">
               <h3 style={{ color: '#e0e0e0', margin: '0 0 12px 0', fontSize: '15px' }}>API Endpoints</h3>
