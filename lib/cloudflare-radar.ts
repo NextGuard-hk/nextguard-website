@@ -155,3 +155,10 @@ export async function queryAndCacheRadarCategory(
     return [];
   }
 }
+
+// Simple wrapper to get categories from Cloudflare Radar
+export async function getCategoriesFromRadar(domain: string): Promise<string[]> {
+  const result = await queryCloudflareRadar(domain);
+  if (!result) return [];
+  return result.categories;
+}
