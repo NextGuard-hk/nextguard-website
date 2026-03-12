@@ -1,7 +1,8 @@
 // app/api/v1/threat-intel/ingest/route.ts
-// NextGuard Threat Intel v5.0 - Feed Ingestion API
+// NextGuard Threat Intel v5.1 - Feed Ingestion API
 // Fetches all OSINT feeds and writes IOCs to Turso DB
 // Called by Vercel Cron or manually via POST
+// v5.1: Added PhishStats feed, increased ingest limits for better coverage
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestIndicators, expireOldIndicators } from '@/lib/threat-intel-db';
@@ -11,7 +12,7 @@ async function fetchTextLines(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(20000),
-      headers: { 'User-Agent': 'NextGuard-ThreatIntel/5.0' },
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/5.1' },
     });
     if (!res.ok) return [];
     const text = await res.text();
@@ -79,6 +80,37 @@ async function ingestPhishTank(): Promise<number> {
     } catch {}
   }
   return 0;
+}
+
+// NEW v5.1: Parse PhishStats - recent phishing URLs
+async function ingestPhishStats(): Promise<number> {
+  const indicators: { value: string; type: string; description: string }[] = [];
+  try {
+    const res = await fetch('https://phishstats.info/phish_score.csv', {
+      signal: AbortSignal.timeout(20000),
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/5.1' },
+    });
+    if (!res.ok) return 0;
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      if (line.startsWith('#') || line.length < 10) continue;
+      try {
+        const match = line.match(/,"?(https?:\/\/[^"\s,]+)"?/);
+        if (match?.[1]) {
+          const url = match[1].trim().toLowerCase();
+          try {
+            const hostname = new URL(url).hostname.replace(/^www\./, '');
+            if (hostname && hostname.includes('.')) {
+              indicators.push({ value: hostname, type: 'domain', description: 'PhishStats phishing URL' });
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+  } catch {}
+  if (indicators.length === 0) return 0;
+  const { added, updated } = await ingestIndicators('phishstats', indicators);
+  return added + updated;
 }
 
 // Parse ThreatFox hostfile format
@@ -168,15 +200,12 @@ async function ingestDisposableEmails(): Promise<number> {
 
 // Verify cron or API key auth
 function isAuthorized(request: NextRequest): boolean {
-  // Accept Bearer token (for Vercel Cron)
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true;
-  // Accept query parameter key (for manual triggering)
   const key = request.nextUrl.searchParams.get('key');
   const adminKey = process.env.TI_ADMIN_KEY;
   if (adminKey && key === adminKey) return true;
-  // If no secrets configured, allow access
   if (!cronSecret && !adminKey) return true;
   return false;
 }
@@ -195,6 +224,7 @@ export async function GET(request: NextRequest) {
     phishing_army: ingestPhishingArmy,
     openphish: ingestOpenPhish,
     phishtank: ingestPhishTank,
+    phishstats: ingestPhishStats,
     threatfox: ingestThreatFox,
     feodo_tracker: ingestFeodoTracker,
     c2_intel: ingestC2Intel,
