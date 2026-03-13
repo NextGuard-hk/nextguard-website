@@ -21,6 +21,10 @@ export async function GET() {
         const result = await db.execute(
           `SELECT COUNT(*) as total, MAX(updated_at) as last_updated FROM indicators WHERE is_active = 1`
         );
+        // v6.0: also get historical total (all indicators including inactive)
+        const historicalResult = await db.execute(
+          `SELECT COUNT(*) as historical_total FROM indicators`
+        );
         const feedResult = await db.execute(
           `SELECT COUNT(*) as active_feeds FROM feeds WHERE is_active = 1 AND status = 'active'`
         );
@@ -30,6 +34,7 @@ export async function GET() {
         checks.db = {
           status: 'healthy',
           total_indicators: result.rows[0]?.total ?? 0,
+          historical_total: historicalResult.rows[0]?.historical_total ?? 0,
           last_updated: result.rows[0]?.last_updated ?? null,
           active_feeds: feedResult.rows[0]?.active_feeds ?? 0,
           lookups_last_24h: logResult.rows[0]?.lookups_24h ?? 0,
@@ -52,7 +57,7 @@ export async function GET() {
       const db = getDB();
       const staleness = await db.execute(`
         SELECT id, name, last_success, status,
-          CAST((julianday('now') - julianday(COALESCE(last_success, '2000-01-01'))) * 24 AS INTEGER) as hours_since_update
+        CAST((julianday('now') - julianday(COALESCE(last_success, '2000-01-01'))) * 24 AS INTEGER) as hours_since_update
         FROM feeds
         WHERE is_active = 1
         ORDER BY hours_since_update DESC
@@ -71,7 +76,7 @@ export async function GET() {
     }
   }
 
-  // 3. Turso backup info (via env variable - Turso handles backups automatically)
+  // 3. Turso backup info
   checks.backup = {
     provider: 'Turso (libSQL)',
     backup_type: 'Continuous point-in-time replication',
@@ -87,8 +92,8 @@ export async function GET() {
     mode: 'automatic',
     strategy: 'DB circuit-breaker -> live OSINT fallback',
     db_retry_interval_ms: 60000,
-    live_osint_sources: 13,
-    note: 'If DB fails, all lookups auto-failover to live OSINT feeds with engine=osint-live-v4.7-db-failover',
+    live_osint_sources: 15,
+    note: 'If DB fails, all lookups auto-failover to live OSINT feeds with engine=osint-live-v6.0-db-failover',
   };
 
   const overallStatus = checks.db.status === 'healthy' ? 'healthy' : 'degraded';
@@ -97,7 +102,7 @@ export async function GET() {
   return NextResponse.json({
     status: overallStatus,
     service: 'NextGuard Threat Intelligence Engine',
-    version: 'v5.2',
+    version: 'v6.0',
     timestamp: new Date().toISOString(),
     probe_ms: Date.now() - startTime,
     checks,
