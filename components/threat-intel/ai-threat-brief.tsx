@@ -24,7 +24,7 @@ const briefStyles = `
   .ai-brief-section { background: #12122a88; border-radius: 8px; padding: 12px; border: 1px solid #2a2a4a; }
   .ai-brief-section h4 { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0; }
   .ai-brief-section li { color: #c8c8e0; font-size: 12px; line-height: 1.5; padding: 2px 0; list-style: none; }
-  .ai-brief-section li::before { content: '\25B8 '; color: #6366f1; }
+  .ai-brief-section li::before { content: '> '; color: #6366f1; }
   .ai-brief-risk { background: #ef444415; border: 1px solid #ef444433; border-radius: 8px; padding: 10px 12px; color: #fca5a5; font-size: 12px; margin-top: 12px; display: flex; align-items: center; gap: 8px; }
   .ai-brief-regional { color: #22d3ee; font-size: 11px; margin-top: 10px; padding: 8px 12px; background: #22d3ee10; border-radius: 6px; border: 1px solid #22d3ee22; }
   .ai-brief-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 8px; }
@@ -63,7 +63,7 @@ export default function AIThreatBrief() {
 
   const handleCopy = () => {
     if (!brief) return;
-    const text = `AI Threat Brief - ${brief.title}\n\n${brief.summary}\n\nKey Findings:\n${brief.key_findings.map(f => `- ${f}`).join('\n')}\n\nRisk: ${brief.risk_assessment}\n\nActions:\n${brief.recommended_actions.map(a => `- ${a}`).join('\n')}\n\n${brief.regional_focus ? `APAC: ${brief.regional_focus}` : ''}`;
+    const text = ['AI Threat Brief - ' + brief.title, '', brief.summary, '', 'Key Findings:', ...brief.key_findings.map(f => '- ' + f), '', 'Risk: ' + brief.risk_assessment, '', 'Actions:', ...brief.recommended_actions.map(a => '- ' + a), '', brief.regional_focus ? 'APAC: ' + brief.regional_focus : ''].join('\n');
     navigator.clipboard.writeText(text);
   };
 
@@ -77,7 +77,7 @@ export default function AIThreatBrief() {
             <span style={{ color: '#555', fontSize: '10px' }}>Powered by Perplexity + DeepSeek</span>
           </div>
           <button className="ai-brief-btn" onClick={() => setCollapsed(!collapsed)} style={{ fontSize: '12px' }}>
-            {collapsed ? '\u25BC Expand' : '\u25B2 Collapse'}
+            {collapsed ? 'Expand' : 'Collapse'}
           </button>
         </div>
         {loading && (<div className="ai-brief-loading"><div className="spinner" />Generating AI threat intelligence brief...</div>)}
@@ -96,7 +96,7 @@ export default function AIThreatBrief() {
                 <ul style={{ margin: 0, padding: 0 }}>{(brief.recommended_actions || []).map((a, i) => (<li key={i}>{a}</li>))}</ul>
               </div>
             </div>
-            {brief.risk_assessment && (<div className="ai-brief-risk"><span style={{ fontSize: '16px' }}>Warning</span><span>{brief.risk_assessment}</span></div>)}
+            {brief.risk_assessment && (<div className="ai-brief-risk"><span style={{ fontSize: '16px' }}>!</span><span>{brief.risk_assessment}</span></div>)}
             {brief.regional_focus && (<div className="ai-brief-regional"><strong>APAC Focus:</strong> {brief.regional_focus}</div>)}
             <div className="ai-brief-footer">
               <span className="ai-brief-time">Generated: {generatedAt ? new Date(generatedAt).toLocaleString() : '-'}</span>
