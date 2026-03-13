@@ -5,13 +5,13 @@ import { categorizeUrl } from '@/lib/url-categories';
 import { initDB, getDB } from '@/lib/db';
 import { getCategoriesFromRadar } from '@/lib/cloudflare-radar';
 
-// ─── In-Memory Lookup Cache ──────────────────────────────────────────────────
+// --- In-Memory Lookup Cache ---
 interface CacheEntry {
   response: any;
   timestamp: number;
 }
 const LOOKUP_CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 const CACHE_MAX_SIZE = 2000;
 
 function getCached(key: string): any | null {
@@ -32,7 +32,7 @@ function setCache(key: string, response: any): void {
   LOOKUP_CACHE.set(key, { response, timestamp: Date.now() });
 }
 
-// ─── DB State ────────────────────────────────────────────────────────────────
+// --- DB State ---
 let dbInitialized = false;
 let initialIngestDone = false;
 let dbHealthy = true;
@@ -74,85 +74,6 @@ async function quickSeedIfEmpty() {
   } catch {}
 }
 
-// ─── Composite Threat Score (0-100) ──────────────────────────────────────────
-interface ScoreBreakdown {
-  ioc_match: number;       // 0-40: IOC database hits
-  category_risk: number;   // 0-25: Category-based risk
-  domain_signals: number;  // 0-20: Domain reputation signals
-  source_confidence: number; // 0-15: Source confidence & count
-}
-
-function computeThreatScore(
-  riskLevel: string,
-  categories: string[],
-  sourcesHit: string[],
-  confidence: number,
-  domain: string
-): { threat_score: number; score_breakdown: ScoreBreakdown; risk_label: string } {
-  const breakdown: ScoreBreakdown = { ioc_match: 0, category_risk: 0, domain_signals: 0, source_confidence: 0 };
-
-  // 1. IOC Match Score (0-40)
-  if (riskLevel === 'known_malicious' || riskLevel === 'critical') breakdown.ioc_match = 40;
-  else if (riskLevel === 'high' || riskLevel === 'high_risk') breakdown.ioc_match = 30;
-  else if (riskLevel === 'medium' || riskLevel === 'medium_risk') breakdown.ioc_match = 20;
-  else if (riskLevel === 'low' || riskLevel === 'low_risk') breakdown.ioc_match = 10;
-  else breakdown.ioc_match = 0;
-
-  // 2. Category Risk Score (0-25)
-  const catStr = categories.map(c => c.toLowerCase()).join(' ');
-  if (/malware|c2|command.and.control|ransomware|trojan/.test(catStr)) breakdown.category_risk = 25;
-  else if (/phishing|credential.harvesting|social.engineering/.test(catStr)) breakdown.category_risk = 22;
-  else if (/spam|scam|fraud/.test(catStr)) breakdown.category_risk = 18;
-  else if (/paste.site|url.shortener/.test(catStr)) breakdown.category_risk = 15;
-  else if (/dynamic.dns|suspicious/.test(catStr)) breakdown.category_risk = 12;
-  else if (/adult|gambling|proxy|anonymizer|vpn/.test(catStr)) breakdown.category_risk = 8;
-  else if (/uncategorized/.test(catStr)) breakdown.category_risk = 5;
-  else breakdown.category_risk = 0;
-
-  // 3. Domain Signals Score (0-20)
-  const d = domain.toLowerCase();
-  const suspiciousTLDs = ['.xyz', '.top', '.buzz', '.tk', '.ml', '.ga', '.cf', '.gq', '.cc', '.pw', '.lat', '.surf', '.rest', '.icu'];
-  const dynamicDNS = ['duckdns.org', 'no-ip.com', 'linkpc.net', 'ddns.net', 'freedns.org', 'hopto.org', 'zapto.org', 'serveftp.com', 'sytes.net', 'r-e.kr', 'n-e.kr'];
-  const freeHosting = ['000webhostapp.com', 'weebly.com', 'wixsite.com', 'blogspot.com', 'herokuapp.com', 'netlify.app', 'pages.dev', 'workers.dev'];
-  let domainScore = 0;
-  if (suspiciousTLDs.some(tld => d.endsWith(tld))) domainScore += 8;
-  if (dynamicDNS.some(dns => d.includes(dns))) domainScore += 10;
-  if (freeHosting.some(host => d.includes(host))) domainScore += 5;
-  // High entropy (DGA-like) detection
-  const parts = d.split('.')[0];
-  if (parts && parts.length > 8) {
-    const consonants = (parts.match(/[bcdfghjklmnpqrstvwxyz]/gi) || []).length;
-    const ratio = consonants / parts.length;
-    if (ratio > 0.75) domainScore += 10;
-  }
-  // Very short or numeric subdomains
-  if (/^\d+\./.test(d) || /^[a-z]{1,2}\d+\./.test(d)) domainScore += 5;
-  breakdown.domain_signals = Math.min(domainScore, 20);
-
-  // 4. Source Confidence Score (0-15)
-  const srcCount = sourcesHit.length;
-  if (srcCount >= 4) breakdown.source_confidence = 15;
-  else if (srcCount >= 3) breakdown.source_confidence = 12;
-  else if (srcCount >= 2) breakdown.source_confidence = 10;
-  else if (srcCount >= 1) breakdown.source_confidence = 7;
-  else if (confidence > 70) breakdown.source_confidence = 5;
-  else breakdown.source_confidence = 0;
-
-  const totalScore = Math.min(
-    breakdown.ioc_match + breakdown.category_risk + breakdown.domain_signals + breakdown.source_confidence,
-    100
-  );
-
-  // Map score to risk label
-  let risk_label = 'clean';
-  if (totalScore >= 86) risk_label = 'critical';
-  else if (totalScore >= 61) risk_label = 'high';
-  else if (totalScore >= 36) risk_label = 'medium';
-  else if (totalScore >= 16) risk_label = 'low';
-
-  return { threat_score: totalScore, score_breakdown: breakdown, risk_label };
-}
-
 function riskToVerdict(riskLevel: string): string {
   switch (riskLevel) {
     case 'critical': case 'high': case 'known_malicious': return 'malicious';
@@ -181,46 +102,76 @@ async function lookupUrlCategory(domain: string): Promise<string[]> {
     let d = domain.toLowerCase();
     if (d.startsWith('http')) { try { d = new URL(d).hostname; } catch {} }
     d = d.replace(/^www\./, '');
-    const result = await db.execute({
-      sql: `SELECT category FROM url_categories WHERE domain = ? LIMIT 5`,
-      args: [d],
-    });
-    if (result.rows.length > 0) {
-      return [...new Set(result.rows.map(r => r.category as string))];
-    }
+    const result = await db.execute({ sql: `SELECT category FROM url_categories WHERE domain = ? LIMIT 5`, args: [d] });
+    if (result.rows.length > 0) return [...new Set(result.rows.map(r => r.category as string))];
     const parts = d.split('.');
     if (parts.length > 2) {
       const parent = parts.slice(-2).join('.');
-      const parentResult = await db.execute({
-        sql: `SELECT category FROM url_categories WHERE domain = ? LIMIT 5`,
-        args: [parent],
-      });
-      if (parentResult.rows.length > 0) {
-        return [...new Set(parentResult.rows.map(r => r.category as string))];
-      }
+      const parentResult = await db.execute({ sql: `SELECT category FROM url_categories WHERE domain = ? LIMIT 5`, args: [parent] });
+      if (parentResult.rows.length > 0) return [...new Set(parentResult.rows.map(r => r.category as string))];
     }
     return [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 async function resolveCategories(domain: string, liveCats: string[]): Promise<{ categories: string[]; source: string }> {
   const dbCats = isDbAvailable() ? await lookupUrlCategory(domain) : [];
-  if (dbCats.length > 0) {
-    return { categories: dbCats, source: 'manual-override' };
-  }
+  if (dbCats.length > 0) return { categories: dbCats, source: 'manual-override' };
   try {
     const radarCats = await getCategoriesFromRadar(domain);
-    if (radarCats.length > 0 && radarCats[0] !== 'Uncategorized') {
-      return { categories: radarCats, source: 'cloudflare-radar' };
-    }
+    if (radarCats.length > 0 && radarCats[0] !== 'Uncategorized') return { categories: radarCats, source: 'cloudflare-radar' };
   } catch {}
-  if (liveCats.length > 0) {
-    return { categories: liveCats, source: 'live-osint' };
-  }
-  const heuristicCats = categorizeUrl(domain);
-  return { categories: heuristicCats, source: 'heuristic' };
+  if (liveCats.length > 0) return { categories: liveCats, source: 'live-osint' };
+  return { categories: categorizeUrl(domain), source: 'heuristic' };
+}
+
+// --- Composite Threat Score (0-100) ---
+interface ScoreBreakdown {
+  ioc_match: number;
+  category_risk: number;
+  domain_signals: number;
+  confidence_boost: number;
+}
+
+function getCategoryRiskScore(categories: string[]): number {
+  const catLower = categories.map(c => c.toLowerCase());
+  if (catLower.some(c => ['malware','phishing','c2','command and control','ransomware'].includes(c))) return 25;
+  if (catLower.some(c => ['botnet','exploit','trojan','spyware'].includes(c))) return 22;
+  if (catLower.some(c => ['spam','scam','fraud'].includes(c))) return 18;
+  if (catLower.some(c => c.includes('paste') || c.includes('file sharing'))) return 15;
+  if (catLower.some(c => c.includes('dynamic dns') || c.includes('suspicious'))) return 10;
+  if (catLower.some(c => c.includes('uncategorized') || c.includes('newly'))) return 5;
+  if (catLower.some(c => ['technology','business','education','news','shopping','entertainment','social media'].includes(c))) return 0;
+  return 3;
+}
+
+function getDomainSignalScore(domain: string): number {
+  let score = 0;
+  const d = domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '');
+  const suspiciousTLDs = ['.xyz','.top','.buzz','.tk','.ml','.ga','.cf','.gq','.work','.click','.loan','.racing','.win','.bid','.stream'];
+  if (suspiciousTLDs.some(t => d.endsWith(t))) score += 8;
+  const dynamicDNS = ['duckdns.org','no-ip.com','ddns.net','hopto.org','zapto.org','sytes.net','linkpc.net','r-e.kr','n-e.kr','dynu.com'];
+  if (dynamicDNS.some(dd => d.includes(dd))) score += 10;
+  const freeHosting = ['000webhostapp.com','herokuapp.com','netlify.app','web.app','firebaseapp.com','pages.dev','workers.dev','blogspot.com'];
+  if (freeHosting.some(fh => d.includes(fh))) score += 5;
+  const parts = d.replace(/\.[^.]+$/, '').split(/[.-]/);
+  if (parts.join('').length > 20) score += 7;
+  return Math.min(score, 20);
+}
+
+function computeThreatScore(riskLevel: string, confidence: number, sourcesHit: string[], categories: string[], domain: string): { threat_score: number; score_breakdown: ScoreBreakdown; risk_label: string } {
+  let iocMatch = 0;
+  if (sourcesHit.length > 0) iocMatch = Math.min(20 + sourcesHit.length * 8, 40);
+  const categoryRisk = getCategoryRiskScore(categories);
+  const domainSignals = getDomainSignalScore(domain);
+  const confidenceBoost = Math.min(Math.round(confidence * 0.15), 15);
+  const threatScore = Math.min(iocMatch + categoryRisk + domainSignals + confidenceBoost, 100);
+  let riskLabel = 'clean';
+  if (threatScore >= 86) riskLabel = 'critical';
+  else if (threatScore >= 61) riskLabel = 'high';
+  else if (threatScore >= 36) riskLabel = 'medium';
+  else if (threatScore >= 16) riskLabel = 'low';
+  return { threat_score: threatScore, score_breakdown: { ioc_match: iocMatch, category_risk: categoryRisk, domain_signals: domainSignals, confidence_boost: confidenceBoost }, risk_label: riskLabel };
 }
 
 async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix = '') {
@@ -230,9 +181,7 @@ async function liveOsintLookup(trimmed: string, startTime: number, engineSuffix 
   const sourcesHit = result.sources.filter(s => s.hit).map(s => s.name);
   const liveCats = result.categories.length > 0 ? result.categories : [];
   const { categories, source: categorySource } = await resolveCategories(result.domain || trimmed, liveCats);
-  const { threat_score, score_breakdown, risk_label } = computeThreatScore(
-    result.risk_level, categories, sourcesHit, result.overall_score, trimmed
-  );
+  const { threat_score, score_breakdown, risk_label } = computeThreatScore(result.risk_level, result.overall_score, sourcesHit, categories, trimmed);
   const response = {
     indicator: trimmed, type: 'url', verdict,
     risk_level: result.risk_level, confidence: result.overall_score,
@@ -257,9 +206,7 @@ async function dbLookupResponse(trimmed: string, startTime: number) {
   const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
   const sourcesHit = dbResult.hits.map(h => h.feed);
   const { categories: finalCats, source: categorySource } = await resolveCategories(trimmed, allCategories);
-  const { threat_score, score_breakdown, risk_label } = computeThreatScore(
-    riskLevel, finalCats, sourcesHit, topHit?.confidence ?? 0, trimmed
-  );
+  const { threat_score, score_breakdown, risk_label } = computeThreatScore(riskLevel, topHit?.confidence ?? 0, sourcesHit, finalCats, trimmed);
   const response = {
     indicator: trimmed, type: 'url', verdict, risk_level: riskLevel,
     confidence: topHit?.confidence ?? 0,
@@ -296,30 +243,15 @@ export async function GET(request: Request) {
     const cacheKey = `${trimmed}:${mode}`;
     const cached = getCached(cacheKey);
     if (cached) {
-      return NextResponse.json({
-        ...cached,
-        lookup_ms: Date.now() - startTime,
-        cache_hit: true,
-      });
+      return NextResponse.json({ ...cached, lookup_ms: Date.now() - startTime, cache_hit: true });
     }
     if (mode === 'db') {
-      if (!isDbAvailable()) {
-        return liveOsintLookup(trimmed, startTime, '-db-failover');
-      }
-      try {
-        return await dbLookupResponse(trimmed, startTime);
-      } catch (dbErr: any) {
-        markDbFailed();
-        return liveOsintLookup(trimmed, startTime, '-db-failover');
-      }
+      if (!isDbAvailable()) return liveOsintLookup(trimmed, startTime, '-db-failover');
+      try { return await dbLookupResponse(trimmed, startTime); } catch { markDbFailed(); return liveOsintLookup(trimmed, startTime, '-db-failover'); }
     }
-    if (mode === 'live') {
-      return liveOsintLookup(trimmed, startTime);
-    }
-    // Mode: hybrid (default)
-    if (dbInitialized && isDbAvailable()) {
-      quickSeedIfEmpty().catch(() => {});
-    }
+    if (mode === 'live') return liveOsintLookup(trimmed, startTime);
+    // hybrid
+    if (dbInitialized && isDbAvailable()) { quickSeedIfEmpty().catch(() => {}); }
     if (isDbAvailable()) {
       try {
         const dbResult = await lookupIndicator(trimmed);
@@ -331,9 +263,7 @@ export async function GET(request: Request) {
           const allCategories = [...new Set(dbResult.hits.flatMap(h => h.categories))];
           const sourcesHit = dbResult.hits.map(h => h.feed);
           const { categories: finalCats, source: categorySource } = await resolveCategories(trimmed, allCategories);
-          const { threat_score, score_breakdown, risk_label } = computeThreatScore(
-            riskLevel, finalCats, sourcesHit, topHit.confidence, trimmed
-          );
+          const { threat_score, score_breakdown, risk_label } = computeThreatScore(riskLevel, topHit.confidence, sourcesHit, finalCats, trimmed);
           const response = {
             indicator: trimmed, type: type || 'url', verdict, risk_level: riskLevel,
             confidence: topHit.confidence,
@@ -351,9 +281,7 @@ export async function GET(request: Request) {
           setCache(cacheKey, response);
           return NextResponse.json(response);
         }
-      } catch (dbErr: any) {
-        markDbFailed();
-      }
+      } catch (dbErr: any) { markDbFailed(); }
     }
     const engineSuffix = !isDbAvailable() ? '-db-failover' : '-fallback';
     return liveOsintLookup(trimmed, startTime, engineSuffix);
