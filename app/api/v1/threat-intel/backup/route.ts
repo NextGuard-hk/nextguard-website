@@ -1,8 +1,9 @@
 // app/api/v1/threat-intel/backup/route.ts
-// NextGuard Turso DB Backup API v7.0
-// Lightweight integrity check + row counts (no full export to avoid timeout)
+// NextGuard Turso DB Backup API v8.0
+// Default: lightweight integrity check + row counts
+// Paginated export: ?table=indicators&page=1&limit=5000
+// Full single-table: ?table=feeds (small tables exported in one go)
 // Protected by CRON_SECRET or TI_ADMIN_KEY
-// Use ?full=true for full data export (manual use only)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
@@ -28,11 +29,51 @@ export async function GET(request: NextRequest) {
 
   const startTime = Date.now();
   const db = getDB();
-  const errors: string[] = [];
-  const fullExport = request.nextUrl.searchParams.get('full') === 'true';
+  const table = request.nextUrl.searchParams.get('table');
+  const page = parseInt(request.nextUrl.searchParams.get('page') || '1');
+  const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '5000'), 10000);
+  const offset = (page - 1) * limit;
 
   try {
-    // 1. Get row counts (fast)
+    // If table specified, do paginated export
+    if (table) {
+      const validTables = ['indicators', 'feeds', 'lookup_log'];
+      if (!validTables.includes(table)) {
+        return NextResponse.json({ error: `Invalid table. Use: ${validTables.join(', ')}` }, { status: 400 });
+      }
+
+      const countResult = await db.execute({ sql: `SELECT COUNT(*) as cnt FROM ${table}`, args: [] });
+      const totalRows = Number(countResult.rows[0]?.cnt ?? 0);
+      const totalPages = Math.ceil(totalRows / limit);
+
+      let orderBy = 'rowid';
+      if (table === 'indicators') orderBy = 'rowid';
+      if (table === 'feeds') orderBy = 'feed_id';
+      if (table === 'lookup_log') orderBy = 'timestamp DESC';
+
+      const rows = await db.execute({
+        sql: `SELECT * FROM ${table} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
+        args: [limit, offset],
+      });
+
+      return NextResponse.json({
+        version: '8.0',
+        export: {
+          table,
+          page,
+          limit,
+          total_rows: totalRows,
+          total_pages: totalPages,
+          rows_in_page: rows.rows.length,
+          has_more: page < totalPages,
+        },
+        rows: rows.rows,
+        duration_ms: Date.now() - startTime,
+      });
+    }
+
+    // Default: lightweight integrity check
+    const errors: string[] = [];
     const indicatorCount = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM indicators', args: [] });
     const feedCount = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM feeds', args: [] });
 
@@ -47,7 +88,6 @@ export async function GET(request: NextRequest) {
       lookup_log: Number(lookupLogCount.rows[0]?.cnt ?? 0),
     };
 
-    // 2. Integrity checks
     const integrityChecks: string[] = [];
     if (counts.indicators === 0) errors.push('indicators table is empty');
     else integrityChecks.push(`indicators: ${counts.indicators} rows`);
@@ -55,27 +95,12 @@ export async function GET(request: NextRequest) {
     else integrityChecks.push(`feeds: ${counts.feeds} rows`);
     integrityChecks.push(`lookup_log: ${counts.lookup_log} rows`);
 
-    // 3. Sample check - verify a few rows are readable
     const sampleIndicator = await db.execute({ sql: 'SELECT value_normalized, source_feed FROM indicators LIMIT 1', args: [] });
     if (sampleIndicator.rows.length === 0) errors.push('Cannot read from indicators');
     else integrityChecks.push('sample read: OK');
 
-    // 4. Optional full export
-    let data: any = { counts };
-    if (fullExport) {
-      const indicators = await db.execute({ sql: 'SELECT * FROM indicators ORDER BY source_feed, value_normalized', args: [] });
-      const feeds = await db.execute({ sql: 'SELECT * FROM feeds ORDER BY feed_id', args: [] });
-      const lookupLog = await db.execute({ sql: 'SELECT * FROM lookup_log ORDER BY timestamp DESC LIMIT 1000', args: [] });
-      data = {
-        counts,
-        indicators: { count: indicators.rows.length, rows: indicators.rows },
-        feeds: { count: feeds.rows.length, rows: feeds.rows },
-        lookup_log: { count: lookupLog.rows.length, rows: lookupLog.rows, note: 'Last 1000 entries' },
-      };
-    }
-
-    const backup = {
-      version: '7.0',
+    return NextResponse.json({
+      version: '8.0',
       timestamp: new Date().toISOString(),
       duration_ms: Date.now() - startTime,
       integrity: {
@@ -83,10 +108,18 @@ export async function GET(request: NextRequest) {
         checks: integrityChecks,
         errors,
       },
-      data,
-    };
-
-    return NextResponse.json(backup);
+      data: {
+        counts,
+        export_guide: {
+          description: 'Use ?table= parameter for paginated data export',
+          examples: [
+            '/api/v1/threat-intel/backup?table=indicators&page=1&limit=5000',
+            '/api/v1/threat-intel/backup?table=feeds',
+            '/api/v1/threat-intel/backup?table=lookup_log&page=1',
+          ],
+        },
+      },
+    });
   } catch (e: any) {
     return NextResponse.json({
       error: 'Backup failed',
