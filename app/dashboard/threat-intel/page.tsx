@@ -1,6 +1,6 @@
 // app/dashboard/threat-intel/page.tsx
-// Phase 10 - Enterprise Threat Intelligence Dashboard
-// Added: MITRE ATT&CK Map, Dark Web Monitor, Threat Intel Feed, Vulnerability Scanner
+// Phase 12 - Full Enterprise Threat Intelligence Dashboard
+// Added: AI Threat Analysis, AI Report Generator, Smart Alert Triage, Campaign Tracker, Geo Threat Map, Compliance Audit Log, Threat Hunting Workbench
 'use client';
 import React, { useState } from 'react';
 import { useEnrichIOC, useFeedStatus, useInitStatus, useEnrichHistory } from '@/lib/threat-intel-hooks';
@@ -20,6 +20,13 @@ import { MitreAttackMap } from '@/components/threat-intel/mitre-attack-map';
 import { DarkWebMonitor } from '@/components/threat-intel/dark-web-monitor';
 import { ThreatIntelFeed } from '@/components/threat-intel/threat-intel-feed';
 import { VulnerabilityScanner } from '@/components/threat-intel/vulnerability-scanner';
+import { ThreatCampaignTracker } from '@/components/threat-intel/threat-campaign-tracker';
+import { GeoThreatMap } from '@/components/threat-intel/geo-threat-map';
+import { ComplianceAuditLog } from '@/components/threat-intel/compliance-audit-log';
+import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
+import SmartAlertTriage from '@/components/threat-intel/smart-alert-triage';
+import AIThreatAnalysis from '@/components/threat-intel/ai-threat-analysis';
+import AIReportGenerator from '@/components/threat-intel/ai-report-generator';
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
 const ROLES: { key: Role; label: string; desc: string }[] = [
@@ -153,6 +160,7 @@ export default function ThreatIntelDashboard() {
                     { method: 'GET', path: '/api/v1/threat-intel/export?format=csv', desc: 'Export IOCs' },
                     { method: 'GET', path: '/api/v1/threat-intel/ai-brief', desc: 'AI Threat Brief' },
                     { method: 'POST', path: '/api/v1/threat-intel/ai-analyze', desc: 'AI IOC Analysis' },
+                    { method: 'POST', path: '/api/v1/threat-intel/ai-report', desc: 'AI Report Generator' },
                   ].map((ep, i) => (
                     <div key={i} className="ti-api-row">
                       <span className="ti-api-method" style={{ background: ep.method === 'POST' ? '#eab30822' : '#22c55e22', color: ep.method === 'POST' ? '#eab308' : '#22c55e' }}>{ep.method}</span>
@@ -171,7 +179,7 @@ export default function ThreatIntelDashboard() {
           </div>
         </div>
 
-        {/* Phase 10: New Enterprise Components */}
+        {/* Phase 10: Enterprise Components */}
         <div className="ti-full-width">
           {(role === 'soc' || role === 'ciso') && <MitreAttackMap />}
           {(role === 'soc' || role === 'ciso') && (
@@ -181,6 +189,25 @@ export default function ThreatIntelDashboard() {
             </div>
           )}
           {(role === 'soc' || role === 'admin') && <VulnerabilityScanner />}
+        </div>
+
+        {/* Phase 11: Advanced Enterprise Components */}
+        <div className="ti-full-width">
+          {(role === 'soc' || role === 'ciso') && <ThreatCampaignTracker />}
+          {(role === 'soc' || role === 'ciso') && (
+            <div className="ti-two-col">
+              <GeoThreatMap />
+              <ThreatHuntingWorkbench />
+            </div>
+          )}
+          {(role === 'compliance' || role === 'ciso') && <ComplianceAuditLog />}
+        </div>
+
+        {/* Phase 12: AI-Powered Analytics & Smart Triage */}
+        <div className="ti-full-width">
+          {(role === 'soc' || role === 'ciso') && <AIThreatAnalysis />}
+          {(role === 'soc' || role === 'ciso') && <AIReportGenerator />}
+          {(role === 'soc' || role === 'admin') && <SmartAlertTriage />}
         </div>
       </div>
     </ThreatIntelProvider>
