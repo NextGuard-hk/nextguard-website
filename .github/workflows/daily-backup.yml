@@ -3,7 +3,16 @@ name: Daily Backup (7-day retention)
 on:
   schedule:
     - cron: '0 16 * * *'  # 4PM UTC = midnight HKT
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      full_export:
+        description: 'Run full data export (paginated)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   backup:
@@ -22,10 +31,8 @@ jobs:
           TAG_NAME="backup-${DATE}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Delete existing tag for today if re-running
           git tag -d "$TAG_NAME" 2>/dev/null || true
           git push origin --delete "$TAG_NAME" 2>/dev/null || true
-          # Create new backup tag
           git tag -a "$TAG_NAME" -m "Daily backup ${DATE}"
           git push origin "$TAG_NAME"
           echo "Created backup tag: $TAG_NAME"
@@ -34,7 +41,6 @@ jobs:
         run: |
           echo "Cleaning up backup tags older than 7 days..."
           CUTOFF_DATE=$(date -d '7 days ago' +'%Y-%m-%d')
-          echo "Cutoff date: $CUTOFF_DATE"
           git tag -l 'backup-*' | while read tag; do
             TAG_DATE=$(echo "$tag" | sed 's/backup-//')
             if [[ "$TAG_DATE" < "$CUTOFF_DATE" ]]; then
@@ -45,11 +51,10 @@ jobs:
               echo "Keeping backup: $tag"
             fi
           done
-          echo "Cleanup complete."
 
-      - name: Backup Turso threat-intel DB
+      - name: Backup Turso threat-intel DB (integrity check)
         run: |
-          echo "Running Turso DB backup with integrity checks..."
+          echo "Running Turso DB integrity check..."
           RESPONSE=$(curl -s -o turso-backup.json -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
             "https://www.next-guard.com/api/v1/threat-intel/backup")
@@ -64,8 +69,51 @@ jobs:
             echo "::error::Turso DB integrity check found $ERRORS errors"
             exit 1
           fi
-          echo "Turso DB backup verified successfully"
-          cat turso-backup.json | jq '{version: .version, timestamp: .timestamp, duration_ms: .duration_ms, integrity: .integrity.status, indicators: .data.indicators.count, feeds: .data.feeds.count}'
+          echo "Turso DB integrity verified"
+
+      - name: Full data export (paginated)
+        if: github.event.inputs.full_export == 'true'
+        run: |
+          echo "Starting full paginated export..."
+          DATE=$(date +'%Y-%m-%d')
+          mkdir -p backups/full-export
+
+          # Export feeds (small table, single page)
+          echo "Exporting feeds..."
+          curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+            "https://www.next-guard.com/api/v1/threat-intel/backup?table=feeds" \
+            > backups/full-export/feeds-${DATE}.json
+          echo "Feeds exported: $(cat backups/full-export/feeds-${DATE}.json | jq '.export.total_rows') rows"
+
+          # Export lookup_log
+          echo "Exporting lookup_log..."
+          curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+            "https://www.next-guard.com/api/v1/threat-intel/backup?table=lookup_log&limit=10000" \
+            > backups/full-export/lookup_log-${DATE}.json
+          echo "Lookup log exported: $(cat backups/full-export/lookup_log-${DATE}.json | jq '.export.rows_in_page') rows"
+
+          # Export indicators (large table, paginated)
+          echo "Exporting indicators (paginated)..."
+          PAGE=1
+          TOTAL_EXPORTED=0
+          while true; do
+            echo "  Fetching page $PAGE..."
+            curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+              "https://www.next-guard.com/api/v1/threat-intel/backup?table=indicators&page=${PAGE}&limit=5000" \
+              > backups/full-export/indicators-${DATE}-page${PAGE}.json
+
+            ROWS=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq '.export.rows_in_page')
+            HAS_MORE=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq '.export.has_more')
+            TOTAL_EXPORTED=$((TOTAL_EXPORTED + ROWS))
+            echo "  Page $PAGE: $ROWS rows (total so far: $TOTAL_EXPORTED)"
+
+            if [ "$HAS_MORE" != "true" ]; then
+              break
+            fi
+            PAGE=$((PAGE + 1))
+            sleep 1
+          done
+          echo "Full indicator export complete: $TOTAL_EXPORTED rows in $PAGE pages"
 
       - name: Backup npoint.io databases
         run: |
@@ -74,9 +122,13 @@ jobs:
           curl -s "${{ secrets.NPOINT_CONTACTS_URL }}" > backups/contacts-${DATE}.json
           curl -s "${{ secrets.NPOINT_RSVP_URL }}" > backups/rsvp-${DATE}.json
           curl -s "${{ secrets.NPOINT_LOGS_URL }}" > backups/logs-${DATE}.json
-          cp turso-backup.json backups/turso-threat-intel-${DATE}.json
+          cp turso-backup.json backups/turso-integrity-${DATE}.json
           echo "Database backups saved:"
           ls -la backups/
+          if [ -d "backups/full-export" ]; then
+            echo "Full export files:"
+            ls -la backups/full-export/
+          fi
 
       - name: Upload database backups as artifact
         uses: actions/upload-artifact@v4
