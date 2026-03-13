@@ -136,35 +136,29 @@ jobs:
           path: backups/
           retention-days: 7
 
-  # Send alert email if backup fails
+  # Send alert email via NextGuard Resend API if backup fails
   notify-failure:
     runs-on: ubuntu-latest
     needs: backup
     if: failure()
     steps:
-      - name: Send failure alert email
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.ALERT_EMAIL_USERNAME }}
-          password: ${{ secrets.ALERT_EMAIL_PASSWORD }}
-          subject: "Important - TURSO DB Backup Failed"
-          to: oscar@next-guard.com
-          from: NextGuard Backup Alert <${{ secrets.ALERT_EMAIL_USERNAME }}>
-          body: |
-            ⚠️ TURSO DB Daily Backup Failed
-
-            The daily backup job for NextGuard Threat Intelligence database has FAILED.
-
-            Details:
-            - Workflow: ${{ github.workflow }}
-            - Run ID: ${{ github.run_id }}
-            - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            - Triggered: ${{ github.event_name }}
-            - Time (UTC): ${{ github.event.head_commit.timestamp || github.run_started_at }}
-
-            Please investigate immediately. The Turso DB is critical infrastructure.
-
-            — NextGuard Automated Monitoring
+      - name: Send failure alert email via NextGuard API
+        run: |
+          echo "Backup failed! Sending alert email to oscar@next-guard.com..."
+          RESPONSE=$(curl -s -o alert-response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "run_id": "${{ github.run_id }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "error_message": "Daily backup workflow failed. Check the run logs for details."
+            }' \
+            "https://www.next-guard.com/api/v1/threat-intel/backup-alert")
+          echo "Alert API Response (HTTP $RESPONSE):"
+          cat alert-response.json | jq . 2>/dev/null || cat alert-response.json
+          if [ "$RESPONSE" != "200" ]; then
+            echo "::warning::Failed to send alert email (HTTP $RESPONSE)"
+          else
+            echo "Alert email sent successfully to oscar@next-guard.com"
+          fi
