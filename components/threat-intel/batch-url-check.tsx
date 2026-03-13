@@ -1,11 +1,13 @@
 'use client';
-
 import React, { useState } from 'react';
 
 interface BatchResult {
   domain: string;
   verdict: string;
   riskLevel: string;
+  threatScore: number;
+  riskLabel: string;
+  scoreBreakdown: { ioc_match: number; category_risk: number; domain_signals: number; confidence_boost: number } | null;
   categories: string[];
   sources: string[];
   categorySource: string;
@@ -42,6 +44,9 @@ export default function BatchUrlCheck() {
           domain: url,
           verdict: data.verdict || 'Unknown',
           riskLevel: data.risk_level || 'unknown',
+          threatScore: data.threat_score ?? 0,
+          riskLabel: data.risk_label || 'clean',
+          scoreBreakdown: data.score_breakdown || null,
           categories: data.categories || [],
           sources: sources.length > 0 ? sources : (data.sources_hit || []),
           categorySource: data.category_source || 'unknown',
@@ -51,6 +56,9 @@ export default function BatchUrlCheck() {
           domain: url,
           verdict: 'Error',
           riskLevel: 'unknown',
+          threatScore: 0,
+          riskLabel: 'unknown',
+          scoreBreakdown: null,
           categories: [],
           sources: [],
           categorySource: 'error',
@@ -64,11 +72,13 @@ export default function BatchUrlCheck() {
   };
 
   const exportCSV = () => {
-    const header = 'Domain,Verdict,Risk Level,Categories,Category Source,Sources';
+    const header = 'Domain,Verdict,Threat Score,Risk Label,Risk Level,Categories,Category Source,Sources';
     const rows = results.map((r) =>
       [
         r.domain,
         r.verdict,
+        r.threatScore,
+        r.riskLabel,
         r.riskLevel,
         r.categories.join('; '),
         r.categorySource,
@@ -92,6 +102,14 @@ export default function BatchUrlCheck() {
       case 'clean': return '#00cc66';
       default: return '#888888';
     }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 86) return '#ff4444';
+    if (score >= 61) return '#ff6600';
+    if (score >= 36) return '#ffaa00';
+    if (score >= 16) return '#f0e040';
+    return '#00cc66';
   };
 
   const getRiskColor = (level: string) => {
@@ -201,7 +219,7 @@ export default function BatchUrlCheck() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #21262d' }}>
-                {['Domain', 'Verdict', 'Risk Level', 'Categories', 'Category Source', 'Sources'].map((h) => (
+                {['Domain', 'Verdict', 'Threat Score', 'Risk Level', 'Categories', 'Category Source', 'Sources'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#8b949e', fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
@@ -214,6 +232,24 @@ export default function BatchUrlCheck() {
                     <span style={{ color: getVerdictColor(r.verdict), fontWeight: 600 }}>
                       {r.verdict}
                     </span>
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '60px', height: '8px', background: '#21262d', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${r.threatScore}%`, height: '100%', background: getScoreColor(r.threatScore), borderRadius: '4px', transition: 'width 0.3s' }} />
+                      </div>
+                      <span style={{ color: getScoreColor(r.threatScore), fontWeight: 700, fontSize: '14px', minWidth: '24px' }}>
+                        {r.threatScore}
+                      </span>
+                      <span style={{ color: '#6e7681', fontSize: '11px' }}>
+                        {r.riskLabel}
+                      </span>
+                    </div>
+                    {r.scoreBreakdown && (
+                      <div style={{ fontSize: '10px', color: '#484f58', marginTop: '2px' }}>
+                        IOC:{r.scoreBreakdown.ioc_match} Cat:{r.scoreBreakdown.category_risk} Dom:{r.scoreBreakdown.domain_signals} Conf:{r.scoreBreakdown.confidence_boost}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '8px 12px' }}>
                     <span style={{ color: getRiskColor(r.riskLevel), fontWeight: 500 }}>
