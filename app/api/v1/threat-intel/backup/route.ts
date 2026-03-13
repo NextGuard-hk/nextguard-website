@@ -1,8 +1,8 @@
 // app/api/v1/threat-intel/backup/route.ts
-// NextGuard Turso DB Backup API v8.1
+// NextGuard Turso DB Backup API v8.3
 // Default: lightweight integrity check + row counts
 // Paginated export: ?table=indicators&page=1&limit=1000
-// Full single-table: ?table=feeds (small tables exported in one go)
+// Full single-table: ?table=feeds (small tables)
 // Protected by CRON_SECRET or TI_ADMIN_KEY
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,6 +21,13 @@ function isAuthorized(request: NextRequest): boolean {
   if (!cronSecret && !adminKey) return true;
   return false;
 }
+
+// Explicit column lists to avoid SELECT * issues with schema mismatches
+const TABLE_COLUMNS: Record<string, string> = {
+  indicators: 'id, type, value, value_normalized, risk_level, confidence, tlp, categories, tags, description, source_feed, source_ref, first_seen, last_seen, valid_from, valid_until, kill_chain_phase, threat_actor, campaign, hit_count, last_hit_at, is_active, created_at, updated_at',
+  feeds: 'id, name, url, feed_type, indicator_type, parser, is_active, enabled, refresh_interval_min, last_refresh, last_success, last_error, entries_count, total_ingested, avg_refresh_ms, status, config, created_at, updated_at',
+  lookup_log: 'id, indicator_value, indicator_type, result_risk_level, sources_hit, sources_checked, lookup_ms, client_ip, created_at',
+};
 
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
@@ -45,17 +52,15 @@ export async function GET(request: NextRequest) {
       const totalRows = Number(countResult.rows[0]?.cnt ?? 0);
       const totalPages = Math.ceil(totalRows / limit);
 
-      let orderBy = 'rowid';
-      if (table === 'feeds') orderBy = 'feed_id';
-      if (table === 'lookup_log') orderBy = 'timestamp DESC';
-
+      // Use explicit columns instead of SELECT * to avoid schema mismatch errors
+      const columns = TABLE_COLUMNS[table] || '*';
       const rows = await db.execute({
-        sql: `SELECT * FROM ${table} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
+        sql: `SELECT ${columns} FROM ${table} LIMIT ? OFFSET ?`,
         args: [limit, offset],
       });
 
       return NextResponse.json({
-        version: '8.1',
+        version: '8.3',
         export: {
           table,
           page,
@@ -74,7 +79,6 @@ export async function GET(request: NextRequest) {
     const errors: string[] = [];
     const indicatorCount = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM indicators', args: [] });
     const feedCount = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM feeds', args: [] });
-
     let lookupLogCount = { rows: [{ cnt: 0 }] };
     try {
       lookupLogCount = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM lookup_log', args: [] });
@@ -98,7 +102,7 @@ export async function GET(request: NextRequest) {
     else integrityChecks.push('sample read: OK');
 
     return NextResponse.json({
-      version: '8.1',
+      version: '8.3',
       timestamp: new Date().toISOString(),
       duration_ms: Date.now() - startTime,
       integrity: {
@@ -106,17 +110,7 @@ export async function GET(request: NextRequest) {
         checks: integrityChecks,
         errors,
       },
-      data: {
-        counts,
-        export_guide: {
-          description: 'Use ?table= for paginated export (max 2000 rows/page)',
-          examples: [
-            '/api/v1/threat-intel/backup?table=indicators&page=1&limit=1000',
-            '/api/v1/threat-intel/backup?table=feeds',
-            '/api/v1/threat-intel/backup?table=lookup_log',
-          ],
-        },
-      },
+      data: { counts },
     });
   } catch (e: any) {
     return NextResponse.json({
