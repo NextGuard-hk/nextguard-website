@@ -1,6 +1,6 @@
 // app/dashboard/threat-intel/page.tsx
-// Phase 8 — Enterprise Threat Intelligence Dashboard with Role-Based Views
-// Uses ThreatIntelProvider to deduplicate API calls
+// Phase 9 - AI-Enhanced Enterprise Threat Intelligence Dashboard
+// Added: AI Threat Brief + AI IOC Analyzer
 'use client';
 import React, { useState } from 'react';
 import { useEnrichIOC, useFeedStatus, useInitStatus, useEnrichHistory } from '@/lib/threat-intel-hooks';
@@ -14,6 +14,8 @@ import KPICards from '@/components/threat-intel/kpi-cards';
 import ThreatTrendChart from '@/components/threat-intel/threat-trend-chart';
 import PyramidOfPain from '@/components/threat-intel/pyramid-of-pain';
 import LiveActivityFeed from '@/components/threat-intel/live-activity-feed';
+import AIThreatBrief from '@/components/threat-intel/ai-threat-brief';
+import AIIOCAnalyzer from '@/components/threat-intel/ai-ioc-analyzer';
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
 const ROLES: { key: Role; label: string; desc: string }[] = [
@@ -63,7 +65,6 @@ export default function ThreatIntelDashboard() {
     <ThreatIntelProvider>
       <style>{dashStyles}</style>
       <div className="ti-dashboard">
-        {/* Header + Role Switcher */}
         <div className="ti-header">
           <div>
             <h1>Threat Intelligence Dashboard</h1>
@@ -77,8 +78,6 @@ export default function ThreatIntelDashboard() {
             ))}
           </div>
         </div>
-
-        {/* Phase Status Bar */}
         {initStatus && (
           <div className="ti-phase-bar">
             {Object.entries(initStatus.phases).map(([key, phase]) => (
@@ -94,11 +93,8 @@ export default function ThreatIntelDashboard() {
             ))}
           </div>
         )}
-
-        {/* KPI Cards */}
+        {(role === 'ciso' || role === 'soc') && <AIThreatBrief />}
         <KPICards />
-
-        {/* Main Layout */}
         <div className="ti-main-grid">
           <div className="ti-left-col">
             {(role === 'ciso' || role === 'soc' || role === 'admin') && <ThreatTrendChart />}
@@ -114,6 +110,7 @@ export default function ThreatIntelDashboard() {
                 <IOCEnrichmentForm onEnrich={handleEnrich} loading={loading} />
                 {error && <div className="ti-error">{error}</div>}
                 {result && <EnrichmentResults result={result} />}
+                {result && <AIIOCAnalyzer ioc={result.ioc} ioc_type={result.ioc_type} enrichment={result} />}
               </>
             )}
             {role === 'soc' && history.length > 0 && (
@@ -150,6 +147,8 @@ export default function ThreatIntelDashboard() {
                     { method: 'GET', path: '/api/v1/threat-intel/health', desc: 'Platform health check' },
                     { method: 'GET', path: '/api/v1/threat-intel/stats', desc: 'Threat intel statistics' },
                     { method: 'GET', path: '/api/v1/threat-intel/export?format=csv', desc: 'Export IOCs' },
+                    { method: 'GET', path: '/api/v1/threat-intel/ai-brief', desc: 'AI Threat Brief' },
+                    { method: 'POST', path: '/api/v1/threat-intel/ai-analyze', desc: 'AI IOC Analysis' },
                   ].map((ep, i) => (
                     <div key={i} className="ti-api-row">
                       <span className="ti-api-method" style={{ background: ep.method === 'POST' ? '#eab30822' : '#22c55e22', color: ep.method === 'POST' ? '#eab308' : '#22c55e' }}>{ep.method}</span>
