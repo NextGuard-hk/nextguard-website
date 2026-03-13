@@ -1,6 +1,6 @@
 // app/dashboard/threat-intel/page.tsx
-// Phase 9 - AI-Enhanced Enterprise Threat Intelligence Dashboard
-// Added: AI Threat Brief + AI IOC Analyzer
+// Phase 10 - Enterprise Threat Intelligence Dashboard
+// Added: MITRE ATT&CK Map, Dark Web Monitor, Threat Intel Feed, Vulnerability Scanner
 'use client';
 import React, { useState } from 'react';
 import { useEnrichIOC, useFeedStatus, useInitStatus, useEnrichHistory } from '@/lib/threat-intel-hooks';
@@ -16,6 +16,10 @@ import PyramidOfPain from '@/components/threat-intel/pyramid-of-pain';
 import LiveActivityFeed from '@/components/threat-intel/live-activity-feed';
 import AIThreatBrief from '@/components/threat-intel/ai-threat-brief';
 import AIIOCAnalyzer from '@/components/threat-intel/ai-ioc-analyzer';
+import { MitreAttackMap } from '@/components/threat-intel/mitre-attack-map';
+import { DarkWebMonitor } from '@/components/threat-intel/dark-web-monitor';
+import { ThreatIntelFeed } from '@/components/threat-intel/threat-intel-feed';
+import { VulnerabilityScanner } from '@/components/threat-intel/vulnerability-scanner';
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
 const ROLES: { key: Role; label: string; desc: string }[] = [
@@ -49,6 +53,7 @@ const dashStyles = `
   .ti-api-path { color: #60a5fa; font-size: 11px; font-family: monospace; word-break: break-all; min-width: 0; }
   .ti-api-desc { color: #666; font-size: 10px; margin-left: auto; white-space: nowrap; }
   .ti-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ti-full-width { max-width: 1400px; margin: 20px auto 0 auto; display: flex; flex-direction: column; gap: 16px; }
   @media (max-width: 900px) { .ti-main-grid { grid-template-columns: 1fr; } .ti-two-col { grid-template-columns: 1fr; } }
   @media (max-width: 480px) { .ti-dashboard { padding: 68px 12px 12px 12px; } .ti-header h1 { font-size: 20px; } .ti-api-desc { display: none; } .ti-phase-bar { gap: 6px; } }
 `;
@@ -60,7 +65,6 @@ export default function ThreatIntelDashboard() {
   const { history, add, clear } = useEnrichHistory();
   const handleEnrich = async (ioc: string, iocType?: string) => { await enrich(ioc, iocType); };
   React.useEffect(() => { if (result) add(result); }, [result, add]);
-
   return (
     <ThreatIntelProvider>
       <style>{dashStyles}</style>
@@ -165,6 +169,18 @@ export default function ThreatIntelDashboard() {
             {(role === 'admin' || role === 'soc' || role === 'compliance') && <FeedStatusPanel />}
             {role === 'compliance' && <LiveActivityFeed />}
           </div>
+        </div>
+
+        {/* Phase 10: New Enterprise Components */}
+        <div className="ti-full-width">
+          {(role === 'soc' || role === 'ciso') && <MitreAttackMap />}
+          {(role === 'soc' || role === 'ciso') && (
+            <div className="ti-two-col">
+              <ThreatIntelFeed />
+              <DarkWebMonitor />
+            </div>
+          )}
+          {(role === 'soc' || role === 'admin') && <VulnerabilityScanner />}
         </div>
       </div>
     </ThreatIntelProvider>
