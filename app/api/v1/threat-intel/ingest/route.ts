@@ -1,8 +1,8 @@
 // app/api/v1/threat-intel/ingest/route.ts
-// NextGuard Threat Intel v5.1 - Feed Ingestion API
+// NextGuard Threat Intel v6.0 - Feed Ingestion API
 // Fetches all OSINT feeds and writes IOCs to Turso DB
 // Called by Vercel Cron or manually via POST
-// v5.1: Added PhishStats feed, increased ingest limits for better coverage
+// v6.0: Added MalwareBazaar, AbuseIPDB, URLScan feeds, increased coverage
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestIndicators, expireOldIndicators } from '@/lib/threat-intel-db';
@@ -12,7 +12,7 @@ async function fetchTextLines(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(20000),
-      headers: { 'User-Agent': 'NextGuard-ThreatIntel/5.1' },
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/6.0' },
     });
     if (!res.ok) return [];
     const text = await res.text();
@@ -82,13 +82,13 @@ async function ingestPhishTank(): Promise<number> {
   return 0;
 }
 
-// NEW v5.1: Parse PhishStats - recent phishing URLs
+// Parse PhishStats - recent phishing URLs
 async function ingestPhishStats(): Promise<number> {
   const indicators: { value: string; type: string; description: string }[] = [];
   try {
     const res = await fetch('https://phishstats.info/phish_score.csv', {
       signal: AbortSignal.timeout(20000),
-      headers: { 'User-Agent': 'NextGuard-ThreatIntel/5.1' },
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/6.0' },
     });
     if (!res.ok) return 0;
     const text = await res.text();
@@ -198,6 +198,105 @@ async function ingestDisposableEmails(): Promise<number> {
   return added + updated;
 }
 
+// NEW v6.0: Parse MalwareBazaar - recent malware hashes and hosting domains
+async function ingestMalwareBazaar(): Promise<number> {
+  const indicators: { value: string; type: string; description: string }[] = [];
+  try {
+    const res = await fetch('https://bazaar.abuse.ch/export/txt/md5/recent/', {
+      signal: AbortSignal.timeout(20000),
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/6.0' },
+    });
+    if (!res.ok) return 0;
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      const l = line.trim().toLowerCase();
+      if (!l || l.startsWith('#') || l.length < 32) continue;
+      if (/^[a-f0-9]{32}$/.test(l)) {
+        indicators.push({ value: l, type: 'file-hash-md5', description: 'MalwareBazaar recent malware' });
+      }
+    }
+  } catch {}
+  // Also fetch hosting domains
+  try {
+    const res2 = await fetch('https://bazaar.abuse.ch/export/txt/domain/recent/', {
+      signal: AbortSignal.timeout(20000),
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/6.0' },
+    });
+    if (res2.ok) {
+      const text2 = await res2.text();
+      for (const line of text2.split('\n')) {
+        const l = line.trim().toLowerCase();
+        if (!l || l.startsWith('#')) continue;
+        if (l.includes('.') && l.length > 3) {
+          indicators.push({ value: l, type: 'domain', description: 'MalwareBazaar hosting domain' });
+        }
+      }
+    }
+  } catch {}
+  if (indicators.length === 0) return 0;
+  const { added, updated } = await ingestIndicators('malware_bazaar', indicators);
+  return added + updated;
+}
+
+// NEW v6.0: Parse AbuseIPDB - blacklisted IPs (public feed)
+async function ingestAbuseIPDB(): Promise<number> {
+  const indicators: { value: string; type: string; description: string }[] = [];
+  const apiKey = process.env.ABUSEIPDB_API_KEY;
+  if (!apiKey) {
+    // Fallback to public blocklist mirror
+    const lines = await fetchTextLines('https://raw.githubusercontent.com/borestad/blocklist-abuseipdb/main/abuseipdb-s100-all.ipv4');
+    const inds = lines
+      .filter(l => /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(l))
+      .map(l => ({ value: l, type: 'ipv4-addr', description: 'AbuseIPDB high-confidence IP' }));
+    if (inds.length === 0) return 0;
+    const { added, updated } = await ingestIndicators('abuseipdb', inds);
+    return added + updated;
+  }
+  try {
+    const res = await fetch('https://api.abuseipdb.com/api/v2/blacklist?confidenceMinimum=90&limit=10000', {
+      signal: AbortSignal.timeout(30000),
+      headers: { 'Key': apiKey, 'Accept': 'text/plain' },
+    });
+    if (!res.ok) return 0;
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      const ip = line.trim();
+      if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+        indicators.push({ value: ip, type: 'ipv4-addr', description: 'AbuseIPDB blacklisted IP (confidence>=90)' });
+      }
+    }
+  } catch {}
+  if (indicators.length === 0) return 0;
+  const { added, updated } = await ingestIndicators('abuseipdb', indicators);
+  return added + updated;
+}
+
+// NEW v6.0: Parse URLScan.io - recent malicious URLs
+async function ingestURLScan(): Promise<number> {
+  const indicators: { value: string; type: string; description: string }[] = [];
+  try {
+    const res = await fetch('https://urlscan.io/api/v1/search/?q=task.tags:phishing%20AND%20date:>now-7d&size=1000', {
+      signal: AbortSignal.timeout(20000),
+      headers: { 'User-Agent': 'NextGuard-ThreatIntel/6.0' },
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    if (data.results) {
+      for (const r of data.results) {
+        try {
+          const hostname = new URL(r.task?.url || r.page?.url || '').hostname.replace(/^www\./, '').toLowerCase();
+          if (hostname && hostname.includes('.')) {
+            indicators.push({ value: hostname, type: 'domain', description: 'URLScan.io phishing detection' });
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+  if (indicators.length === 0) return 0;
+  const { added, updated } = await ingestIndicators('urlscan', indicators);
+  return added + updated;
+}
+
 // Verify cron or API key auth
 function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
@@ -214,11 +313,9 @@ export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
   const feedParam = request.nextUrl.searchParams.get('feed');
   const startTime = Date.now();
   const results: Record<string, any> = {};
-
   const feedFunctions: Record<string, () => Promise<number>> = {
     urlhaus: ingestUrlhaus,
     phishing_army: ingestPhishingArmy,
@@ -232,10 +329,11 @@ export async function GET(request: NextRequest) {
     blocklist_de: ingestBlocklistDe,
     emerging_threats: ingestEmergingThreats,
     disposable_emails: ingestDisposableEmails,
+    malware_bazaar: ingestMalwareBazaar,
+    abuseipdb: ingestAbuseIPDB,
+    urlscan: ingestURLScan,
   };
-
   const feedsToRun = feedParam ? [feedParam] : Object.keys(feedFunctions);
-
   // Run feeds in parallel (2 at a time to avoid timeout)
   for (let i = 0; i < feedsToRun.length; i += 2) {
     const chunk = feedsToRun.slice(i, i + 2);
@@ -250,9 +348,7 @@ export async function GET(request: NextRequest) {
       }
     }));
   }
-
   const expired = await expireOldIndicators();
-
   return NextResponse.json({
     success: true,
     message: 'Feed ingestion complete',
