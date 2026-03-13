@@ -1,7 +1,7 @@
 // app/api/v1/threat-intel/backup/route.ts
-// NextGuard Turso DB Backup API v8.0
+// NextGuard Turso DB Backup API v8.1
 // Default: lightweight integrity check + row counts
-// Paginated export: ?table=indicators&page=1&limit=5000
+// Paginated export: ?table=indicators&page=1&limit=1000
 // Full single-table: ?table=feeds (small tables exported in one go)
 // Protected by CRON_SECRET or TI_ADMIN_KEY
 
@@ -31,11 +31,10 @@ export async function GET(request: NextRequest) {
   const db = getDB();
   const table = request.nextUrl.searchParams.get('table');
   const page = parseInt(request.nextUrl.searchParams.get('page') || '1');
-  const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '5000'), 10000);
+  const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '1000'), 2000);
   const offset = (page - 1) * limit;
 
   try {
-    // If table specified, do paginated export
     if (table) {
       const validTables = ['indicators', 'feeds', 'lookup_log'];
       if (!validTables.includes(table)) {
@@ -47,7 +46,6 @@ export async function GET(request: NextRequest) {
       const totalPages = Math.ceil(totalRows / limit);
 
       let orderBy = 'rowid';
-      if (table === 'indicators') orderBy = 'rowid';
       if (table === 'feeds') orderBy = 'feed_id';
       if (table === 'lookup_log') orderBy = 'timestamp DESC';
 
@@ -57,7 +55,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({
-        version: '8.0',
+        version: '8.1',
         export: {
           table,
           page,
@@ -100,7 +98,7 @@ export async function GET(request: NextRequest) {
     else integrityChecks.push('sample read: OK');
 
     return NextResponse.json({
-      version: '8.0',
+      version: '8.1',
       timestamp: new Date().toISOString(),
       duration_ms: Date.now() - startTime,
       integrity: {
@@ -111,11 +109,11 @@ export async function GET(request: NextRequest) {
       data: {
         counts,
         export_guide: {
-          description: 'Use ?table= parameter for paginated data export',
+          description: 'Use ?table= for paginated export (max 2000 rows/page)',
           examples: [
-            '/api/v1/threat-intel/backup?table=indicators&page=1&limit=5000',
+            '/api/v1/threat-intel/backup?table=indicators&page=1&limit=1000',
             '/api/v1/threat-intel/backup?table=feeds',
-            '/api/v1/threat-intel/backup?table=lookup_log&page=1',
+            '/api/v1/threat-intel/backup?table=lookup_log',
           ],
         },
       },
