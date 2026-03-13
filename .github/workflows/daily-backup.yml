@@ -78,32 +78,36 @@ jobs:
           DATE=$(date +'%Y-%m-%d')
           mkdir -p backups/full-export
 
-          # Export feeds (small table, single page)
+          # Export feeds (small table)
           echo "Exporting feeds..."
           curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
             "https://www.next-guard.com/api/v1/threat-intel/backup?table=feeds" \
             > backups/full-export/feeds-${DATE}.json
-          echo "Feeds exported: $(cat backups/full-export/feeds-${DATE}.json | jq '.export.total_rows') rows"
+          FEED_ROWS=$(cat backups/full-export/feeds-${DATE}.json | jq -r '.export.total_rows // "error"')
+          echo "Feeds exported: $FEED_ROWS rows"
+          sleep 2
 
           # Export lookup_log
           echo "Exporting lookup_log..."
           curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-            "https://www.next-guard.com/api/v1/threat-intel/backup?table=lookup_log&limit=10000" \
+            "https://www.next-guard.com/api/v1/threat-intel/backup?table=lookup_log&limit=1000" \
             > backups/full-export/lookup_log-${DATE}.json
-          echo "Lookup log exported: $(cat backups/full-export/lookup_log-${DATE}.json | jq '.export.rows_in_page') rows"
+          LOG_ROWS=$(cat backups/full-export/lookup_log-${DATE}.json | jq -r '.export.rows_in_page // "error"')
+          echo "Lookup log exported: $LOG_ROWS rows"
+          sleep 2
 
-          # Export indicators (large table, paginated)
-          echo "Exporting indicators (paginated)..."
+          # Export indicators (large table, paginated with 1000 rows per page)
+          echo "Exporting indicators (paginated, 1000 rows/page)..."
           PAGE=1
           TOTAL_EXPORTED=0
           while true; do
             echo "  Fetching page $PAGE..."
             curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-              "https://www.next-guard.com/api/v1/threat-intel/backup?table=indicators&page=${PAGE}&limit=5000" \
+              "https://www.next-guard.com/api/v1/threat-intel/backup?table=indicators&page=${PAGE}&limit=1000" \
               > backups/full-export/indicators-${DATE}-page${PAGE}.json
 
-            ROWS=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq '.export.rows_in_page')
-            HAS_MORE=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq '.export.has_more')
+            ROWS=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq -r '.export.rows_in_page // "0"')
+            HAS_MORE=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq -r '.export.has_more // "false"')
             TOTAL_EXPORTED=$((TOTAL_EXPORTED + ROWS))
             echo "  Page $PAGE: $ROWS rows (total so far: $TOTAL_EXPORTED)"
 
@@ -111,7 +115,7 @@ jobs:
               break
             fi
             PAGE=$((PAGE + 1))
-            sleep 1
+            sleep 2
           done
           echo "Full indicator export complete: $TOTAL_EXPORTED rows in $PAGE pages"
 
