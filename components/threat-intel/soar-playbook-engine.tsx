@@ -129,7 +129,7 @@ export default function SOARPlaybookEngine() {
               <div className="soar-steps">
                 {pb.steps.map((s, i) => (
                   <React.Fragment key={i}>
-                    {i > 0 && <span className="soar-step-arrow">\u2192</span>}
+                    {i > 0 && <span className="soar-step-arrow">→</span>}
                     <span className={`soar-step ${s.status === 'done' ? 'soar-step-done' : ''}`}>{s.name}</span>
                   </React.Fragment>
                 ))}
