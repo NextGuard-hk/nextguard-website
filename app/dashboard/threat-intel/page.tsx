@@ -32,6 +32,8 @@ import SupplyChainRisk from '@/components/threat-intel/supply-chain-risk'
 import AdversaryProfiles from '@/components/threat-intel/adversary-profiles'
 import ExecutiveRiskDashboard from '@/components/threat-intel/executive-risk-dashboard'
 import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
+import ThreatCorrelationEngine from '@/components/threat-intel/threat-correlation-engine'
+import ISACIntegration from '@/components/threat-intel/isac-integration'
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
 const ROLES: { key: Role; label: string; desc: string }[] = [
@@ -219,6 +221,8 @@ export default function ThreatIntelDashboard() {
             {(role === 'soc' || role === 'ciso' || role === 'admin') && <SupplyChainRisk />}
             {(role === 'soc' || role === 'ciso') && <AdversaryProfiles />}
         {(role === 'ciso') && <ExecutiveRiskDashboard />}
+            {(role === 'soc' || role === 'ciso') && <ThreatCorrelationEngine />}
+{(role === 'soc' || role === 'ciso') && <ISACIntegration />}
           </div>
         </div>
       </div>
