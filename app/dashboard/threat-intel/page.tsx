@@ -16,7 +16,7 @@ import PyramidOfPain from '@/components/threat-intel/pyramid-of-pain';
 import LiveActivityFeed from '@/components/threat-intel/live-activity-feed';
 import AIThreatBrief from '@/components/threat-intel/ai-threat-brief';
 import AIIOCAnalyzer from '@/components/threat-intel/ai-ioc-analyzer';
-import { MitreAttackMap } from '@/components/threat-intel/mitre-attack-map';
+import MitreAttackMap from '@/components/threat-intel/mitre-attack-map';
 import { DarkWebMonitor } from '@/components/threat-intel/dark-web-monitor';
 import { ThreatIntelFeed } from '@/components/threat-intel/threat-intel-feed';
 import { VulnerabilityScanner } from '@/components/threat-intel/vulnerability-scanner';
