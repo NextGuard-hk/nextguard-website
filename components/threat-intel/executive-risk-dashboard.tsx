@@ -146,7 +146,7 @@ export default function ExecutiveRiskDashboard() {
               <div className="erd-metric-value" style={{ color: m.color }}>{m.value}{m.label === 'Coverage' || m.label === 'SLA Met' || m.label === 'False Pos' ? '%' : m.label === 'MTTD' ? 'min' : m.label === 'MTTR' ? 'min' : ''}</div>
               <div className="erd-metric-label">{m.label}</div>
               <div className="erd-metric-delta" style={{ color: m.trend === 'down' && m.label !== 'Coverage' ? '#22c55e' : m.trend === 'up' ? '#22c55e' : '#f59e0b' }}>
-                {m.trend === 'down' ? '\u2193' : m.trend === 'up' ? '\u2191' : '\u2192'} {m.delta}
+                {m.trend === 'down' ? '↓' : m.trend === 'up' ? '↑' : '→'} {m.delta}
               </div>
             </div>
           ))}
