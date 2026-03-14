@@ -26,9 +26,9 @@ import AIThreatAnalysis from '@/components/threat-intel/ai-threat-analysis';
 import AIReportGenerator from '@/components/threat-intel/ai-report-generator';
 import { GeoThreatMap } from '@/components/threat-intel/geo-threat-map';
 import { ComplianceAuditLog } from '@/components/threat-intel/compliance-audit-log';
-import { IncidentWarRoom } from '@/components/threat-intel/incident-war-room'
-import { SOARPlaybookEngine } from '@/components/threat-intel/soar-playbook-engine'
-import { SupplyChainRisk } from '@/components/threat-intel/supply-chain-risk'
+import IncidentWarRoom from '@/components/threat-intel/incident-war-room'
+import SOARPlaybookEngine from '@/components/threat-intel/soar-playbook-engine'
+import SupplyChainRisk from '@/components/threat-intel/supply-chain-risk'
 import AdversaryProfiles from '@/components/threat-intel/adversary-profiles'
 import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
 
