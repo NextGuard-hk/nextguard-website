@@ -35,7 +35,7 @@ const warRoomStyles = `
   .warroom-meta { display: flex; gap: 12px; color: #666; font-size: 10px; flex-wrap: wrap; }
   .warroom-meta span { color: #aaa; }
   .warroom-timeline { background: #12122a; border-radius: 10px; padding: 14px; border: 1px solid #2a2a4a; }
-  .warroom-timeline-title { color: '#e0e0e0'; font-size: 13px; font-weight: 600; margin: 0 0 10px 0; }
+  .warroom-timeline-title { color: #e0e0e0; font-size: 13px; font-weight: 600; margin: 0 0 10px 0; }
   .warroom-event { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid #1a1a3a; font-size: 11px; }
   .warroom-event-time { color: #666; min-width: 60px; font-family: monospace; font-size: 10px; }
   .warroom-event-actor { color: #22d3ee; min-width: 80px; }
@@ -71,7 +71,6 @@ export default function IncidentWarRoom() {
   const [incidents] = useState<Incident[]>(MOCK_INCIDENTS);
   const [selected, setSelected] = useState<string>(MOCK_INCIDENTS[0].id);
   const active = incidents.find(i => i.id === selected);
-
   return (
     <>
       <style>{warRoomStyles}</style>
@@ -83,9 +82,10 @@ export default function IncidentWarRoom() {
           </div>
           <div className="warroom-badge"><span className="pulse" /> {incidents.filter(i => i.status === 'active').length} Active</div>
         </div>
-
         <div className="warroom-incidents">
           {incidents.map(inc => (
+            <div key={inc.id} className={`warroom-incident ${selected === inc.id ? 'warroom-incident-active' : ''}`} onClick={() => setSelected(inc.id)}>
+              <div className="warroom-incident-header">
                 <h4 className="warroom-incident-title">{inc.id}: {inc.title}</h4>
                 <span className={`warroom-sev warroom-sev-${inc.severity}`}>{inc.severity}</span>
               </div>
@@ -98,7 +98,6 @@ export default function IncidentWarRoom() {
             </div>
           ))}
         </div>
-
         {active && (
           <div className="warroom-timeline">
             <h4 style={{ color: '#e0e0e0', fontSize: '13px', fontWeight: 600, margin: '0 0 10px 0' }}>Timeline: {active.id}</h4>
