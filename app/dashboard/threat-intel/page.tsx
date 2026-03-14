@@ -30,6 +30,7 @@ import IncidentWarRoom from '@/components/threat-intel/incident-war-room'
 import SOARPlaybookEngine from '@/components/threat-intel/soar-playbook-engine'
 import SupplyChainRisk from '@/components/threat-intel/supply-chain-risk'
 import AdversaryProfiles from '@/components/threat-intel/adversary-profiles'
+import ExecutiveRiskDashboard from '@/components/threat-intel/executive-risk-dashboard'
 import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
@@ -221,5 +222,6 @@ export default function ThreatIntelDashboard() {
         </div>
       </div>
     </ThreatIntelProvider>
+            {(role === 'ciso') && <ExecutiveRiskDashboard />}
   );
 }
