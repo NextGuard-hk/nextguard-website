@@ -34,6 +34,9 @@ import ExecutiveRiskDashboard from '@/components/threat-intel/executive-risk-das
 import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
 import ThreatCorrelationEngine from '@/components/threat-intel/threat-correlation-engine'
 import ISACIntegration from '@/components/threat-intel/isac-integration'
+import PredictiveThreatAnalytics from '@/components/threat-intel/predictive-threat-analytics'
+import DeceptionTechnology from '@/components/threat-intel/deception-technology'
+import MaturityScorecard from '@/components/threat-intel/maturity-scorecard'
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
 const ROLES: { key: Role; label: string; desc: string }[] = [
@@ -223,6 +226,10 @@ export default function ThreatIntelDashboard() {
         {(role === 'ciso') && <ExecutiveRiskDashboard />}
             {(role === 'soc' || role === 'ciso') && <ThreatCorrelationEngine />}
 {(role === 'soc' || role === 'ciso') && <ISACIntegration />}
+            {/* Phase 14: Predictive & Deception */}
+{(role === 'soc' || role === 'ciso') && <PredictiveThreatAnalytics />}
+{(role === 'soc' || role === 'ciso') && <DeceptionTechnology />}
+{(role === 'ciso' || role === 'compliance') && <MaturityScorecard />}
           </div>
         </div>
       </div>
