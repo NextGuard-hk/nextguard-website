@@ -218,10 +218,10 @@ export default function ThreatIntelDashboard() {
             {(role === 'soc' || role === 'ciso') && <SOARPlaybookEngine />}
             {(role === 'soc' || role === 'ciso' || role === 'admin') && <SupplyChainRisk />}
             {(role === 'soc' || role === 'ciso') && <AdversaryProfiles />}
+        {(role === 'ciso') && <ExecutiveRiskDashboard />}
           </div>
         </div>
       </div>
     </ThreatIntelProvider>
-            {(role === 'ciso') && <ExecutiveRiskDashboard />}
   );
 }
