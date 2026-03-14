@@ -1,6 +1,6 @@
 // app/dashboard/threat-intel/page.tsx
-// Phase 12 - Full Enterprise Threat Intelligence Dashboard
-// Added: AI Threat Analysis, AI Report Generator, Smart Alert Triage, Campaign Tracker, Geo Threat Map, Compliance Audit Log, Threat Hunting Workbench
+// Phase 11 - Full Enterprise Threat Intelligence Dashboard
+// Added: Campaign Tracker, Geo Threat Map, Compliance Audit Log, Threat Hunting Workbench
 'use client';
 import React, { useState } from 'react';
 import { useEnrichIOC, useFeedStatus, useInitStatus, useEnrichHistory } from '@/lib/threat-intel-hooks';
@@ -21,12 +21,16 @@ import { DarkWebMonitor } from '@/components/threat-intel/dark-web-monitor';
 import { ThreatIntelFeed } from '@/components/threat-intel/threat-intel-feed';
 import { VulnerabilityScanner } from '@/components/threat-intel/vulnerability-scanner';
 import { ThreatCampaignTracker } from '@/components/threat-intel/threat-campaign-tracker';
-import { GeoThreatMap } from '@/components/threat-intel/geo-threat-map';
-import { ComplianceAuditLog } from '@/components/threat-intel/compliance-audit-log';
-import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
 import SmartAlertTriage from '@/components/threat-intel/smart-alert-triage';
 import AIThreatAnalysis from '@/components/threat-intel/ai-threat-analysis';
 import AIReportGenerator from '@/components/threat-intel/ai-report-generator';
+import { GeoThreatMap } from '@/components/threat-intel/geo-threat-map';
+import { ComplianceAuditLog } from '@/components/threat-intel/compliance-audit-log';
+import { IncidentWarRoom } from '@/components/threat-intel/incident-war-room'
+import { SOARPlaybookEngine } from '@/components/threat-intel/soar-playbook-engine'
+import { SupplyChainRisk } from '@/components/threat-intel/supply-chain-risk'
+import AdversaryProfiles from '@/components/threat-intel/adversary-profiles'
+import { ThreatHuntingWorkbench } from '@/components/threat-intel/threat-hunting-workbench';
 
 type Role = 'soc' | 'ciso' | 'admin' | 'compliance';
 const ROLES: { key: Role; label: string; desc: string }[] = [
@@ -160,7 +164,6 @@ export default function ThreatIntelDashboard() {
                     { method: 'GET', path: '/api/v1/threat-intel/export?format=csv', desc: 'Export IOCs' },
                     { method: 'GET', path: '/api/v1/threat-intel/ai-brief', desc: 'AI Threat Brief' },
                     { method: 'POST', path: '/api/v1/threat-intel/ai-analyze', desc: 'AI IOC Analysis' },
-                    { method: 'POST', path: '/api/v1/threat-intel/ai-report', desc: 'AI Report Generator' },
                   ].map((ep, i) => (
                     <div key={i} className="ti-api-row">
                       <span className="ti-api-method" style={{ background: ep.method === 'POST' ? '#eab30822' : '#22c55e22', color: ep.method === 'POST' ? '#eab308' : '#22c55e' }}>{ep.method}</span>
@@ -200,14 +203,21 @@ export default function ThreatIntelDashboard() {
               <ThreatHuntingWorkbench />
             </div>
           )}
+          {role === 'soc' && <ThreatHuntingWorkbench />}
           {(role === 'compliance' || role === 'ciso') && <ComplianceAuditLog />}
-        </div>
 
-        {/* Phase 12: AI-Powered Analytics & Smart Triage */}
-        <div className="ti-full-width">
-          {(role === 'soc' || role === 'ciso') && <AIThreatAnalysis />}
-          {(role === 'soc' || role === 'ciso') && <AIReportGenerator />}
-          {(role === 'soc' || role === 'admin') && <SmartAlertTriage />}
+                    {/* Phase 12: AI-Powered Analytics & Smart Triage */}
+          <div className="ti-full-width">
+            {(role === 'soc' || role === 'ciso') && <AIThreatAnalysis />}
+            {(role === 'soc' || role === 'ciso') && <AIReportGenerator />}
+            {(role === 'soc' || role === 'admin') && <SmartAlertTriage />}
+
+                        {/* Phase 13: Incident Response & Supply Chain */}
+            {(role === 'soc' || role === 'ciso') && <IncidentWarRoom />}
+            {(role === 'soc' || role === 'ciso') && <SOARPlaybookEngine />}
+            {(role === 'soc' || role === 'ciso' || role === 'admin') && <SupplyChainRisk />}
+            {(role === 'soc' || role === 'ciso') && <AdversaryProfiles />}
+          </div>
         </div>
       </div>
     </ThreatIntelProvider>
