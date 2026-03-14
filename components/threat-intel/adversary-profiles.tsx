@@ -20,7 +20,7 @@ interface AdversaryGroup {
   references: { source_name: string; url?: string }[];
 }
 
-export function AdversaryProfiles() {
+export default function AdversaryProfiles() {
   const [groups, setGroups] = useState<AdversaryGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
