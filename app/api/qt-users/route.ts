@@ -3,7 +3,7 @@
 // Protected: requires QUOTATION_SETUP_SECRET env var as Bearer token
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
-import { hashPassword, generateTotpSecret } from '@/lib/quotation-auth';
+import { hashQtPassword, generateTotpSecret, getTotpUri } from '@/lib/quotation-auth';
 import { initQuotationDB } from '@/lib/quotation-db';
 
 function checkSetupAuth(req: NextRequest) {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (!checkSetupAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const db = getDB();
   await initQuotationDB();
-  const users = await db.execute('SELECT id, username, email, is_active, totp_enabled, created_at FROM qt_users ORDER BY created_at DESC');
+  const users = await db.execute('SELECT id, email, name, role, is_active, totp_enabled, last_login, created_at FROM qt_admin_users ORDER BY created_at DESC');
   return NextResponse.json({ users: users.rows });
 }
 
@@ -28,42 +28,53 @@ export async function POST(req: NextRequest) {
   const db = getDB();
   await initQuotationDB();
   const body = await req.json();
-  const { username, password, email } = body;
-  if (!username || !password) return NextResponse.json({ error: 'username and password required' }, { status: 400 });
+  const { email, password, name, role = 'sales' } = body;
+  if (!email || !password || !name) return NextResponse.json({ error: 'email, password and name required' }, { status: 400 });
 
-  const existing = await db.execute({ sql: 'SELECT id FROM qt_users WHERE username = ?', args: [username] });
-  if (existing.rows.length > 0) return NextResponse.json({ error: 'Username already exists' }, { status: 409 });
+  const existing = await db.execute({ sql: 'SELECT id FROM qt_admin_users WHERE email = ?', args: [email.toLowerCase()] });
+  if (existing.rows.length > 0) return NextResponse.json({ error: 'Email already exists' }, { status: 409 });
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashQtPassword(password);
   const totpSecret = generateTotpSecret();
-  const id = crypto.randomUUID();
+  const id = 'usr_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
   await db.execute({
-    sql: 'INSERT INTO qt_users (id, username, password_hash, email, totp_secret, totp_enabled, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 1, datetime("now"), datetime("now"))',
-    args: [id, username, passwordHash, email || null, totpSecret],
+    sql: `INSERT INTO qt_admin_users (id, email, password_hash, name, role, totp_secret, totp_enabled, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, 1, 1)`,
+    args: [id, email.toLowerCase().trim(), passwordHash, name, role, totpSecret],
   });
 
-  // Return the TOTP secret so it can be added to authenticator app
-  const totpUri = `otpauth://totp/NextGuard:${username}?secret=${totpSecret}&issuer=NextGuard`;
+  const totpUri = getTotpUri(totpSecret, email);
 
   return NextResponse.json({
     success: true,
-    user: { id, username, email },
+    user: { id, email, name, role },
     totp: {
       secret: totpSecret,
       uri: totpUri,
-      instructions: 'Scan the URI in Google Authenticator or Authy to enable 2FA.',
+      instructions: 'Add this secret to Google Authenticator or Authy. The URI can be converted to a QR code at https://www.qr-code-generator.com/',
     },
   }, { status: 201 });
 }
 
-// DELETE /api/qt-users - delete user by username
+// PATCH /api/qt-users - update user (deactivate/reactivate)
+export async function PATCH(req: NextRequest) {
+  if (!checkSetupAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const db = getDB();
+  const body = await req.json();
+  const { email, is_active } = body;
+  if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+  await db.execute({ sql: `UPDATE qt_admin_users SET is_active = ?, updated_at = datetime('now') WHERE email = ?`, args: [is_active ? 1 : 0, email.toLowerCase()] });
+  return NextResponse.json({ success: true });
+}
+
+// DELETE /api/qt-users - delete user by email
 export async function DELETE(req: NextRequest) {
   if (!checkSetupAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const db = getDB();
   const body = await req.json();
-  const { username } = body;
-  if (!username) return NextResponse.json({ error: 'username required' }, { status: 400 });
-  await db.execute({ sql: 'DELETE FROM qt_users WHERE username = ?', args: [username] });
+  const { email } = body;
+  if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+  await db.execute({ sql: 'DELETE FROM qt_admin_users WHERE email = ?', args: [email.toLowerCase()] });
   return NextResponse.json({ success: true });
 }
