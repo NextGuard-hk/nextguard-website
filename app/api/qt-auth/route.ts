@@ -171,7 +171,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: 'DB initialized and products seeded.' })
   }
 
-feat: add Quotation Auth API (api/qt-auth/route.ts)  if (action === 'create-admin') {
     const { setupSecret, email, password, name, role } = body
     const expectedSecret = process.env.QT_SETUP_SECRET
     if (!expectedSecret || setupSecret !== expectedSecret) {
