@@ -1,8 +1,7 @@
-"use client";
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Globe, TrendingUp, Shield, AlertTriangle } from "lucide-react";
+// components/threat-intel/geo-threat-map.tsx
+'use client';
+
+import React, { useState } from 'react';
 
 interface CountryThreat {
   country: string;
@@ -10,139 +9,116 @@ interface CountryThreat {
   groups: number;
   techniques: number;
   topGroups: string[];
-  severity: "critical" | "high" | "medium" | "low";
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  attacks24h: number;
+  targetSectors: string[];
 }
 
-const COUNTRY_MAP: Record<string, { code: string; severity: "critical" | "high" | "medium" | "low" }> = {
-  'China': { code: 'CN', severity: 'critical' },
-  'Russia': { code: 'RU', severity: 'critical' },
-  'North Korea': { code: 'KP', severity: 'high' },
-  'Iran': { code: 'IR', severity: 'high' },
-  'Vietnam': { code: 'VN', severity: 'medium' },
-  'India': { code: 'IN', severity: 'medium' },
-  'Pakistan': { code: 'PK', severity: 'medium' },
-  'Israel': { code: 'IL', severity: 'medium' },
-  'Unknown': { code: '??', severity: 'low' },
-};
+const mockData: CountryThreat[] = [
+  { country: 'China', code: 'CN', groups: 41, techniques: 287, topGroups: ['APT41','APT10','Mustang Panda','Hafnium'], severity: 'critical', attacks24h: 1847, targetSectors: ['Technology','Government','Defense'] },
+  { country: 'Russia', code: 'RU', groups: 38, techniques: 256, topGroups: ['APT29','APT28','Sandworm','Turla'], severity: 'critical', attacks24h: 1523, targetSectors: ['Government','Energy','Military'] },
+  { country: 'North Korea', code: 'KP', groups: 12, techniques: 134, topGroups: ['Lazarus','Kimsuky','Andariel'], severity: 'high', attacks24h: 892, targetSectors: ['Finance','Cryptocurrency','Defense'] },
+  { country: 'Iran', code: 'IR', groups: 18, techniques: 156, topGroups: ['OilRig','Charming Kitten','MuddyWater'], severity: 'high', attacks24h: 634, targetSectors: ['Energy','Government','Telecom'] },
+  { country: 'Vietnam', code: 'VN', groups: 5, techniques: 67, topGroups: ['APT32','Ocean Lotus'], severity: 'medium', attacks24h: 213, targetSectors: ['Government','Media','Manufacturing'] },
+  { country: 'India', code: 'IN', groups: 4, techniques: 45, topGroups: ['SideWinder','Patchwork'], severity: 'medium', attacks24h: 178, targetSectors: ['Government','Defense'] },
+  { country: 'Pakistan', code: 'PK', groups: 3, techniques: 38, topGroups: ['Transparent Tribe','SideCopy'], severity: 'medium', attacks24h: 145, targetSectors: ['Government','Military'] },
+  { country: 'Israel', code: 'IL', groups: 3, techniques: 52, topGroups: ['Unit 8200','Candiru'], severity: 'medium', attacks24h: 98, targetSectors: ['Telecom','Government'] },
+  { country: 'Brazil', code: 'BR', groups: 2, techniques: 23, topGroups: ['Prilex','Grandoreiro'], severity: 'low', attacks24h: 67, targetSectors: ['Finance','Retail'] },
+  { country: 'Turkey', code: 'TR', groups: 2, techniques: 19, topGroups: ['StrongPity','Sea Turtle'], severity: 'low', attacks24h: 43, targetSectors: ['Government','Telecom'] },
+];
 
-const severityBg = (s: string) => {
-  switch (s) {
-    case "critical": return "bg-red-500/20 text-red-400 border-red-500/50";
-    case "high": return "bg-orange-500/20 text-orange-400 border-orange-500/50";
-    case "medium": return "bg-yellow-500/20 text-yellow-400 border-yellow-500/50";
-    default: return "bg-blue-500/20 text-blue-400 border-blue-500/50";
-  }
-};
+const styles = `
+  .geo-container { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  .geo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+  .geo-title { color: #e0e0e0; font-size: 20px; font-weight: 700; }
+  .geo-stats { display: flex; gap: 16px; }
+  .geo-stat { background: #12122a; border-radius: 8px; padding: 8px 16px; text-align: center; }
+  .geo-stat-num { font-size: 20px; font-weight: 700; color: #a78bfa; }
+  .geo-stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
+  .geo-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .geo-filter { padding: 4px 12px; border-radius: 12px; border: 1px solid #333; background: transparent; color: #ccc; cursor: pointer; font-size: 12px; }
+  .geo-filter.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+  .geo-table { width: 100%; border-collapse: collapse; }
+  .geo-table th { text-align: left; padding: 10px 12px; color: #888; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #2d2d5e; }
+  .geo-table td { padding: 10px 12px; border-bottom: 1px solid #1a1a3e; color: #e0e0e0; font-size: 13px; }
+  .geo-table tr { cursor: pointer; transition: background 0.2s; }
+  .geo-table tr:hover { background: #1a1040; }
+  .geo-sev { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .geo-sev-critical { background: #ef4444; color: #fff; }
+  .geo-sev-high { background: #f59e0b; color: #000; }
+  .geo-sev-medium { background: #3b82f6; color: #fff; }
+  .geo-sev-low { background: #22c55e; color: #000; }
+  .geo-bar-bg { background: #1a1a3e; border-radius: 4px; height: 6px; width: 100px; }
+  .geo-bar { border-radius: 4px; height: 6px; }
+  .geo-groups { display: flex; gap: 4px; flex-wrap: wrap; }
+  .geo-group-tag { background: #1e1e3f; color: #a78bfa; padding: 1px 6px; border-radius: 6px; font-size: 10px; }
+  .geo-detail { background: #0f172a; border: 1px solid #2d2d5e; border-radius: 8px; padding: 16px; margin: 8px 0; }
+  .geo-detail-sectors { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .geo-sector-tag { background: #1a1a2e; color: #f59e0b; padding: 2px 8px; border-radius: 6px; font-size: 11px; }
+`;
 
-export function GeoThreatMap() {
-  const [data, setData] = useState<CountryThreat[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function GeoThreatMap() {
+  const [sevFilter, setSevFilter] = useState('all');
+  const [expandedCode, setExpandedCode] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/v1/threat-intel/mitre')
-      .then(r => r.json())
-      .then(result => {
-        const groups = result.groups || [];
-        const countryAgg: Record<string, { groups: string[]; techniques: number }> = {};
-        groups.forEach((g: any) => {
-          const country = extractCountry(g.description || '', g.aliases || []);
-          if (!countryAgg[country]) countryAgg[country] = { groups: [], techniques: 0 };
-          countryAgg[country].groups.push(g.name);
-          countryAgg[country].techniques += g.techniques?.length || 0;
-        });
-        const mapped: CountryThreat[] = Object.entries(countryAgg)
-          .map(([country, info]) => ({
-            country,
-            code: COUNTRY_MAP[country]?.code || '??',
-            groups: info.groups.length,
-            techniques: info.techniques,
-            topGroups: info.groups.slice(0, 3),
-            severity: COUNTRY_MAP[country]?.severity || 'low',
-          }))
-          .sort((a, b) => b.groups - a.groups);
-        setData(mapped);
-        setLoading(false);
-      })
-      .catch(e => { setError(e.message); setLoading(false); });
-  }, []);
+  const sevOptions = ['all', 'critical', 'high', 'medium', 'low'];
+  const filtered = mockData.filter(d => sevFilter === 'all' || d.severity === sevFilter);
+  const totalGroups = mockData.reduce((s, d) => s + d.groups, 0);
+  const totalAttacks = mockData.reduce((s, d) => s + d.attacks24h, 0);
+  const maxAttacks = Math.max(...mockData.map(d => d.attacks24h));
 
-  const totalGroups = data.reduce((s, d) => s + d.groups, 0);
-  const totalTechniques = data.reduce((s, d) => s + d.techniques, 0);
-  const maxGroups = Math.max(...data.map(d => d.groups), 1);
+  const barColor = (sev: string) => sev === 'critical' ? '#ef4444' : sev === 'high' ? '#f59e0b' : sev === 'medium' ? '#3b82f6' : '#22c55e';
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-blue-500" />
-              Geographic Threat Map
-            </CardTitle>
-            <CardDescription>Adversary group origins from MITRE ATT&CK</CardDescription>
-          </div>
-          <Badge variant="outline" className="text-xs">Source: MITRE ATT&CK</Badge>
+    <div className="geo-container">
+      <style>{styles}</style>
+      <div className="geo-header">
+        <h3 className="geo-title">Geo Threat Map</h3>
+        <div className="geo-stats">
+          <div className="geo-stat"><div className="geo-stat-num">{mockData.length}</div><div className="geo-stat-label">Countries</div></div>
+          <div className="geo-stat"><div className="geo-stat-num">{totalGroups}</div><div className="geo-stat-label">Groups</div></div>
+          <div className="geo-stat"><div className="geo-stat-num">{totalAttacks.toLocaleString()}</div><div className="geo-stat-label">Attacks/24h</div></div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="bg-card border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{totalGroups}</div>
-            <div className="text-xs text-muted-foreground">Threat Groups</div>
-          </div>
-          <div className="bg-card border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{data.filter(d => d.severity === 'critical').length}</div>
-            <div className="text-xs text-muted-foreground">Critical Origins</div>
-          </div>
-          <div className="bg-card border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{data.length}</div>
-            <div className="text-xs text-muted-foreground">Source Countries</div>
-          </div>
-        </div>
-
-        {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
-
-        <div className="space-y-2">
-          {loading ? (
-            Array(6).fill(null).map((_, i) => (
-              <div key={i} className="h-12 bg-muted animate-pulse rounded-lg" />
-            ))
-          ) : (
-            data.filter(d => d.country !== 'Unknown').map(item => (
-              <div key={item.code} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-accent/50 transition-colors">
-                <div className="w-8 text-center font-mono text-xs font-bold">{item.code}</div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">{item.country}</span>
-                    <Badge className={severityBg(item.severity) + " text-xs"}>{item.severity}</Badge>
-                    <span className="text-xs text-muted-foreground">{item.groups} groups</span>
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(item.groups / maxGroups) * 100}%` }} />
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-muted-foreground">{item.topGroups.slice(0, 2).join(', ')}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="geo-filters">
+        {sevOptions.map(s => (
+          <button key={s} className={`geo-filter ${sevFilter === s ? 'active' : ''}`} onClick={() => setSevFilter(s)}>{s === 'all' ? 'All Severity' : s}</button>
+        ))}
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table className="geo-table">
+          <thead><tr><th>Country</th><th>Severity</th><th>Groups</th><th>Techniques</th><th>Attacks/24h</th><th>Top Groups</th></tr></thead>
+          <tbody>
+            {filtered.map(d => (
+              <React.Fragment key={d.code}>
+                <tr onClick={() => setExpandedCode(expandedCode === d.code ? null : d.code)}>
+                  <td style={{fontWeight:600}}>{d.country} <span style={{color:'#666',fontSize:11}}>({d.code})</span></td>
+                  <td><span className={`geo-sev geo-sev-${d.severity}`}>{d.severity}</span></td>
+                  <td>{d.groups}</td>
+                  <td>{d.techniques}</td>
+                  <td>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span>{d.attacks24h.toLocaleString()}</span>
+                      <div className="geo-bar-bg"><div className="geo-bar" style={{width:`${(d.attacks24h/maxAttacks)*100}%`,background:barColor(d.severity)}} /></div>
+                    </div>
+                  </td>
+                  <td><div className="geo-groups">{d.topGroups.slice(0,3).map(g => <span key={g} className="geo-group-tag">{g}</span>)}</div></td>
+                </tr>
+                {expandedCode === d.code && (
+                  <tr><td colSpan={6}>
+                    <div className="geo-detail">
+                      <div style={{color:'#888',fontSize:11,textTransform:'uppercase',marginBottom:6,fontWeight:600}}>All Threat Groups</div>
+                      <div className="geo-groups" style={{marginBottom:12}}>{d.topGroups.map(g => <span key={g} className="geo-group-tag">{g}</span>)}</div>
+                      <div style={{color:'#888',fontSize:11,textTransform:'uppercase',marginBottom:6,fontWeight:600}}>Target Sectors</div>
+                      <div className="geo-detail-sectors">{d.targetSectors.map(s => <span key={s} className="geo-sector-tag">{s}</span>)}</div>
+                    </div>
+                  </td></tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
-}
-
-function extractCountry(desc: string, aliases: string[]): string {
-  const d = desc.toLowerCase();
-  if (d.includes('china') || d.includes('chinese') || d.includes('prc')) return 'China';
-  if (d.includes('russia') || d.includes('russian') || d.includes('gru') || d.includes('fsb')) return 'Russia';
-  if (d.includes('north korea') || d.includes('dprk') || d.includes('lazarus')) return 'North Korea';
-  if (d.includes('iran') || d.includes('iranian') || d.includes('irgc')) return 'Iran';
-  if (d.includes('vietnam')) return 'Vietnam';
-  if (d.includes('india')) return 'India';
-  if (d.includes('pakistan')) return 'Pakistan';
-  if (d.includes('israel')) return 'Israel';
-  return 'Unknown';
 }
