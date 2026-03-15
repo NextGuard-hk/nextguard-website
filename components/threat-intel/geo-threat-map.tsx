@@ -122,3 +122,6 @@ export default function GeoThreatMap() {
     </div>
   );
 }
+
+
+export { GeoThreatMap };
