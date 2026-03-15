@@ -103,7 +103,6 @@ export async function POST(req: NextRequest) {
     })
     await writeQuotationAudit(auth.userId, auth.email, 'product_updated', 'product', id)
     const updated = await db.execute({ sql: `SELECT * FROM qt_products WHERE id = ?`, args: [id] })
-feat: add Products & Pricing API (api/qt-products/route.ts)  }
 
   // Update price
   if (action === 'update-price') {
