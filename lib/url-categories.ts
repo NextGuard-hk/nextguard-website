@@ -593,8 +593,6 @@ export function categorizeUrl(domain: string): string[] {
       rule.categories.forEach(c => cats.add(c));
     }
   }
-venetianmacao.com
-
     }
   }
 
