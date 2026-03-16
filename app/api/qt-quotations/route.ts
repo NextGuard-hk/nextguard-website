@@ -73,7 +73,9 @@ export async function POST(req: NextRequest) {
     if (!customerName || !termYears) {
       return NextResponse.json({ error: 'customerName and termYears are required' }, { status: 400 })
     }
-    const lineInputs: PriceLineInput[] = (lines || []).map((l: any) => ({
+    // Filter out empty lines (no product selected)
+    const validLines = (lines || []).filter((l: any) => l.productId || l.product_id || l.productCode || l.product_code)
+    const lineInputs: PriceLineInput[] = validLines.map((l: any) => ({
       productId: l.productId || l.product_id || '',
       productCode: l.productCode || l.product_code || '',
       siteType: l.siteType || l.site_type || 'production',
@@ -133,7 +135,7 @@ export async function POST(req: NextRequest) {
           line_total, is_included, notes, sort_order
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         args: [
-          lineId, quotationId, pl.siteType, pl.productId, pl.productCode, pl.description, pl.qty,
+          lineId, quotationId, pl.siteType, pl.productId || null, pl.productCode, pl.description, pl.qty,
           pl.applianceUnitPrice, pl.applianceTotal, pl.licenseUnitPrice,
           pl.year1Fee, pl.year2Fee, pl.year3Fee, pl.year4Fee, pl.year5Fee,
           pl.lineTotal, pl.isIncluded ? 1 : 0, pl.notes, pl.sortOrder,
@@ -150,6 +152,6 @@ export async function POST(req: NextRequest) {
     }, { status: 201 })
   } catch (e: any) {
     console.error('Quotation POST error:', e)
-    return NextResponse.json({ error: e.message || 'Internal server error', stack: e.stack?.split('\n').slice(0, 5) }, { status: 500 })
+    return NextResponse.json({ error: e.message || 'Internal server error', stack: e.stack?.split('\\n').slice(0, 5) }, { status: 500 })
   }
 }
