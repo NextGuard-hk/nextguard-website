@@ -133,7 +133,7 @@ export default function SWGDashboard() {
   }
 
   if (loading) return (
-    <div className="min-h-screen 150
+    <div className="min-h-screen bg-black text-white pt-16 lg:pt-20
       flex items-center justify-center">
       <div className="text-xl">Loading SWG Dashboard...</div>
     </div>
@@ -148,7 +148,7 @@ export default function SWGDashboard() {
   ] as const
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white pt-16 lg:pt-20">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-3">
