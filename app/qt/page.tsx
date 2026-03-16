@@ -9,8 +9,56 @@ interface Quotation {
 }
 interface User { id: string; email: string; name: string; role: string }
 
-const STATUS_COLOR: Record<string,string> = { draft:'#6b7280', sent:'#3b82f6', accepted:'#22c55e', rejected:'#ef4444', expired:'#f59e0b', cancelled:'#9ca3af' }
-const STATUS_LABEL: Record<string,string> = { draft:'Draft', sent:'Sent', accepted:'Accepted', rejected:'Rejected', expired:'Expired', cancelled:'Cancelled' }
+const STATUS_COLOR: Record<string,string> = {
+  draft:'#6b7280', sent:'#3b82f6', accepted:'#22c55e',
+  rejected:'#ef4444', expired:'#f59e0b', cancelled:'#9ca3af'
+}
+const STATUS_LABEL: Record<string,string> = {
+  draft:'Draft', sent:'Sent', accepted:'Accepted',
+  rejected:'Rejected', expired:'Expired', cancelled:'Cancelled'
+}
+
+const RESPONSIVE_CSS = `
+  .qt-root { min-height:100vh; background:#0a0f1a; color:#e0e0e0; font-family:system-ui,sans-serif; }
+  .qt-header { display:flex; align-items:center; padding:14px 24px; background:#0d1117; border-bottom:1px solid #1f2937; flex-wrap:wrap; gap:8px; }
+  .qt-logo { font-size:18px; font-weight:700; color:#fff; letter-spacing:1px; }
+  .qt-logo span { color:#22c55e; }
+  .qt-header-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .qt-container { max-width:1200px; margin:0 auto; padding:24px 16px; }
+  .qt-title-row { display:flex; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+  .qt-title { font-size:24px; font-weight:700; color:#f9fafb; }
+  .qt-subtitle { font-size:13px; color:#6b7280; margin-top:2px; }
+  .qt-search-row { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+  .qt-search-input { flex:1; min-width:160px; padding:9px 14px; background:#111827; border:1px solid #1f2937; border-radius:8px; color:#e0e0e0; font-size:14px; outline:none; }
+  .qt-btn-search { padding:9px 18px; background:#1f2937; border:1px solid #374151; border-radius:8px; color:#9ca3af; font-size:14px; cursor:pointer; white-space:nowrap; }
+  .qt-select-status { padding:9px 14px; background:#111827; border:1px solid #1f2937; border-radius:8px; color:#e0e0e0; font-size:14px; outline:none; }
+  .qt-btn-new { background:#22c55e; color:#fff; border:none; border-radius:8px; padding:10px 20px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .qt-card { background:#0d1117; border:1px solid #1f2937; border-radius:12px; overflow:hidden; }
+  .qt-empty { text-align:center; padding:60px 20px; }
+  .qt-empty-icon { font-size:48px; margin-bottom:12px; }
+  .qt-empty-title { color:#f9fafb; font-size:16px; font-weight:600; margin-bottom:6px; }
+  .qt-empty-sub { color:#6b7280; font-size:14px; margin-bottom:20px; }
+  .qt-table-wrap { overflow-x:auto; }
+  .qt-table { width:100%; border-collapse:collapse; font-size:13px; min-width:650px; }
+  .qt-table th { text-align:left; padding:10px 12px; color:#9ca3af; font-weight:500; border-bottom:1px solid #1f2937; white-space:nowrap; }
+  .qt-table td { padding:10px 12px; vertical-align:middle; }
+  .qt-table tr:not(:last-child) td { border-bottom:1px solid #1f2937; }
+  .qt-table tbody tr:hover { background:#1a2235; cursor:pointer; }
+  .qt-ref { color:#3b82f6; font-weight:600; }
+  .qt-cust { font-weight:500; color:#f9fafb; }
+  .qt-proj { font-size:11px; color:#6b7280; }
+  .qt-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; color:#fff; }
+  .qt-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .qt-btn-sm { background:#1f2937; border:1px solid #374151; color:#9ca3af; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; white-space:nowrap; }
+  @media (max-width:640px) {
+    .qt-header { padding:10px 14px; }
+    .qt-container { padding:16px 10px; }
+    .qt-title { font-size:20px; }
+    .qt-table { min-width:480px; }
+    .qt-btn-new { width:100%; text-align:center; }
+    .qt-title-row { flex-direction:column; align-items:flex-start; }
+  }
+`
 
 export default function QtDashboard() {
   const router = useRouter()
@@ -41,8 +89,7 @@ export default function QtDashboard() {
       const d = await res.json()
       setQuotations(d.quotations||[])
       setTotal(d.total||0)
-    } catch {}
-    finally { setLoading(false) }
+    } catch {} finally { setLoading(false) }
   }, [search, statusFilter, router])
 
   useEffect(() => { if(user) load() }, [user, load])
@@ -55,72 +102,76 @@ export default function QtDashboard() {
   const fmt = (n:number,c='HKD') => new Intl.NumberFormat('en-HK',{style:'currency',currency:c,minimumFractionDigits:0}).format(n)
   const fmtDate = (d:string) => new Date(d).toLocaleDateString('en-HK',{day:'2-digit',month:'short',year:'numeric'})
 
-  if (!user) return <div style={{minHeight:'100vh',background:'#0a0a1a',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{color:'#888'}}>Loading...</div></div>
+  if (!user) return <div className="qt-root" style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}><style>{RESPONSIVE_CSS}</style><div style={{color:'#6b7280'}}>Loading...</div></div>
 
   return (
-    <div style={{minHeight:'100vh',background:'#0a0a1a',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif',color:'#e0e0e0'}}>
-      <div style={{background:'#111827',borderBottom:'1px solid #1f2937',padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',height:60,position:'sticky',top:0,zIndex:100}}>
-        <div style={{display:'flex',alignItems:'center',gap:16}}>
-          <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>NEXT<span style={{color:'#22c55e'}}>GUARD</span></span>
-          <span style={{color:'#374151',fontSize:18}}>|</span>
-          <span style={{color:'#9ca3af',fontSize:14}}>Quotation System</span>
+    <div className="qt-root">
+      <style>{RESPONSIVE_CSS}</style>
+      <header className="qt-header">
+        <div className="qt-logo"><span>NEXT</span>GUARD &nbsp;<span style={{color:'#374151',fontWeight:300}}>|</span>&nbsp; Quotation System</div>
+        <div className="qt-header-right">
+          <span style={{color:'#9ca3af',fontSize:14}}>{user.name}</span>
+          {user.role==='admin'&&<span style={{background:'#1f2937',border:'1px solid #374151',borderRadius:6,padding:'2px 10px',fontSize:12,color:'#9ca3af'}}>Admin</span>}
+          <button onClick={logout} style={{background:'#1f2937',border:'1px solid #374151',borderRadius:8,padding:'6px 16px',color:'#9ca3af',fontSize:13,cursor:'pointer'}}>Logout</button>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <span style={{color:'#9ca3af',fontSize:13}}>{user.name}</span>
-          {user.role==='admin'&&<span style={{background:'#7c3aed22',color:'#a78bfa',border:'1px solid #7c3aed44',borderRadius:6,padding:'2px 8px',fontSize:11}}>Admin</span>}
-          <button onClick={logout} style={{background:'transparent',border:'1px solid #374151',color:'#9ca3af',borderRadius:6,padding:'6px 12px',fontSize:12,cursor:'pointer'}}>Logout</button>
-        </div>
-      </div>
-      <div style={{maxWidth:1200,margin:'0 auto',padding:'32px 24px'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
+      </header>
+      <div className="qt-container">
+        <div className="qt-title-row">
           <div>
-            <h1 style={{color:'#fff',fontSize:24,fontWeight:700,margin:0}}>Quotations</h1>
-            <p style={{color:'#6b7280',fontSize:14,margin:'4px 0 0 0'}}>{total} total</p>
+            <div className="qt-title">Quotations</div>
+            <div className="qt-subtitle">{total} total</div>
           </div>
-          <button onClick={()=>router.push('/qt/new')} style={{background:'#22c55e',color:'#fff',border:'none',borderRadius:8,padding:'10px 20px',fontSize:14,fontWeight:600,cursor:'pointer'}}>+ New Quotation</button>
+          <button className="qt-btn-new" style={{marginLeft:'auto'}} onClick={()=>router.push('/qt/new')}>+ New Quotation</button>
         </div>
-        <div style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
-          <input value={searchInput} onChange={e=>setSearchInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')setSearch(searchInput)}}
-            placeholder="Search customer, project, ref..." style={{flex:1,minWidth:200,padding:'9px 14px',background:'#111827',border:'1px solid #1f2937',borderRadius:8,color:'#e0e0e0',fontSize:14,outline:'none'}} />
-          <button onClick={()=>setSearch(searchInput)} style={{padding:'9px 18px',background:'#1f2937',border:'1px solid #374151',borderRadius:8,color:'#9ca3af',fontSize:14,cursor:'pointer'}}>Search</button>
-          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{padding:'9px 14px',background:'#111827',border:'1px solid #1f2937',borderRadius:8,color:'#e0e0e0',fontSize:14,outline:'none'}}>
+        <div className="qt-search-row">
+          <input className="qt-search-input" value={searchInput} onChange={e=>setSearchInput(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter')setSearch(searchInput)}}
+            placeholder="Search customer, project, ref..." />
+          <button className="qt-btn-search" onClick={()=>setSearch(searchInput)}>Search</button>
+          <select className="qt-select-status" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
             {['draft','sent','accepted','rejected','expired'].map(s=><option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
           </select>
         </div>
-        <div style={{background:'#111827',border:'1px solid #1f2937',borderRadius:12,overflow:'hidden'}}>
-          {loading?(<div style={{padding:48,textAlign:'center',color:'#6b7280'}}>Loading...</div>)
-          :quotations.length===0?(
-            <div style={{padding:64,textAlign:'center'}}>
-              <div style={{fontSize:48,marginBottom:16}}>📄</div>
-              <div style={{color:'#fff',fontSize:18,fontWeight:600,marginBottom:8}}>No quotations yet</div>
-              <div style={{color:'#6b7280',fontSize:14,marginBottom:24}}>Create your first quotation to get started</div>
-              <button onClick={()=>router.push('/qt/new')} style={{background:'#22c55e',color:'#fff',border:'none',borderRadius:8,padding:'10px 24px',fontSize:14,fontWeight:600,cursor:'pointer'}}>+ New Quotation</button>
+        <div className="qt-card">
+          {loading ? (
+            <div style={{textAlign:'center',padding:'40px',color:'#6b7280'}}>Loading...</div>
+          ) : quotations.length===0 ? (
+            <div className="qt-empty">
+              <div className="qt-empty-icon">📄</div>
+              <div className="qt-empty-title">No quotations yet</div>
+              <div className="qt-empty-sub">Create your first quotation to get started</div>
+              <button className="qt-btn-new" onClick={()=>router.push('/qt/new')}>+ New Quotation</button>
             </div>
-          ):(
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr style={{borderBottom:'1px solid #1f2937'}}>
-                  {['Ref #','Customer / Project','Type','Term','Amount','Status','Date',''].map(h=><th key={h} style={{padding:'12px 16px',textAlign:'left',color:'#6b7280',fontSize:11,fontWeight:600,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>)}
-                </tr></thead>
+          ) : (
+            <div className="qt-table-wrap">
+              <table className="qt-table">
+                <thead>
+                  <tr>
+                    {['Ref #','Customer / Project','Type','Term','Amount','Status','Date',''].map(h=>
+                      <th key={h}>{h}</th>
+                    )}
+                  </tr>
+                </thead>
                 <tbody>
                   {quotations.map(q=>(
-                    <tr key={q.id} onClick={()=>router.push(`/qt/${q.id}`)} style={{borderBottom:'1px solid #1f2937',cursor:'pointer'}}
-                      onMouseEnter={e=>(e.currentTarget.style.background='#1f2937')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-                      <td style={{padding:'14px 16px',color:'#22c55e',fontSize:13,fontWeight:600,fontFamily:'monospace',whiteSpace:'nowrap'}}>{q.ref_number}</td>
-                      <td style={{padding:'14px 16px',minWidth:180}}>
-                        <div style={{color:'#fff',fontSize:14,fontWeight:600}}>{q.customer_name}</div>
-                        {q.project_name&&<div style={{color:'#6b7280',fontSize:12,marginTop:2}}>{q.project_name}</div>}
+                    <tr key={q.id} onClick={()=>router.push(`/qt/${q.id}`)}>
+                      <td className="qt-ref">{q.ref_number}</td>
+                      <td>
+                        <div className="qt-cust">{q.customer_name}</div>
+                        {q.project_name&&<div className="qt-proj">{q.project_name}</div>}
                       </td>
-                      <td style={{padding:'14px 16px'}}><span style={{background:'#1f293744',border:'1px solid #374151',borderRadius:6,padding:'2px 8px',fontSize:11,color:'#9ca3af'}}>{q.customer_type==='partner'?'Partner':'End User'}</span></td>
-                      <td style={{padding:'14px 16px',color:'#9ca3af',fontSize:13,whiteSpace:'nowrap'}}>{q.term_years}Y</td>
-                      <td style={{padding:'14px 16px',color:'#fff',fontSize:14,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(q.final_price,q.currency)}</td>
-                      <td style={{padding:'14px 16px'}}><span style={{background:(STATUS_COLOR[q.status]||'#6b7280')+'22',color:STATUS_COLOR[q.status]||'#6b7280',border:`1px solid ${(STATUS_COLOR[q.status]||'#6b7280')}44`,borderRadius:6,padding:'3px 10px',fontSize:12}}>{STATUS_LABEL[q.status]||q.status}</span></td>
-                      <td style={{padding:'14px 16px',color:'#6b7280',fontSize:12,whiteSpace:'nowrap'}}>{fmtDate(q.created_at)}</td>
-                      <td style={{padding:'14px 16px'}}>
-                        <div style={{display:'flex',gap:6}}>
-                          <button onClick={e=>{e.stopPropagation();router.push(`/qt/${q.id}`)}} style={{background:'#1f2937',border:'1px solid #374151',color:'#9ca3af',borderRadius:6,padding:'5px 10px',fontSize:12,cursor:'pointer'}}>View</button>
-                          <button onClick={e=>{e.stopPropagation();router.push(`/qt/${q.id}/pdf`)}} style={{background:'#1f2937',border:'1px solid #374151',color:'#9ca3af',borderRadius:6,padding:'5px 10px',fontSize:12,cursor:'pointer'}}>PDF</button>
+                      <td style={{color:'#9ca3af'}}>{q.customer_type==='partner'?'Partner':'End User'}</td>
+                      <td style={{color:'#9ca3af'}}>{q.term_years}Y</td>
+                      <td style={{color:'#f9fafb',fontWeight:500}}>{fmt(q.final_price,q.currency)}</td>
+                      <td>
+                        <span className="qt-badge" style={{background:STATUS_COLOR[q.status]}}>{STATUS_LABEL[q.status]}</span>
+                      </td>
+                      <td style={{color:'#9ca3af',whiteSpace:'nowrap'}}>{fmtDate(q.created_at)}</td>
+                      <td>
+                        <div className="qt-actions">
+                          <button className="qt-btn-sm" onClick={e=>{e.stopPropagation();router.push(`/qt/${q.id}`)}}>View</button>
+                          <button className="qt-btn-sm" onClick={e=>{e.stopPropagation();router.push(`/qt/${q.id}/pdf`)}}>PDF</button>
                         </div>
                       </td>
                     </tr>
