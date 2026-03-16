@@ -83,8 +83,8 @@ async function queryCustomCategory(domain: string): Promise<{ category: string; 
     const db = getDB();
     const r = await db.execute({
       sql: `SELECT cc.name as category, cc.action FROM custom_url_entries cue
-            JOIN custom_url_categories cc ON cc.id = cue.category_id
-            WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`,
+      JOIN custom_url_categories cc ON cc.id = cue.category_id
+      WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`,
       args: [domain]
     });
     if (r.rows.length > 0) return { category: r.rows[0].category as string, action: r.rows[0].action as string };
@@ -112,28 +112,65 @@ async function queryOverride(domain: string): Promise<{ action: string } | null>
     const db = getDB();
     const r = await db.execute({
       sql: `SELECT action FROM url_policy_overrides
-            WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`,
+      WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`,
       args: [domain]
     });
     if (r.rows.length > 0) return { action: r.rows[0].action as string };
   } catch {}
   return null;
 }
-async function logUrlEvent(domain: string, action: string, category: string, riskLevel: string) {
+// P2-1: Group-based policy lookup - Tier 1 feature
+async function queryGroupPolicy(userId: string | null, category: string): Promise<{ action: string; groupName: string } | null> {
+  if (!userId) return null;
+  try {
+    const db = getDB();
+    const r = await db.execute({
+      sql: `SELECT g.name as group_name, gr.action FROM url_policy_groups g
+      JOIN url_policy_user_assignments a ON a.group_id = g.id
+      JOIN url_policy_group_rules gr ON gr.group_id = g.id
+      WHERE a.user_id = ? AND g.is_active = 1 AND LOWER(gr.category) = LOWER(?)
+      ORDER BY g.priority ASC LIMIT 1`,
+      args: [userId, category]
+    });
+    if (r.rows.length > 0) return { action: r.rows[0].action as string, groupName: r.rows[0].group_name as string };
+  } catch {}
+  return null;
+}
+// P2-3: Schedule-based policy check
+async function isWithinSchedule(groupId: number): Promise<boolean> {
+  try {
+    const db = getDB();
+    const r = await db.execute({
+      sql: `SELECT * FROM url_policy_schedules WHERE group_id = ? AND is_active = 1`,
+      args: [groupId]
+    });
+    if (r.rows.length === 0) return true; // no schedule = always active
+    const now = new Date();
+    const day = now.toLocaleDateString('en-US', { weekday: 'lowercase' }).slice(0,3);
+    const hhmm = now.getHours() * 100 + now.getMinutes();
+    for (const row of r.rows as any[]) {
+      const days = JSON.parse(row.days_of_week || '[]');
+      if (days.includes(day) && hhmm >= row.start_time && hhmm <= row.end_time) return true;
+    }
+    return false;
+  } catch { return true; }
+}
+async function logUrlEvent(domain: string, action: string, category: string, riskLevel: string, userId?: string | null) {
   try {
     const db = getDB();
     await db.execute({
-      sql: `INSERT OR IGNORE INTO url_policy_log (domain, action, category, risk_level, evaluated_at)
-            VALUES (?, ?, ?, ?, datetime('now'))`,
-      args: [domain, action, category, riskLevel]
+      sql: `INSERT OR IGNORE INTO url_policy_log (domain, action, category, risk_level, user_id, evaluated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      args: [domain, action, category, riskLevel, userId || null]
     });
   } catch {}
 }
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url') || '';
+  const userId = request.nextUrl.searchParams.get('userId') || null;
   if (!url) return NextResponse.json({ error: 'url parameter required' }, { status: 400 });
   try {
-    const result = await evaluateUrl(url);
+    const result = await evaluateUrl(url, userId);
     return NextResponse.json(result);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -143,21 +180,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const userId = body.userId || null;
     if (Array.isArray(body.urls)) {
-      const results = await Promise.all(body.urls.slice(0, 50).map((u: string) => evaluateUrl(u)));
+      const results = await Promise.all(body.urls.slice(0, 50).map((u: string) => evaluateUrl(u, userId)));
       return NextResponse.json({ results, count: results.length });
     }
-    if (body.url) return NextResponse.json(await evaluateUrl(body.url));
+    if (body.url) return NextResponse.json(await evaluateUrl(body.url, userId));
     return NextResponse.json({ error: 'url or urls required' }, { status: 400 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-async function evaluateUrl(inputUrl: string) {
+async function evaluateUrl(inputUrl: string, userId: string | null = null) {
   const domain = normalizeDomain(inputUrl);
   const startTime = Date.now();
-  // Layer 0a: Override check (highest priority - admin/user manual overrides)
+  // Layer 0a: Override check (highest priority)
   const override = await queryOverride(domain);
   // Layer 0b: Custom URL categories
   const customMatch = await queryCustomCategory(domain);
@@ -169,7 +207,7 @@ async function evaluateUrl(inputUrl: string) {
   // Layer 3: Threat intel
   let threatIntel = { isMalicious: false, riskLevel: 'unknown', threatType: null as string | null };
   try { threatIntel = await queryThreatIntel(domain); } catch {}
-  // Layer 4: DGA Detection (P2-2)
+  // Layer 4: DGA Detection
   const dgaResult = detectDGA(domain);
   const allCategories = [...staticCategories];
   let categorySource = 'static-taxonomy';
@@ -185,7 +223,6 @@ async function evaluateUrl(inputUrl: string) {
     categorySource = 'threat-intel';
     confidence = 99;
   }
-  // Add DGA category if detected
   if (dgaResult.isDGA) {
     if (!allCategories.includes('DGA/Suspicious')) allCategories.push('DGA/Suspicious');
     if (categorySource === 'static-taxonomy') categorySource = 'dga-detection';
@@ -207,6 +244,19 @@ async function evaluateUrl(inputUrl: string) {
   let action = getHighestAction(allCategories);
   if (threatIntel.isMalicious) action = 'Block';
   if (dgaResult.isDGA && ACTION_PRIORITY[action] < ACTION_PRIORITY['Warn']) action = 'Warn';
+  // Layer 6 (NEW): Group-based policy - per-user/group rules like Zscaler
+  let groupPolicyApplied: string | null = null;
+  if (userId) {
+    for (const cat of allCategories) {
+      const gp = await queryGroupPolicy(userId, cat);
+      if (gp) {
+        action = gp.action;
+        groupPolicyApplied = gp.groupName;
+        categorySource = 'group-policy';
+        break;
+      }
+    }
+  }
   let customCategory: string | null = null;
   if (customMatch) {
     customCategory = customMatch.category;
@@ -215,7 +265,6 @@ async function evaluateUrl(inputUrl: string) {
     categorySource = 'custom';
     confidence = 100;
   }
-  // Override takes highest priority (after custom)
   let overrideApplied = false;
   if (override) {
     action = override.action;
@@ -226,7 +275,7 @@ async function evaluateUrl(inputUrl: string) {
   const te = taxonomyEntries.find(t =>
     staticCategories.some(c => c.toLowerCase() === t.name.toLowerCase() || c.toLowerCase() === t.slug.toLowerCase())
   );
-  await logUrlEvent(domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel);
+  await logUrlEvent(domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel, userId);
   return {
     url: inputUrl, domain, action, confidence, categorySource,
     categories: allCategories,
@@ -240,6 +289,8 @@ async function evaluateUrl(inputUrl: string) {
     dbCategoryMatch: dbCategory,
     customCategoryMatch: customCategory,
     overrideApplied,
+    groupPolicyApplied,
+    userId,
     dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors },
     evalMs: Date.now() - startTime,
     aiClassified,
