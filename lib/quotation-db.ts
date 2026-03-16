@@ -229,6 +229,77 @@ export async function seedDefaultProducts(): Promise<void> {
       sql: `INSERT OR IGNORE INTO qt_products (id, code, name, type, deployment, description, features, is_active, sort_order)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
       args: [p.id, p.code, p.name, p.type, p.deployment, p.description, p.features],
+
+      // Seed default pricing for all products
+export async function seedDefaultPrices(): Promise<void> {
+  const db = getDB()
+  // Pricing: [productId, termYears, minQty, applianceUnitPrice, licenseUnitPrice]
+  const prices: [string, number, number, number, number][] = [
+    // Management Server - UCSS-5100 (Hardware)
+    ['prod_ucss_5100', 1, 1, 45000, 18000],
+    ['prod_ucss_5100', 3, 1, 45000, 15000],
+    ['prod_ucss_5100', 5, 1, 45000, 12000],
+    // Management Server - UCSS-5100-VM
+    ['prod_ucss_5100_vm', 1, 1, 0, 25000],
+    ['prod_ucss_5100_vm', 3, 1, 0, 21000],
+    ['prod_ucss_5100_vm', 5, 1, 0, 18000],
+    // Management Server - UCSS-1100-VM
+    ['prod_ucss_1100_vm', 1, 1, 0, 15000],
+    ['prod_ucss_1100_vm', 3, 1, 0, 12000],
+    ['prod_ucss_1100_vm', 5, 1, 0, 10000],
+    // Web Gateway - UCSG-SWGD-5100 (Hardware)
+    ['prod_ucsg_swgd_5100', 1, 1, 85000, 28000],
+    ['prod_ucsg_swgd_5100', 3, 1, 85000, 24000],
+    ['prod_ucsg_swgd_5100', 5, 1, 85000, 20000],
+    ['prod_ucsg_swgd_5100', 1, 500, 85000, 22000],
+    ['prod_ucsg_swgd_5100', 3, 500, 85000, 18000],
+    // Web Gateway - UCSG-SWGD-1100-VM
+    ['prod_ucsg_swgd_1100_vm', 1, 1, 0, 35000],
+    ['prod_ucsg_swgd_1100_vm', 3, 1, 0, 30000],
+    ['prod_ucsg_swgd_1100_vm', 5, 1, 0, 25000],
+    // Email Gateway - UCSG-ASEG-5100 (Hardware)
+    ['prod_ucsg_aseg_5100', 1, 1, 75000, 25000],
+    ['prod_ucsg_aseg_5100', 3, 1, 75000, 21000],
+    ['prod_ucsg_aseg_5100', 5, 1, 75000, 18000],
+    // Email Gateway - UCSG-ASEG-1100-VM
+    ['prod_ucsg_aseg_1100_vm', 1, 1, 0, 32000],
+    ['prod_ucsg_aseg_1100_vm', 3, 1, 0, 27000],
+    ['prod_ucsg_aseg_1100_vm', 5, 1, 0, 22000],
+    // Endpoint DLP - Windows (per seat)
+    ['prod_ucsc_win', 1, 1, 0, 380],
+    ['prod_ucsc_win', 3, 1, 0, 320],
+    ['prod_ucsc_win', 5, 1, 0, 260],
+    ['prod_ucsc_win', 1, 100, 0, 320],
+    ['prod_ucsc_win', 3, 100, 0, 270],
+    ['prod_ucsc_win', 1, 500, 0, 260],
+    ['prod_ucsc_win', 3, 500, 0, 220],
+    ['prod_ucsc_win', 1, 1000, 0, 220],
+    ['prod_ucsc_win', 3, 1000, 0, 185],
+    // Endpoint DLP - macOS (per seat)
+    ['prod_ucsc_mac', 1, 1, 0, 420],
+    ['prod_ucsc_mac', 3, 1, 0, 350],
+    ['prod_ucsc_mac', 5, 1, 0, 290],
+    ['prod_ucsc_mac', 1, 100, 0, 350],
+    ['prod_ucsc_mac', 3, 100, 0, 295],
+    ['prod_ucsc_mac', 1, 500, 0, 290],
+    ['prod_ucsc_mac', 3, 500, 0, 240],
+    // Professional Services
+    ['prod_ps_impl', 1, 1, 0, 45000],
+    ['prod_ps_impl', 3, 1, 0, 45000],
+    // Annual Maintenance Service
+    ['prod_annual_svc', 1, 1, 0, 35000],
+    ['prod_annual_svc', 3, 1, 0, 30000],
+    ['prod_annual_svc', 5, 1, 0, 25000],
+  ]
+
+  for (const [productId, termYears, minQty, appPrice, licPrice] of prices) {
+    const id = `price_${productId}_${termYears}y_${minQty}q`
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO qt_prices (id, product_id, term_years, min_qty, max_qty, appliance_unit_price, license_unit_price, currency) VALUES (?, ?, ?, ?, 999999, ?, ?, 'HKD')`,
+      args: [id, productId, termYears, minQty, appPrice, licPrice],
+    })
+  }
+}
     })
   }
 }
