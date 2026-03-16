@@ -13,17 +13,19 @@ interface Summary {
   allowed: number
   blocked: number
   warned: number
+  blockRate: number
+  highRiskLastHour: number
   riskDistribution: { risk_level: string; count: number }[]
 }
 
-interface TopDomain { domain: string; category: string; count: number; lastSeen: string }
-interface RecentLog { domain: string; action: string; risk_level: string; category: string; timestamp: string; user_id?: string }
+interface TopDomain { domain: string; category: string; risk_level: string; hit_count: number }
+interface RecentLog { domain: string; action: string; risk_level: string; category: string; evaluated_at: string }
 
 const RISK_COLOR: Record<string, string> = {
-  critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e', safe: '#3b82f6'
+  critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e', safe: '#3b82f6', unknown: '#6b7280'
 }
 const ACTION_COLOR: Record<string, string> = {
-  block: '#ef4444', warn: '#f97316', allow: '#22c55e'
+  Block: '#ef4444', Warn: '#f97316', Allow: '#22c55e'
 }
 
 export default function UrlAnalyticsPage() {
@@ -34,27 +36,30 @@ export default function UrlAnalyticsPage() {
   const [recent, setRecent] = useState<RecentLog[]>([])
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
-      const base = '/api/v1/analytics/url'
+      const base = `/api/v1/url-policy/analytics?hours=${hours}`
       const [sumRes, blockedRes, warnedRes, recentRes] = await Promise.all([
-        fetch(`${base}/summary?hours=${hours}`),
-        fetch(`${base}/top-blocked?hours=${hours}&limit=10`),
-        fetch(`${base}/top-warned?hours=${hours}&limit=10`),
-        fetch(`${base}/recent?hours=${hours}&limit=20`),
+        fetch(`${base}&type=summary`),
+        fetch(`${base}&type=top-blocked&limit=10`),
+        fetch(`${base}&type=top-warned&limit=10`),
+        fetch(`${base}&type=recent&limit=20`),
       ])
       const [sumData, blockedData, warnedData, recentData] = await Promise.all([
         sumRes.json(), blockedRes.json(), warnedRes.json(), recentRes.json()
       ])
-      if (sumData.success) setSummary(sumData.data)
-      if (blockedData.success) setTopBlocked(blockedData.data)
-      if (warnedData.success) setTopWarned(warnedData.data)
-      if (recentData.success) setRecent(recentData.data)
+      if (!sumData.error) setSummary(sumData)
+      if (!blockedData.error) setTopBlocked(blockedData.topBlocked || [])
+      if (!warnedData.error) setTopWarned(warnedData.topWarned || [])
+      if (!recentData.error) setRecent(recentData.recent || [])
+      if (sumData.error) setError(sumData.error)
       setLastUpdated(new Date().toLocaleTimeString())
     } catch (e) {
-      console.error('Failed to fetch URL analytics:', e)
+      setError(e instanceof Error ? e.message : 'Failed to fetch analytics')
     } finally {
       setLoading(false)
     }
@@ -62,8 +67,9 @@ export default function UrlAnalyticsPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const blockRate = summary ? Math.round((summary.blocked / (summary.totalEvaluations || 1)) * 100) : 0
-  const warnRate = summary ? Math.round((summary.warned / (summary.totalEvaluations || 1)) * 100) : 0
+  const blockRate = summary?.blockRate ?? 0
+  const warnRate = summary && summary.totalEvaluations > 0
+    ? Math.round((summary.warned / summary.totalEvaluations) * 100) : 0
 
   return (
     <div className="p-6 space-y-6">
@@ -95,6 +101,12 @@ export default function UrlAnalyticsPage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 text-red-400 text-sm">
+          ⚠️ Analytics DB not yet initialised: {error}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card className="bg-gray-900 border-gray-700">
           <CardContent className="p-4">
@@ -153,8 +165,7 @@ export default function UrlAnalyticsPage() {
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={summary.riskDistribution} dataKey="count" nameKey="risk_level"
-                    cx="50%" cy="50%" outerRadius={80} label={({ risk_level, percent }) =>
-                      `${risk_level} ${(percent * 100).toFixed(0)}%`}>
+                    cx="50%" cy="50%" outerRadius={80}>
                     {summary.riskDistribution.map((entry) => (
                       <Cell key={entry.risk_level} fill={RISK_COLOR[entry.risk_level] ?? '#6b7280'} />
                     ))}
@@ -164,7 +175,7 @@ export default function UrlAnalyticsPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-gray-500">No data available</div>
+              <div className="h-[220px] flex items-center justify-center text-gray-500">No data yet — start evaluating URLs to see analytics</div>
             )}
           </CardContent>
         </Card>
@@ -182,11 +193,11 @@ export default function UrlAnalyticsPage() {
                   <XAxis type="number" stroke="#9ca3af" tick={{ fontSize: 10 }} />
                   <YAxis type="category" dataKey="domain" stroke="#9ca3af" tick={{ fontSize: 10 }} width={100} />
                   <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#fff' }} />
-                  <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="hit_count" fill="#ef4444" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-gray-500">No blocked domains</div>
+              <div className="h-[220px] flex items-center justify-center text-gray-500">No blocked domains in this period</div>
             )}
           </CardContent>
         </Card>
@@ -205,8 +216,8 @@ export default function UrlAnalyticsPage() {
                   <tr className="border-b border-gray-700 text-gray-400">
                     <th className="text-left pb-2">Domain</th>
                     <th className="text-left pb-2">Category</th>
+                    <th className="text-left pb-2">Risk</th>
                     <th className="text-right pb-2">Count</th>
-                    <th className="text-right pb-2">Last Seen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -214,15 +225,15 @@ export default function UrlAnalyticsPage() {
                     <tr key={i} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
                       <td className="py-2 text-white font-mono text-xs">{d.domain}</td>
                       <td className="py-2"><Badge variant="outline" className="text-orange-400 border-orange-800 text-xs">{d.category}</Badge></td>
-                      <td className="py-2 text-right text-orange-400 font-semibold">{d.count}</td>
-                      <td className="py-2 text-right text-gray-500 text-xs">{new Date(d.lastSeen).toLocaleString()}</td>
+                      <td className="py-2"><span className="text-xs" style={{ color: RISK_COLOR[d.risk_level] ?? '#9ca3af' }}>{d.risk_level}</span></td>
+                      <td className="py-2 text-right text-orange-400 font-semibold">{d.hit_count}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-gray-500 text-center py-6">No warned domains</div>
+            <div className="text-gray-500 text-center py-6">No warned domains in this period</div>
           )}
         </CardContent>
       </Card>
@@ -248,19 +259,15 @@ export default function UrlAnalyticsPage() {
                 <tbody>
                   {recent.map((log, i) => (
                     <tr key={i} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
-                      <td className="py-1.5 text-white font-mono text-xs max-w-[180px] truncate">{log.domain}</td>
+                      <td className="py-1.5 text-white font-mono text-xs max-w-[150px] truncate">{log.domain}</td>
                       <td className="py-1.5">
                         <Badge className="text-xs" style={{ backgroundColor: ACTION_COLOR[log.action] ?? '#6b7280', color: '#fff', border: 'none' }}>
                           {log.action.toUpperCase()}
                         </Badge>
                       </td>
-                      <td className="py-1.5">
-                        <span className="text-xs font-medium" style={{ color: RISK_COLOR[log.risk_level] ?? '#9ca3af' }}>
-                          {log.risk_level}
-                        </span>
-                      </td>
+                      <td className="py-1.5"><span className="text-xs" style={{ color: RISK_COLOR[log.risk_level] ?? '#9ca3af' }}>{log.risk_level}</span></td>
                       <td className="py-1.5 text-gray-400 text-xs">{log.category}</td>
-                      <td className="py-1.5 text-right text-gray-500 text-xs">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                      <td className="py-1.5 text-right text-gray-500 text-xs">{new Date(log.evaluated_at).toLocaleTimeString()}</td>
                     </tr>
                   ))}
                 </tbody>
