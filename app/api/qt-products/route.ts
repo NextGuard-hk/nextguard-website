@@ -5,6 +5,15 @@ import { authenticateQtRequest } from '@/lib/quotation-auth'
 import { getDB } from '@/lib/db'
 import { generateId, writeQuotationAudit } from '@/lib/quotation-db'
 
+// Virtual category definitions derived from product types
+const TYPE_CATEGORIES: Record<string, { id: string; name: string; sort_order: number }> = {
+  management:    { id: 'management',    name: 'Management Server',       sort_order: 1 },
+  endpoint:      { id: 'endpoint',      name: 'Endpoint DLP Agent',      sort_order: 2 },
+  email_gateway: { id: 'email_gateway', name: 'Email Security Gateway',  sort_order: 3 },
+  web_gateway:   { id: 'web_gateway',   name: 'Web Security Gateway',    sort_order: 4 },
+  service:       { id: 'service',       name: 'Professional Services',   sort_order: 5 },
+}
+
 export async function GET(req: NextRequest) {
   const auth = authenticateQtRequest(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -14,24 +23,18 @@ export async function GET(req: NextRequest) {
   const categoryId = searchParams.get('categoryId')
   const includeInactive = searchParams.get('includeInactive') === 'true' && auth.role === 'admin'
 
-  // Fetch categories
-  let categories: any[] = []
-  try {
-    const catResult = await db.execute(`SELECT * FROM qt_product_categories WHERE is_active = 1 ORDER BY sort_order`)
-    categories = catResult.rows as any[]
-  } catch(e) { /* table may not exist yet */ }
-
   let sql = `SELECT p.*, GROUP_CONCAT(pr.id) as price_ids FROM qt_products p LEFT JOIN qt_prices pr ON pr.product_id = p.id`
   const args: string[] = []
   const where: string[] = []
   if (!includeInactive) where.push(`p.is_active = 1`)
   if (type) { where.push(`p.type = ?`); args.push(type) }
-  if (categoryId) { where.push(`p.category_id = ?`); args.push(categoryId) }
+  if (categoryId) { where.push(`p.type = ?`); args.push(categoryId) }
   if (where.length > 0) sql += ` WHERE ` + where.join(' AND ')
   sql += ` GROUP BY p.id ORDER BY p.sort_order, p.type, p.code`
   const result = await db.execute({ sql, args })
   const products = result.rows.map((row: any) => ({
     ...row,
+    category_id: row.type, // use type as category_id for frontend grouping
     features: (() => { try { return JSON.parse(row.features || '[]') } catch { return [] } })(),
   }))
   const productIds = products.map((p: any) => p.id)
@@ -47,6 +50,13 @@ export async function GET(req: NextRequest) {
     ...p,
     prices: prices.filter((pr: any) => pr.product_id === p.id),
   }))
+
+  // Build virtual categories from types actually present in products
+  const usedTypes = [...new Set(enriched.map((p: any) => p.type as string))]
+  const categories = usedTypes
+    .map(t => TYPE_CATEGORIES[t] || { id: t, name: t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), sort_order: 99 })
+    .sort((a, b) => a.sort_order - b.sort_order)
+
   return NextResponse.json({ categories, products: enriched })
 }
 
@@ -56,7 +66,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const { action } = body
   const db = getDB()
-
   if (!action || action === 'create-product') {
     const { code, name, type, deployment, description, features, sortOrder, categoryId } = body
     if (!code || !name || !type) return NextResponse.json({ error: 'code, name, type are required' }, { status: 400 })
@@ -69,7 +78,6 @@ export async function POST(req: NextRequest) {
     const created = await db.execute({ sql: `SELECT * FROM qt_products WHERE id = ?`, args: [id] })
     return NextResponse.json({ product: created.rows[0] }, { status: 201 })
   }
-
   if (action === 'create-price') {
     const { productId, termYears, minQty, maxQty, applianceUnitPrice, licenseUnitPrice, currency } = body
     if (!productId || !termYears) return NextResponse.json({ error: 'productId and termYears required' }, { status: 400 })
@@ -82,7 +90,6 @@ export async function POST(req: NextRequest) {
     const created = await db.execute({ sql: `SELECT * FROM qt_prices WHERE id = ?`, args: [id] })
     return NextResponse.json({ price: created.rows[0] }, { status: 201 })
   }
-
   if (action === 'update-product') {
     const { id, code, name, type, deployment, description, features, sortOrder, isActive, categoryId } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -94,7 +101,6 @@ export async function POST(req: NextRequest) {
     const updated = await db.execute({ sql: `SELECT * FROM qt_products WHERE id = ?`, args: [id] })
     return NextResponse.json({ product: updated.rows[0] })
   }
-
   if (action === 'update-price') {
     const { id, applianceUnitPrice, licenseUnitPrice, termYears, minQty, maxQty, isActive } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -106,7 +112,6 @@ export async function POST(req: NextRequest) {
     const updated = await db.execute({ sql: `SELECT * FROM qt_prices WHERE id = ?`, args: [id] })
     return NextResponse.json({ price: updated.rows[0] })
   }
-
   if (action === 'delete-price') {
     const { id } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -114,7 +119,6 @@ export async function POST(req: NextRequest) {
     await writeQuotationAudit(auth.userId, auth.email, 'price_deleted', 'price', id)
     return NextResponse.json({ success: true })
   }
-
   if (action === 'create-category') {
     const { name, codePrefix, description, sortOrder } = body
     if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })
@@ -125,7 +129,6 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json({ category: { id, name } }, { status: 201 })
   }
-
   if (action === 'update-category') {
     const { id, name, codePrefix, description, sortOrder, isActive } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -135,6 +138,5 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json({ success: true })
   }
-
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
