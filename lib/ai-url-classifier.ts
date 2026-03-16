@@ -265,3 +265,21 @@ export async function classifyUrlWithAI(url: string): Promise<{ primaryCategory:
     source: result.source,
   }
 }
+
+// Batch classification for multiple URLs
+export async function batchClassifyWithAI(urls: string[]): Promise<Array<{ url: string; primaryCategory: string; confidence: number; source: string; cached: boolean; classificationMs: number }>> {
+  const results = await Promise.all(
+    urls.slice(0, 50).map(async (url) => {
+      const result = await classifyURL(url)
+      return {
+        url: result.url,
+        primaryCategory: result.category,
+        confidence: result.confidence,
+        source: result.source,
+        cached: result.cached,
+        classificationMs: result.responseTimeMs,
+      }
+    })
+  )
+  return results
+}
