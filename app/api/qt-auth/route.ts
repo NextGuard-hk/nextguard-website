@@ -1,145 +1,196 @@
 // app/api/qt-auth/route.ts
-// Quotation System Auth API - Login, TOTP setup, verify
+// Quotation System Auth - Uses same account system as /admin (download-users)
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  getQtUserByEmail, verifyQtPassword, signQtToken, verifyQtToken,
-  recordLoginSuccess, recordLoginFailure, isAccountLocked,
-  isLoginRateLimited, recordLoginAttempt, clearLoginAttempts,
-  generateTotpSecret, verifyTotpCode, getTotpUri, updateUserTotpSecret,
-  getQtUserById, hashQtPassword, authenticateQtRequest,
-} from '@/lib/quotation-auth'
-import { initQuotationDB, seedDefaultProducts, writeQuotationAudit } from '@/lib/quotation-db'
-import { getDB } from '@/lib/db'
+import { getUsers, saveUsers } from '../download-users/route'
+import { initQuotationDB, seedDefaultProducts } from '@/lib/quotation-db'
 
-// Helper to get client IP
+const QT_JWT_SECRET = process.env.QT_JWT_SECRET || process.env.JWT_SECRET || 'qt-nextguard-secret-2026'
+const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
+
 function getClientIp(req: NextRequest): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
 }
+
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password + (process.env.DOWNLOAD_USER_SESSION_SECRET || 'salt'))
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+async function sendEmail(to: string, subject: string, html: string) {
+  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured')
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'NextGuard Quotation <noreply@next-guard.com>', to: [to], subject, html }),
+  })
+}
+
+// JWT helpers
+function base64url(str: string): string {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+function base64urlDecode(str: string): string {
+  const padded = str + '=='.slice(0, (4 - str.length % 4) % 4)
+  return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
+}
+
+interface QtJWTPayload {
+  userId: string; email: string; name: string; role: string
+  mfaVerified: boolean; iat: number; exp: number
+}
+
+function signQtToken(payload: Omit<QtJWTPayload, 'iat' | 'exp'>, expiresIn = 28800): string {
+  const now = Math.floor(Date.now() / 1000)
+  const full: QtJWTPayload = { ...payload, iat: now, exp: now + expiresIn }
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const body = base64url(JSON.stringify(full))
+  const sig = base64url(QT_JWT_SECRET + '.qt.' + header + '.' + body)
+  return header + '.' + body + '.' + sig
+}
+
+function verifyQtToken(token: string): QtJWTPayload | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const expectedSig = base64url(QT_JWT_SECRET + '.qt.' + parts[0] + '.' + parts[1])
+    if (parts[2] !== expectedSig) return null
+    const payload = JSON.parse(base64urlDecode(parts[1])) as QtJWTPayload
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null
+    return payload
+  } catch { return null }
+}
+
+export function authenticateQtRequest(req: NextRequest): QtJWTPayload | null {
+  const cookie = req.cookies.get('qt_session')?.value
+  if (!cookie) return null
+  const payload = verifyQtToken(cookie)
+  if (!payload || !payload.mfaVerified) return null
+  return payload
+}
+
+// Rate limiting
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
+function isRateLimited(ip: string): boolean {
+  const a = loginAttempts.get(ip)
+  if (!a) return false
+  if (Date.now() - a.lastAttempt > 15 * 60 * 1000) { loginAttempts.delete(ip); return false }
+  return a.count >= 5
+}
+function recordAttempt(ip: string) {
+  const a = loginAttempts.get(ip)
+  if (a) { a.count++; a.lastAttempt = Date.now() }
+  else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
+}
+function clearAttempts(ip: string) { loginAttempts.delete(ip) }
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
   const body = await req.json().catch(() => ({}))
   const { action } = body
 
-  // Initialize DB on first call
+  // Initialize QT DB on first call
   await initQuotationDB().catch(() => {})
 
-  // STEP 1: Email + Password Login
+  // STEP 1: Email + Password Login (uses admin/download-users accounts)
   if (action === 'login') {
-    if (isLoginRateLimited(ip)) {
+    if (isRateLimited(ip)) {
       return NextResponse.json({ error: 'Too many login attempts. Please wait 15 minutes.' }, { status: 429 })
     }
     const { email, password } = body
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
-    const user = await getQtUserByEmail(email).catch(() => null)
+    const users = await getUsers()
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
     if (!user) {
-      recordLoginAttempt(ip)
+      recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
-    if (isAccountLocked(user)) {
-      return NextResponse.json({ error: 'Account is temporarily locked due to too many failed attempts. Please try again later.' }, { status: 403 })
+    if (!user.active) {
+      return NextResponse.json({ error: 'Account is disabled.' }, { status: 403 })
     }
-    const valid = await verifyQtPassword(password, user.password_hash)
-    if (!valid) {
-      await recordLoginFailure(user.id)
-      recordLoginAttempt(ip)
-      await writeQuotationAudit(user.id, user.email, 'login_failed', 'auth', user.id, { ip })
+    const hash = await hashPassword(password)
+    if (hash !== user.passwordHash) {
+      recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
-    clearLoginAttempts(ip)
-    // If TOTP is enabled, return partial token (pre-MFA)
-    if (user.totp_enabled) {
-      const preMfaToken = signQtToken(
-        { userId: user.id, email: user.email, name: user.name, role: user.role, mfaVerified: false },
-        300 // 5 minutes to complete TOTP
-      )
-      return NextResponse.json({ requireTotp: true, preMfaToken })
-    }
-    // TOTP not yet set up - return setup required
-    const setupToken = signQtToken(
-      { userId: user.id, email: user.email, name: user.name, role: user.role, mfaVerified: false },
-      600 // 10 minutes to set up TOTP
+    clearAttempts(ip)
+
+    // Send OTP email for 2FA (same as admin login)
+    const otp = generateOTP()
+    user.otp = otp
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    await saveUsers(users)
+
+    const preMfaToken = signQtToken(
+      { userId: user.id, email: user.email, name: user.contactName || user.email, role: 'admin', mfaVerified: false },
+      600 // 10 minutes to complete OTP
     )
-    return NextResponse.json({ requireTotpSetup: true, setupToken })
+
+    try {
+      await sendEmail(email, 'NextGuard Quotation - Login Verification Code', `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#22c55e">NextGuard Quotation System</h2>
+          <p>Your login verification code is:</p>
+          <div style="font-size:32px;font-weight:700;letter-spacing:6px;background:#f3f4f6;padding:16px 24px;border-radius:8px;text-align:center;margin:16px 0">${otp}</div>
+          <p style="color:#666;font-size:13px">This code expires in 10 minutes.</p>
+        </div>
+      `)
+    } catch (e) {
+      return NextResponse.json({ error: 'Failed to send verification email.' }, { status: 500 })
+    }
+
+    return NextResponse.json({ requireOtp: true, preMfaToken, message: 'Verification code sent to your email.' })
   }
 
-  // STEP 2a: Verify TOTP code
-  if (action === 'verify-totp') {
-    const { preMfaToken, totpCode } = body
-    if (!preMfaToken || !totpCode) {
-      return NextResponse.json({ error: 'Token and TOTP code are required.' }, { status: 400 })
+  // STEP 2: Verify OTP code
+  if (action === 'verify-otp') {
+    const { preMfaToken, otpCode } = body
+    if (!preMfaToken || !otpCode) {
+      return NextResponse.json({ error: 'Token and OTP code are required.' }, { status: 400 })
     }
     const rawPayload = verifyQtToken(preMfaToken)
     if (!rawPayload || rawPayload.mfaVerified) {
       return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 })
     }
-    const user = await getQtUserById(rawPayload.userId)
-    if (!user || !user.totp_secret) {
-      return NextResponse.json({ error: 'User not found or TOTP not configured.' }, { status: 401 })
+    const users = await getUsers()
+    const user = users.find(u => u.email.toLowerCase() === rawPayload.email.toLowerCase())
+    if (!user) {
+      return NextResponse.json({ error: 'User not found.' }, { status: 401 })
     }
-    const valid = await verifyTotpCode(user.totp_secret, totpCode)
-    if (!valid) {
-      recordLoginAttempt(ip)
-      await writeQuotationAudit(user.id, user.email, 'totp_failed', 'auth', user.id, { ip })
-      return NextResponse.json({ error: 'Invalid TOTP code. Please try again.' }, { status: 401 })
+    if (!user.otp || user.otp !== otpCode) {
+      recordAttempt(ip)
+      return NextResponse.json({ error: 'Invalid verification code.' }, { status: 401 })
     }
-    clearLoginAttempts(ip)
-    await recordLoginSuccess(user.id)
-    await writeQuotationAudit(user.id, user.email, 'login_success', 'auth', user.id, { ip })
-    const token = signQtToken({ userId: user.id, email: user.email, name: user.name, role: user.role, mfaVerified: true })
+    if (user.otpExpires && new Date(user.otpExpires) < new Date()) {
+      return NextResponse.json({ error: 'Verification code expired. Please login again.' }, { status: 401 })
+    }
+    // Clear OTP
+    clearAttempts(ip)
+    delete user.otp
+    delete user.otpExpires
+    user.lastLogin = new Date().toISOString()
+    user.loginCount = (user.loginCount || 0) + 1
+    await saveUsers(users)
+
+    const token = signQtToken({
+      userId: user.id, email: user.email,
+      name: user.contactName || user.email, role: 'admin', mfaVerified: true
+    })
     const response = NextResponse.json({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      token,
+      user: { id: user.id, email: user.email, name: user.contactName || user.email, role: 'admin' },
     })
-    response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
-    return response
-  }
-
-  // STEP 2b: Get TOTP setup QR code
-  if (action === 'setup-totp-init') {
-    const { setupToken } = body
-    if (!setupToken) return NextResponse.json({ error: 'Setup token required.' }, { status: 400 })
-    const rawPayload = verifyQtToken(setupToken)
-    if (!rawPayload) return NextResponse.json({ error: 'Invalid or expired setup token.' }, { status: 401 })
-    const secret = generateTotpSecret()
-    const uri = getTotpUri(secret, rawPayload.email)
-    const confirmToken = signQtToken(
-      { userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: rawPayload.role, mfaVerified: false },
-      600
-    ) + '.' + Buffer.from(secret).toString('base64url')
-    return NextResponse.json({ otpUri: uri, secret, confirmToken })
-  }
-
-  // STEP 2c: Confirm TOTP setup with first code
-  if (action === 'setup-totp-confirm') {
-    const { confirmToken, totpCode } = body
-    if (!confirmToken || !totpCode) {
-      return NextResponse.json({ error: 'Confirm token and TOTP code required.' }, { status: 400 })
-    }
-    const parts = confirmToken.split('.')
-    if (parts.length !== 4) return NextResponse.json({ error: 'Invalid confirm token.' }, { status: 400 })
-    const jwtPart = parts.slice(0, 3).join('.')
-    const secretB64 = parts[3]
-    const rawPayload = verifyQtToken(jwtPart)
-    if (!rawPayload) return NextResponse.json({ error: 'Invalid or expired confirm token.' }, { status: 401 })
-    const secret = Buffer.from(secretB64, 'base64url').toString()
-    const valid = await verifyTotpCode(secret, totpCode)
-    if (!valid) {
-      return NextResponse.json({ error: 'Invalid TOTP code. Please scan the QR code again.' }, { status: 400 })
-    }
-    await updateUserTotpSecret(rawPayload.userId, secret, true)
-    await recordLoginSuccess(rawPayload.userId)
-    await writeQuotationAudit(rawPayload.userId, rawPayload.email, 'totp_setup_complete', 'auth', rawPayload.userId, { ip })
-    const token = signQtToken({ userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: rawPayload.role, mfaVerified: true })
-    const response = NextResponse.json({
-      success: true,
-      user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: rawPayload.role },
-      token,
+    response.cookies.set('qt_session', token, {
+      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/'
     })
-    response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
     return response
   }
 
@@ -150,28 +201,13 @@ export async function POST(req: NextRequest) {
     return response
   }
 
-  // Init DB + seed (Admin only)
+  // Init DB + seed products (admin only)
   if (action === 'init-db') {
     const auth = authenticateQtRequest(req)
-    if (!auth || auth.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
-    }
+    if (!auth) return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
     await initQuotationDB()
     await seedDefaultProducts()
     return NextResponse.json({ success: true, message: 'DB initialized and products seeded.' })
-  }
-
-  // Create admin user (setup secret required)
-  if (action === 'create-admin') {
-    const { setupSecret, email, password, name, role } = body
-    const expectedSecret = process.env.QT_SETUP_SECRET
-    if (!expectedSecret || setupSecret !== expectedSecret) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
-    const { createQtAdminUser } = await import('@/lib/quotation-auth')
-    const user = await createQtAdminUser(email, password, name || email, role || 'admin')
-    await writeQuotationAudit(user.id, user.email, 'user_created', 'auth', user.id, { role: user.role })
-    return NextResponse.json({ success: true, userId: user.id, email: user.email })
   }
 
   return NextResponse.json({ error: 'Invalid action.' }, { status: 400 })
