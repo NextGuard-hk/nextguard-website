@@ -150,5 +150,37 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   await db.execute({ sql: `DELETE FROM qt_quotations WHERE id = ?`, args: [id] })
   await writeQuotationAudit(auth.userId, auth.email, 'quotation_deleted', 'quotation', id)
 
+  // PATCH - quick status update (used by detail page)
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = authenticateQtRequest(req)
+  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const db = getDB()
+  const body = await req.json().catch(() => ({}))
+
+  const qtResult = await db.execute({ sql: `SELECT * FROM qt_quotations WHERE id = ?`, args: [id] })
+  if (qtResult.rows.length === 0) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
+  const existing = qtResult.rows[0] as any
+
+  if (auth.role !== 'admin' && existing.created_by !== auth.userId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { status } = body
+  if (!status) return NextResponse.json({ error: 'status is required' }, { status: 400 })
+
+  const updates: string[] = [`status = ?`, `updated_at = datetime('now')`]
+  const args: any[] = [status]
+  if (status === 'sent') { updates.push(`sent_at = ?`); args.push(new Date().toISOString()) }
+  args.push(id)
+
+  await db.execute({ sql: `UPDATE qt_quotations SET ${updates.join(', ')} WHERE id = ?`, args })
+  await writeQuotationAudit(auth.userId, auth.email, 'status_updated', 'quotation', id, { status })
+
+  const updated = await db.execute({ sql: `SELECT * FROM qt_quotations WHERE id = ?`, args: [id] })
+  return NextResponse.json({ quotation: updated.rows[0] })
+}
+
   return NextResponse.json({ success: true })
 }
