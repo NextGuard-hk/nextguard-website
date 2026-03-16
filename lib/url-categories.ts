@@ -1,501 +1,337 @@
 // lib/url-categories.ts
-// Enterprise URL Categorization Engine v3.0 - Word-boundary keyword matching
-// Provides accurate category for every URL - clean or malicious
-// Enhanced: Dynamic DNS detection, suspicious TLD heuristics, domain pattern analysis
+// Enterprise URL Categorization Engine v5.0 - 100-Category Taxonomy
+// NextGuard Technology - Tier-One Grade URL Classification
 
+export const URL_TAXONOMY: Record<number,{slug:string;name:string;group:string;description:string;defaultAction:string;priority:number}> = {
+  // Security & Risk
+  1:{slug:'malware',name:'Malware',group:'Security & Risk',description:'Malware distribution, payloads, loaders',defaultAction:'Block',priority:1},
+  2:{slug:'phishing',name:'Phishing',group:'Security & Risk',description:'Credential phishing, brand impersonation login pages',defaultAction:'Block',priority:1},
+  3:{slug:'scam-fraud',name:'Scam/Fraud',group:'Security & Risk',description:'Investment scams, fake support, advance-fee fraud',defaultAction:'Block',priority:1},
+  4:{slug:'botnet-c2',name:'Botnet/C2',group:'Security & Risk',description:'Command-and-control infrastructure, botnet beacons',defaultAction:'Block',priority:1},
+  5:{slug:'exploit-attack-tools',name:'Exploit/Attack Tools',group:'Security & Risk',description:'Exploit kits, attack tools, weaponization resources',defaultAction:'Block',priority:2},
+  6:{slug:'suspicious',name:'Suspicious',group:'Security & Risk',description:'Highly suspicious but insufficient evidence for malicious verdict',defaultAction:'Alert',priority:2},
+  7:{slug:'newly-registered',name:'Newly Registered Domain',group:'Security & Risk',description:'Domain registered within past 30 days',defaultAction:'Alert',priority:2},
+  8:{slug:'dynamic-dns',name:'Dynamic DNS',group:'Security & Risk',description:'Dynamic DNS provider subdomain - commonly abused by malware',defaultAction:'Alert',priority:2},
+  9:{slug:'parked',name:'Parked/For Sale',group:'Security & Risk',description:'Parked or for-sale page with minimal content',defaultAction:'Alert',priority:3},
+  10:{slug:'uncategorized',name:'Uncategorized',group:'Security & Risk',description:'Unable to assign any category with sufficient confidence',defaultAction:'Alert',priority:5},
+  // Infrastructure
+  11:{slug:'cdn',name:'CDN',group:'Infrastructure',description:'Content delivery networks and edge caching services',defaultAction:'Allow',priority:4},
+  12:{slug:'dns-services',name:'DNS Services',group:'Infrastructure',description:'DNS resolvers, public DNS, DNS management tools',defaultAction:'Allow',priority:4},
+  13:{slug:'dns-over-https',name:'DNS over HTTPS',group:'Infrastructure',description:'Encrypted DNS endpoints - may bypass enterprise DNS policy',defaultAction:'Alert',priority:3},
+  14:{slug:'hosting',name:'Hosting/Colocation',group:'Infrastructure',description:'Web hosting, server rental, data-centre services',defaultAction:'Allow',priority:4},
+  15:{slug:'cloud-infrastructure',name:'Cloud Infrastructure',group:'Infrastructure',description:'IaaS/PaaS cloud platforms (AWS, GCP, Azure)',defaultAction:'Allow',priority:4},
+  16:{slug:'certificate-pki',name:'Certificate/PKI',group:'Infrastructure',description:'Certificate authorities, OCSP, CRL endpoints',defaultAction:'Allow',priority:4},
+  17:{slug:'domain-registrar',name:'Domain/Registrar',group:'Infrastructure',description:'Domain registrars, WHOIS, DNS management portals',defaultAction:'Allow',priority:4},
+  18:{slug:'network-utilities',name:'Network Utilities',group:'Infrastructure',description:'Ping, traceroute, port scanners, IP lookup tools',defaultAction:'Alert',priority:4},
+  19:{slug:'api-platforms',name:'API Platforms',group:'Infrastructure',description:'API gateways, iPaaS, developer API service platforms',defaultAction:'Allow',priority:4},
+  20:{slug:'software-updates',name:'Software Updates',group:'Infrastructure',description:'Legitimate vendor software updates and patch delivery',defaultAction:'Allow',priority:4},
+  // Business SaaS
+  21:{slug:'crm',name:'CRM',group:'Business SaaS',description:'Customer relationship management platforms',defaultAction:'Allow',priority:4},
+  22:{slug:'erp',name:'ERP',group:'Business SaaS',description:'Enterprise resource planning systems',defaultAction:'Allow',priority:4},
+  23:{slug:'hr-payroll',name:'HR/Payroll',group:'Business SaaS',description:'Human resources, payroll, leave, recruitment platforms',defaultAction:'Allow',priority:4},
+  24:{slug:'accounting-saas',name:'Accounting/Finance SaaS',group:'Business SaaS',description:'Accounting, expense management, corporate finance SaaS',defaultAction:'Allow',priority:4},
+  25:{slug:'project-management',name:'Project Management',group:'Business SaaS',description:'Task and project tracking, work management platforms',defaultAction:'Allow',priority:4},
+  26:{slug:'itsm-helpdesk',name:'ITSM/Helpdesk',group:'Business SaaS',description:'IT service management, ticketing, helpdesk systems',defaultAction:'Allow',priority:4},
+  27:{slug:'e-signature',name:'E-Signature',group:'Business SaaS',description:'Electronic signature and contract signing platforms',defaultAction:'Allow',priority:4},
+  28:{slug:'forms-survey',name:'Forms/Survey Tools',group:'Business SaaS',description:'Online forms, surveys, data-collection platforms',defaultAction:'Allow',priority:4},
+  29:{slug:'scheduling',name:'Scheduling/Booking',group:'Business SaaS',description:'Meeting booking and appointment scheduling tools',defaultAction:'Allow',priority:4},
+  30:{slug:'customer-support',name:'Customer Support/Chat',group:'Business SaaS',description:'Live-chat widgets, ticketing and customer-service platforms',defaultAction:'Allow',priority:4},
+  // Collaboration
+  31:{slug:'email',name:'Email',group:'Collaboration',description:'Webmail and enterprise email services',defaultAction:'Allow',priority:4},
+  32:{slug:'messaging',name:'Messaging',group:'Collaboration',description:'Instant messaging and real-time chat applications',defaultAction:'Allow',priority:4},
+  33:{slug:'team-collaboration',name:'Team Collaboration',group:'Collaboration',description:'Team workspaces, channels, collaborative platforms',defaultAction:'Allow',priority:4},
+  34:{slug:'video-conferencing',name:'Video Conferencing',group:'Collaboration',description:'Video meeting and voice-calling platforms',defaultAction:'Allow',priority:4},
+  35:{slug:'web-meetings',name:'Web Meetings',group:'Collaboration',description:'Webinar and online presentation systems',defaultAction:'Allow',priority:4},
+  36:{slug:'calendar',name:'Calendar/Contacts',group:'Collaboration',description:'Calendar, contacts and scheduling services',defaultAction:'Allow',priority:4},
+  37:{slug:'knowledge-wiki',name:'Knowledge/Wiki',group:'Collaboration',description:'Internal knowledge bases, wikis, documentation portals',defaultAction:'Allow',priority:4},
+  38:{slug:'doc-collaboration',name:'Document Collaboration',group:'Collaboration',description:'Online document co-editing and review platforms',defaultAction:'Allow',priority:4},
+  39:{slug:'enterprise-portals',name:'Enterprise Portals',group:'Collaboration',description:'Company intranet portals, employee self-service',defaultAction:'Allow',priority:4},
+  40:{slug:'productivity-suites',name:'Productivity Suites',group:'Collaboration',description:'Integrated office and productivity suites',defaultAction:'Allow',priority:4},
+  // Storage & Transfer
+  41:{slug:'cloud-storage',name:'Cloud Storage',group:'Storage & Transfer',description:'Cloud drives and file sync services',defaultAction:'Allow',priority:3},
+  42:{slug:'file-sharing',name:'File Sharing',group:'Storage & Transfer',description:'Public file-sharing links and hosted file sites',defaultAction:'Alert',priority:3},
+  43:{slug:'managed-file-transfer',name:'Managed File Transfer',group:'Storage & Transfer',description:'Secure managed file transfer platforms',defaultAction:'Allow',priority:4},
+  44:{slug:'backup-sync',name:'Backup/Sync',group:'Storage & Transfer',description:'Backup, sync and disaster-recovery platforms',defaultAction:'Allow',priority:4},
+  45:{slug:'object-storage',name:'Object Storage',group:'Storage & Transfer',description:'S3-compatible object storage endpoints',defaultAction:'Allow',priority:4},
+  46:{slug:'large-file-transfer',name:'Large File Transfer',group:'Storage & Transfer',description:'Large-file sending and delivery services',defaultAction:'Alert',priority:3},
+  47:{slug:'paste-sites',name:'Paste Sites',group:'Storage & Transfer',description:'Text paste, code snippet and clipboard-sharing sites',defaultAction:'Alert',priority:3},
+  48:{slug:'temp-file-hosting',name:'Temporary File Hosting',group:'Storage & Transfer',description:'Ephemeral file hosting with auto-expiry links',defaultAction:'Alert',priority:3},
+  49:{slug:'download-portals',name:'Download Portals',group:'Storage & Transfer',description:'Software, document and media download portals',defaultAction:'Allow',priority:4},
+  50:{slug:'document-repositories',name:'Document Repositories',group:'Storage & Transfer',description:'Academic and enterprise document libraries',defaultAction:'Allow',priority:4},
+  // Identity & Access
+  51:{slug:'identity-sso',name:'Identity/SSO',group:'Identity & Access',description:'Single sign-on, SAML/OIDC identity providers',defaultAction:'Allow',priority:3},
+  52:{slug:'mfa-authenticator',name:'MFA/Authenticator',group:'Identity & Access',description:'Multi-factor authentication and authenticator services',defaultAction:'Allow',priority:4},
+  53:{slug:'password-managers',name:'Password Managers',group:'Identity & Access',description:'Password vault and credential management tools',defaultAction:'Allow',priority:4},
+  54:{slug:'directory-services',name:'Directory Services',group:'Identity & Access',description:'Active Directory, LDAP and cloud directory services',defaultAction:'Allow',priority:4},
+  55:{slug:'remote-access',name:'Remote Access Portals',group:'Identity & Access',description:'Remote desktop portals, VDI gateways, jump servers',defaultAction:'Allow',priority:3},
+  56:{slug:'vpn-services',name:'VPN Services',group:'Identity & Access',description:'Commercial VPN service providers',defaultAction:'Alert',priority:3},
+  57:{slug:'proxy-anonymizer',name:'Proxy/Anonymizer',group:'Identity & Access',description:'Anonymous web proxies and censorship-bypass tools',defaultAction:'Block',priority:2},
+  58:{slug:'zero-trust',name:'Zero Trust Access',group:'Identity & Access',description:'ZTNA and application-layer secure access platforms',defaultAction:'Allow',priority:4},
+  59:{slug:'admin-consoles',name:'Admin Consoles',group:'Identity & Access',description:'Management dashboards and control-plane portals',defaultAction:'Allow',priority:3},
+  60:{slug:'privileged-access',name:'Privileged Access',group:'Identity & Access',description:'PAM platforms and privileged account operation portals',defaultAction:'Allow',priority:3},
+  // AI & Developer
+  61:{slug:'genai-chat',name:'Generative AI Chat',group:'AI & Developer',description:'General-purpose AI chat assistants and consumer AI tools',defaultAction:'Allow',priority:3},
+  62:{slug:'ai-coding',name:'AI Coding Assistants',group:'AI & Developer',description:'AI-powered code generation and developer assistants',defaultAction:'Allow',priority:3},
+  63:{slug:'ai-model-platforms',name:'AI Model Platforms',group:'AI & Developer',description:'Model APIs, fine-tuning, training and inference platforms',defaultAction:'Allow',priority:4},
+  64:{slug:'developer-docs',name:'Developer Docs',group:'AI & Developer',description:'Developer documentation, SDK references, technical docs',defaultAction:'Allow',priority:4},
+  65:{slug:'code-hosting',name:'Code Hosting',group:'AI & Developer',description:'Source-code hosting, version control and repository platforms',defaultAction:'Allow',priority:4},
+  66:{slug:'ci-cd',name:'CI/CD',group:'AI & Developer',description:'Continuous integration and deployment pipelines',defaultAction:'Allow',priority:4},
+  67:{slug:'package-repos',name:'Package Repositories',group:'AI & Developer',description:'Package registries and dependency download sources',defaultAction:'Allow',priority:4},
+  68:{slug:'container-registries',name:'Container Registries',group:'AI & Developer',description:'Container image registries and OCI distribution endpoints',defaultAction:'Allow',priority:4},
+  69:{slug:'devops-tools',name:'DevOps Tools',group:'AI & Developer',description:'Monitoring, observability, alerting and infrastructure tools',defaultAction:'Allow',priority:4},
+  70:{slug:'technical-forums',name:'Technical Forums',group:'AI & Developer',description:'Developer Q&A, technical communities and discussion boards',defaultAction:'Allow',priority:4},
+  // Media & Social
+  71:{slug:'social-networking',name:'Social Networking',group:'Media & Social',description:'Social networks and user interaction platforms',defaultAction:'Alert',priority:4},
+  72:{slug:'professional-networking',name:'Professional Networking',group:'Media & Social',description:'Professional social and job-recruiting platforms',defaultAction:'Allow',priority:4},
+  73:{slug:'forums-communities',name:'Forums/Communities',group:'Media & Social',description:'Forums, discussion boards and community sites',defaultAction:'Alert',priority:4},
+  74:{slug:'personal-blogs',name:'Personal Blogs',group:'Media & Social',description:'Personal websites, blogs and newsletters',defaultAction:'Alert',priority:4},
+  75:{slug:'news-media',name:'News/Media',group:'Media & Social',description:'News websites and media platforms',defaultAction:'Allow',priority:4},
+  76:{slug:'streaming-video',name:'Streaming Video',group:'Media & Social',description:'Video streaming and on-demand entertainment platforms',defaultAction:'Alert',priority:4},
+  77:{slug:'streaming-audio',name:'Streaming Audio/Radio',group:'Media & Social',description:'Music streaming, podcasts and internet radio',defaultAction:'Alert',priority:4},
+  78:{slug:'image-hosting',name:'Image Hosting',group:'Media & Social',description:'Image hosting, photo albums and gallery sites',defaultAction:'Alert',priority:4},
+  79:{slug:'url-shorteners',name:'URL Shorteners',group:'Media & Social',description:'URL shortening and redirect services',defaultAction:'Alert',priority:3},
+  80:{slug:'podcasts',name:'Podcasts',group:'Media & Social',description:'Podcast platforms and show directories',defaultAction:'Alert',priority:4},
+  // Commerce
+  81:{slug:'shopping',name:'Shopping',group:'Commerce',description:'Online shopping and retail stores',defaultAction:'Alert',priority:4},
+  82:{slug:'marketplaces',name:'Marketplaces',group:'Commerce',description:'Multi-seller trading and marketplace platforms',defaultAction:'Alert',priority:4},
+  83:{slug:'auctions-classifieds',name:'Auctions/Classifieds',group:'Commerce',description:'Auctions, classified ads and second-hand trading sites',defaultAction:'Alert',priority:4},
+  84:{slug:'payments-wallets',name:'Payments/Wallets',group:'Commerce',description:'Payment gateways, digital wallets, payment platforms',defaultAction:'Allow',priority:3},
+  85:{slug:'banking',name:'Banking',group:'Commerce',description:'Online banking, bank portals and financial service logins',defaultAction:'Allow',priority:3},
+  86:{slug:'trading-investment',name:'Trading/Investment',group:'Commerce',description:'Stock, fund and investment platforms',defaultAction:'Alert',priority:3},
+  87:{slug:'cryptocurrency',name:'Cryptocurrency',group:'Commerce',description:'Crypto exchanges, wallets and Web3 portals',defaultAction:'Alert',priority:3},
+  88:{slug:'travel-transportation',name:'Travel/Transportation',group:'Commerce',description:'Flight, hotel, transport and travel reservation platforms',defaultAction:'Alert',priority:4},
+  89:{slug:'food-dining',name:'Food/Dining',group:'Commerce',description:'Food delivery, restaurant discovery and dining info',defaultAction:'Alert',priority:4},
+  90:{slug:'real-estate',name:'Real Estate',group:'Commerce',description:'Property listing, real estate and rental platforms',defaultAction:'Alert',priority:4},
+  // Lifestyle & Regulated
+  91:{slug:'education',name:'Education',group:'Lifestyle & Regulated',description:'Schools, education institutions and learning platforms',defaultAction:'Allow',priority:4},
+  92:{slug:'government',name:'Government',group:'Lifestyle & Regulated',description:'Government agencies, public services and civic portals',defaultAction:'Allow',priority:4},
+  93:{slug:'health-medicine',name:'Health/Medicine',group:'Lifestyle & Regulated',description:'Medical info, clinics, hospitals and health services',defaultAction:'Allow',priority:4},
+  94:{slug:'legal',name:'Legal',group:'Lifestyle & Regulated',description:'Legal services, law firms and regulatory information',defaultAction:'Alert',priority:4},
+  95:{slug:'religion',name:'Religion',group:'Lifestyle & Regulated',description:'Religious organizations and faith information sites',defaultAction:'Alert',priority:4},
+  96:{slug:'adult',name:'Adult',group:'Lifestyle & Regulated',description:'Adult content and adult entertainment services',defaultAction:'Block',priority:1},
+  97:{slug:'gambling',name:'Gambling',group:'Lifestyle & Regulated',description:'Betting, gambling, wagering and casino services',defaultAction:'Block',priority:1},
+  98:{slug:'alcohol-tobacco',name:'Alcohol/Tobacco',group:'Lifestyle & Regulated',description:'Alcohol, tobacco and related product sites',defaultAction:'Alert',priority:4},
+  99:{slug:'games',name:'Games',group:'Lifestyle & Regulated',description:'Video games, gaming platforms and game downloads',defaultAction:'Alert',priority:4},
+  100:{slug:'recreation-hobbies',name:'Recreation/Hobbies',group:'Lifestyle & Regulated',description:'Hobbies, leisure, clubs and personal interest sites',defaultAction:'Alert',priority:4},
+};
+
+// Helper: get category name by ID
+export function getCategoryName(id: number): string {
+  return URL_TAXONOMY[id]?.name ?? 'Uncategorized';
+}
+
+// Helper: get all category slugs list
+export const CATEGORY_SLUGS = Object.values(URL_TAXONOMY).map(c => c.slug);
+
+// Helper: get categories by group
+export function getCategoriesByGroup(group: string) {
+  return Object.entries(URL_TAXONOMY)
+    .filter(([,v]) => v.group === group)
+    .map(([id,v]) => ({id: Number(id), ...v}));
+}
+
+// ══════════════════════════════════════════
+// SECTION 2 - DOMAIN CATEGORIES
+// ══════════════════════════════════════════
 const DOMAIN_CATEGORIES: Record<string, string[]> = {
-  'google.com':['Search Engine'],'bing.com':['Search Engine'],
-  'yahoo.com':['Search Engine','News & Media'],'baidu.com':['Search Engine'],
-  'duckduckgo.com':['Search Engine','Privacy Tools'],
-  'facebook.com':['Social Media'],'instagram.com':['Social Media'],
-  'twitter.com':['Social Media'],'x.com':['Social Media'],
-  'linkedin.com':['Social Media','Job Search'],'tiktok.com':['Social Media'],
-  'snapchat.com':['Social Media'],'pinterest.com':['Social Media'],
-  'reddit.com':['Social Media','Forum & Community'],
-  'discord.com':['Social Media','Gaming'],'slack.com':['Business & Economy'],
-  'weibo.com':['Social Media'],'telegram.org':['Email & Messaging'],
-  'whatsapp.com':['Email & Messaging'],'signal.org':['Email & Messaging','Privacy Tools'],
-  'zoom.us':['Email & Messaging','Business & Economy'],
-  'gmail.com':['Email & Messaging'],'outlook.com':['Email & Messaging'],
-    'office.com':['Email & Messaging','Cloud Services'],'office365.com':['Email & Messaging','Cloud Services'],
-  'protonmail.com':['Email & Messaging','Privacy Tools'],
-  'cnn.com':['News & Media'],'bbc.com':['News & Media'],
-  'nytimes.com':['News & Media'],'reuters.com':['News & Media'],
-  'bloomberg.com':['News & Media','Finance & Banking'],
-  'wsj.com':['News & Media','Finance & Banking'],
-  'techcrunch.com':['News & Media','Technology'],
-  'theverge.com':['News & Media','Technology'],
-  'scmp.com':['News & Media'],'hk01.com':['News & Media'],
-  'mingpao.com':['News & Media'],'rthk.hk':['News & Media'],
-  'sina.com.cn':['News & Media'],'163.com':['News & Media'],
-  'nba.com':['Sports'],'nfl.com':['Sports'],'mlb.com':['Sports'],
-  'espn.com':['Sports','Streaming Media'],'fifa.com':['Sports'],
-  'premierleague.com':['Sports'],'uefa.com':['Sports'],
-  'skysports.com':['Sports','News & Media'],
-  'bleacherreport.com':['Sports','News & Media'],
-  'goal.com':['Sports'],'formula1.com':['Sports'],'ufc.com':['Sports'],
-  'olympics.com':['Sports'],'cricinfo.com':['Sports'],'livescore.com':['Sports'],'7m.com':['Gambling','Sports'],
-  'netflix.com':['Streaming Media','Entertainment'],
-  'youtube.com':['Streaming Media','Video'],
-  'hulu.com':['Streaming Media','Entertainment'],
-  'disneyplus.com':['Streaming Media','Entertainment'],
-  'twitch.tv':['Streaming Media','Gaming'],
-  'spotify.com':['Music','Streaming Media'],
-  'soundcloud.com':['Music'],'tidal.com':['Music'],
-  'vimeo.com':['Video'],'bilibili.com':['Streaming Media','Entertainment'],
-  'iqiyi.com':['Streaming Media','Entertainment'],
-  'steam.com':['Gaming'],'store.steampowered.com':['Gaming'],
-  'epicgames.com':['Gaming'],'roblox.com':['Gaming'],
-  'blizzard.com':['Gaming'],'ea.com':['Gaming'],
-  'nintendo.com':['Gaming'],'playstation.com':['Gaming'],
-  'xbox.com':['Gaming'],'ign.com':['Gaming','News & Media'],
-  'paypal.com':['Finance & Banking'],'stripe.com':['Finance & Banking'],
-  'hsbc.com':['Finance & Banking'],'citibank.com':['Finance & Banking'],
-  'chase.com':['Finance & Banking'],'hangseng.com':['Finance & Banking'],
-  'bochk.com':['Finance & Banking'],'hkex.com.hk':['Finance & Banking'],
-  'wise.com':['Finance & Banking'],'revolut.com':['Finance & Banking'],
-  'coinbase.com':['Cryptocurrency','Finance & Banking'],
-  'binance.com':['Cryptocurrency'],'kraken.com':['Cryptocurrency'],
-  'opensea.io':['Cryptocurrency'],'coingecko.com':['Cryptocurrency'],
-  'amazon.com':['Shopping & E-Commerce'],'ebay.com':['Shopping & E-Commerce'],
-  'shopify.com':['Shopping & E-Commerce'],'etsy.com':['Shopping & E-Commerce'],
-  'aliexpress.com':['Shopping & E-Commerce'],'taobao.com':['Shopping & E-Commerce'],
-  'jd.com':['Shopping & E-Commerce'],'hktvmall.com':['Shopping & E-Commerce'],
-  'apple.com':['Technology','Shopping & E-Commerce'],
-  'microsoft.com':['Technology','Software Development'],
-  'ibm.com':['Technology'],'oracle.com':['Technology'],
-  'salesforce.com':['Technology','SaaS'],'adobe.com':['Technology','SaaS'],
-  'github.com':['Software Development'],'gitlab.com':['Software Development'],
-  'stackoverflow.com':['Software Development','Forum & Community'],
-  'aws.amazon.com':['Cloud Services'],'cloud.google.com':['Cloud Services'],
-  'azure.microsoft.com':['Cloud Services'],'cloudflare.com':['Cloud Services'],
-  'vercel.com':['Cloud Services','Software Development'],
-  'dropbox.com':['Cloud Services','File Sharing'],
-  'coursera.org':['Education'],'udemy.com':['Education'],
-  'wikipedia.org':['Education','Reference'],
-  'mit.edu':['Education'],'harvard.edu':['Education'],
-  'hku.hk':['Education'],'cuhk.edu.hk':['Education'],
-  'gov.hk':['Government'],'info.gov.hk':['Government'],
-  'police.gov.hk':['Government'],'ird.gov.hk':['Government'],
-  'usa.gov':['Government'],'gov.uk':['Government'],
-  'who.int':['Healthcare'],'webmd.com':['Healthcare'],
-  'mayoclinic.org':['Healthcare'],'ha.org.hk':['Healthcare'],
-  'pornhub.com':['Adult Content'],'xvideos.com':['Adult Content'],
-  'onlyfans.com':['Adult Content'],
-  'bet365.com':['Gambling'],'draftkings.com':['Gambling'],
-  'hkjc.com':['Gambling','Sports'],'hkjc.com.hk':['Gambling','Sports'],
-  'macauslot.com':['Gambling'],'sbobet.com':['Gambling','Sports'],
-  'paddypower.com':['Gambling'],'williamhill.com':['Gambling'],
-  'ladbrokes.com':['Gambling'],'888.com':['Gambling'],
-  'pokerstars.com':['Gambling'],'betfair.com':['Gambling','Sports'],
-  'unibet.com':['Gambling'],'bwin.com':['Gambling'],
-  'betway.com':['Gambling'],'fanduel.com':['Gambling','Sports'],
-  'mark6.com.hk':['Gambling'],'melco-resorts.com':['Gambling','Entertainment'],
-  'galaxy-macau.com':['Gambling','Entertainment'],'venetianmacao.com':['Gambling','Entertainment'],
-  'sjmresorts.com':['Gambling','Entertainment','Travel'],'sjmholdings.com':['Gambling','Entertainment'],
-  'wynnresorts.com':['Gambling','Entertainment','Travel'],'wynnmacau.com':['Gambling','Entertainment'],
-  'mgm.com':['Gambling','Entertainment'],'mgmresorts.com':['Gambling','Entertainment','Travel'],
-  'sandschina.com':['Gambling','Entertainment'],'cotaistrip.com':['Gambling','Entertainment'],
-  'studiocity-macau.com':['Gambling','Entertainment'],'grandlisboa.com':['Gambling','Entertainment'],
-  'tinder.com':['Dating'],'match.com':['Dating'],'bumble.com':['Dating'],
-  'nordvpn.com':['VPN & Proxy'],'expressvpn.com':['VPN & Proxy'],
-  'torproject.org':['Privacy Tools'],
-  'mega.nz':['File Sharing'],'wetransfer.com':['File Sharing'],
-  'pastebin.com':['Paste Site'],
-  'bit.ly':['URL Shortener'],'tinyurl.com':['URL Shortener'],
-  't.co':['URL Shortener'],'rb.gy':['URL Shortener'],
-  'cloudfront.net':['CDN & Infrastructure'],'fastly.net':['CDN & Infrastructure'],
-  'booking.com':['Travel'],'airbnb.com':['Travel'],
-  'expedia.com':['Travel'],'tripadvisor.com':['Travel'],
-  'cathaypacific.com':['Travel'],'skyscanner.com':['Travel'],
-  'doordash.com':['Food & Dining'],'ubereats.com':['Food & Dining'],
-  'foodpanda.com':['Food & Dining'],'openrice.com':['Food & Dining'],
-  'indeed.com':['Job Search'],'glassdoor.com':['Job Search'],
-  'jobsdb.com':['Job Search'],
-  'openai.com':['Generative AI','Technology'],
-  'chat.openai.com':['Generative AI'],'claude.ai':['Generative AI'],
-  'perplexity.ai':['Generative AI'],'gemini.google.com':['Generative AI'],
-  'thepiratebay.org':['Torrent & P2P','Piracy'],
-  '1337x.to':['Torrent & P2P','Piracy'],   'chatgpt.com':['Generative AI'],'copilot.microsoft.com':['Generative AI'],   'booking.com':['Travel'],'airbnb.com':['Travel'],   'uber.com':['Transportation'],'lyft.com':['Transportation'],   'weather.com':['Weather'],'accuweather.com':['Weather'],   'imdb.com':['Entertainment','Reference'],'rottentomatoes.com':['Entertainment'],   'craigslist.org':['Classifieds'],'zillow.com':['Real Estate'],   'webex.com':['Email & Messaging','Business & Economy'],   'teams.microsoft.com':['Email & Messaging','Business & Economy'],
-    // v4.2 Extended domains for better coverage
-  'example.com':['Reserved Domain'],'example.net':['Reserved Domain'],'example.org':['Reserved Domain'],
-  'wix.com':['Web Hosting','Website Builder'],'squarespace.com':['Web Hosting','Website Builder'],
-  'godaddy.com':['Web Hosting','Domain Services'],'namecheap.com':['Web Hosting','Domain Services'],
-  'medium.com':['Blog & Personal','News & Media'],'substack.com':['Blog & Personal','News & Media'],
-  'notion.so':['SaaS','Productivity'],'airtable.com':['SaaS','Productivity'],
-  'figma.com':['SaaS','Software Development'],'canva.com':['SaaS','Design'],
-  'trello.com':['SaaS','Productivity'],'asana.com':['SaaS','Productivity'],
-  'hubspot.com':['SaaS','Marketing'],'mailchimp.com':['SaaS','Email & Messaging'],
-  'zendesk.com':['SaaS','Customer Service'],'intercom.com':['SaaS','Customer Service'],
-  'stripe.com':['Finance & Banking','SaaS'],'square.com':['Finance & Banking'],
-  'robinhood.com':['Finance & Banking','Investment'],'etrade.com':['Finance & Banking','Investment'],
-  'fidelity.com':['Finance & Banking','Investment'],'schwab.com':['Finance & Banking','Investment'],
-  'ally.com':['Finance & Banking'],'sofi.com':['Finance & Banking'],
-  'grammarly.com':['SaaS','Education'],'duolingo.com':['Education'],
-  'khanacademy.org':['Education'],'edx.org':['Education'],
-  'skillshare.com':['Education'],'masterclass.com':['Education','Entertainment'],
-  'twitch.tv':['Streaming Media','Gaming'],'kick.com':['Streaming Media','Gaming'],
-  'crunchyroll.com':['Streaming Media','Entertainment'],'funimation.com':['Streaming Media','Entertainment'],
-  'hbomax.com':['Streaming Media','Entertainment'],'peacocktv.com':['Streaming Media','Entertainment'],
-  'primevideo.com':['Streaming Media','Entertainment'],'paramountplus.com':['Streaming Media','Entertainment'],
-  'nike.com':['Shopping & E-Commerce','Fashion & Apparel'],'adidas.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'walmart.com':['Shopping & E-Commerce'],'target.com':['Shopping & E-Commerce'],
-  'bestbuy.com':['Shopping & E-Commerce','Technology'],'newegg.com':['Shopping & E-Commerce','Technology'],
-  'costco.com':['Shopping & E-Commerce'],'wayfair.com':['Shopping & E-Commerce','Home & Garden'],
-  'ikea.com':['Shopping & E-Commerce','Home & Garden'],
-  'akamai.net':['CDN & Infrastructure'],'jsdelivr.net':['CDN & Infrastructure'],
-  'unpkg.com':['CDN & Infrastructure'],'cdnjs.cloudflare.com':['CDN & Infrastructure'],
-  'digitalocean.com':['Cloud Services'],'linode.com':['Cloud Services'],
-  'heroku.com':['Cloud Services','Software Development'],'netlify.com':['Cloud Services','Software Development'],
-  'render.com':['Cloud Services','Software Development'],'fly.io':['Cloud Services'],
-  'docker.com':['Software Development'],'npm.js':['Software Development'],
-  'pypi.org':['Software Development'],'npmjs.com':['Software Development'],
-  'crates.io':['Software Development'],'rubygems.org':['Software Development'],
-  'datadog.com':['SaaS','Monitoring'],'newrelic.com':['SaaS','Monitoring'],
-  'sentry.io':['SaaS','Software Development'],'grafana.com':['SaaS','Monitoring'],
-  'cloudflare.com':['Cloud Services','CDN & Infrastructure'],
-  'ahrefs.com':['SaaS','Marketing'],'semrush.com':['SaaS','Marketing'],
-  'moz.com':['SaaS','Marketing'],'similarweb.com':['SaaS','Marketing'],
-  'whatsapp.com':['Email & Messaging'],'line.me':['Email & Messaging'],
-  'viber.com':['Email & Messaging'],'kakaotalk.com':['Email & Messaging'],
-  'webex.com':['Email & Messaging','Business & Economy'],
-  'uber.com':['Transportation'],'lyft.com':['Transportation'],'grab.com':['Transportation'],
-  'doordash.com':['Food & Dining'],'grubhub.com':['Food & Dining'],
-  'yelp.com':['Food & Dining','Reference'],'zomato.com':['Food & Dining'],
-  'naver.com':['Search Engine','News & Media'],'yandex.com':['Search Engine'],
-  'dw.com':['News & Media'],'aljazeera.com':['News & Media'],'apnews.com':['News & Media'],
-  'theguardian.com':['News & Media'],'washingtonpost.com':['News & Media'],
-  'foxnews.com':['News & Media'],'nbcnews.com':['News & Media'],
-  'abcnews.go.com':['News & Media'],'cbsnews.com':['News & Media'],
-  'forbes.com':['News & Media','Business & Economy'],'fortune.com':['News & Media','Business & Economy'],
-  'wired.com':['News & Media','Technology'],'arstechnica.com':['News & Media','Technology'],
-  'engadget.com':['News & Media','Technology'],'zdnet.com':['News & Media','Technology'],
-  'cnet.com':['News & Media','Technology'],'tomshardware.com':['News & Media','Technology'],
-  'pcmag.com':['News & Media','Technology'],
-  'arxiv.org':['Education','Reference'],'researchgate.net':['Education','Reference'],
-  'scholar.google.com':['Education','Reference'],'jstor.org':['Education','Reference'],
-  'archive.org':['Reference'],'gutenberg.org':['Reference','Education'],
-  'quora.com':['Forum & Community','Reference'],
-  'producthunt.com':['Technology','Forum & Community'],
-  'hackernews.com':['Technology','Forum & Community'],'news.ycombinator.com':['Technology','Forum & Community'],
-  'deviantart.com':['Entertainment','Photography & Images'],
-  'flickr.com':['Photography & Images'],'unsplash.com':['Photography & Images'],
-  'pexels.com':['Photography & Images'],'shutterstock.com':['Photography & Images'],
-  'gettyimages.com':['Photography & Images'],
-  'behance.net':['Design','Photography & Images'],'dribbble.com':['Design'],
-  'fiverr.com':['Business & Economy','Job Search'],'upwork.com':['Business & Economy','Job Search'],
-  'freelancer.com':['Business & Economy','Job Search'],
-  'surveymonkey.com':['SaaS','Business & Economy'],'typeform.com':['SaaS','Business & Economy'],
-  'calendly.com':['SaaS','Productivity'],'doodle.com':['SaaS','Productivity'],
-  'loom.com':['SaaS','Productivity'],'miro.com':['SaaS','Productivity'],
-  '1password.com':['Security'],'lastpass.com':['Security'],'bitwarden.com':['Security'],
-  'malwarebytes.com':['Security'],'kaspersky.com':['Security'],'norton.com':['Security'],
-  'mcafee.com':['Security'],'avast.com':['Security'],
-  'zscaler.com':['Security','Cloud Services'],'paloaltonetworks.com':['Security'],
-  'crowdstrike.com':['Security'],'fortinet.com':['Security'],
-  'cisco.com':['Technology','Networking'],'juniper.net':['Technology','Networking'],
-  'arista.com':['Technology','Networking'],'vmware.com':['Technology','Cloud Services'],
-  'dell.com':['Technology','Shopping & E-Commerce'],'hp.com':['Technology','Shopping & E-Commerce'],
-  'lenovo.com':['Technology','Shopping & E-Commerce'],'asus.com':['Technology','Shopping & E-Commerce'],
-  'samsung.com':['Technology','Shopping & E-Commerce'],'sony.com':['Technology','Entertainment'],
-  'lg.com':['Technology','Shopping & E-Commerce'],
-  'reuters.com':['News & Media'],'ap.org':['News & Media'],
-  // v4.6 Extended domains - Major coverage improvements
-  // Gambling - Extended
-  'hkjc.com':['Gambling','Sports'],'betfair.com':['Gambling'],'williamhill.com':['Gambling'],
-  'paddypower.com':['Gambling'],'ladbrokes.com':['Gambling'],'coral.co.uk':['Gambling'],
-  '888.com':['Gambling'],'pokerstars.com':['Gambling'],'partypoker.com':['Gambling'],
-  'betway.com':['Gambling'],'unibet.com':['Gambling'],'bwin.com':['Gambling'],
-  'pinnacle.com':['Gambling'],'sbobet.com':['Gambling'],'maxbet.com':['Gambling'],
-  'fun88.com':['Gambling'],'w88.com':['Gambling'],'12bet.com':['Gambling'],
-  'dafabet.com':['Gambling'],'m88.com':['Gambling'],'188bet.com':['Gambling'],
-  'happyvalley.hk':['Gambling','Entertainment'],
-  'venetianmacao.com':['Gambling','Entertainment','Travel'],
-  'cotaistrip.com':['Gambling','Entertainment','Travel'],
-  'casinolisboa.com':['Gambling','Entertainment'],
-  'grandlisboa.com':['Gambling','Entertainment'],
-  'fanduel.com':['Gambling','Sports'],'caesars.com':['Gambling','Entertainment'],
-  'mgmresorts.com':['Gambling','Entertainment','Travel'],
-  'lasvegassands.com':['Gambling','Entertainment'],
-  'wynresorts.com':['Gambling','Entertainment','Travel'],
-  'hardrock.com':['Gambling','Entertainment'],
-  // Adult Content - Extended
-  'xhamster.com':['Adult Content'],'redtube.com':['Adult Content'],
-  'youporn.com':['Adult Content'],'tube8.com':['Adult Content'],
-  'brazzers.com':['Adult Content'],'chaturbate.com':['Adult Content'],
-  'stripchat.com':['Adult Content'],'bongacams.com':['Adult Content'],
-  'cam4.com':['Adult Content'],'livejasmin.com':['Adult Content'],
-  'pornhub.com':['Adult Content'],'xnxx.com':['Adult Content'],
-  'spankbang.com':['Adult Content'],'eporner.com':['Adult Content'],
-  // China/HK Popular Domains
-  'wechat.com':['Email & Messaging','Social Media'],'weixin.qq.com':['Email & Messaging','Social Media'],
-  'qq.com':['Email & Messaging','Social Media'],'douyin.com':['Social Media','Streaming Media'],
-  'xiaohongshu.com':['Social Media','Shopping & E-Commerce'],
-  'zhihu.com':['Forum & Community','Education'],
-  'douban.com':['Entertainment','Forum & Community'],
-  'tmall.com':['Shopping & E-Commerce'],'pinduoduo.com':['Shopping & E-Commerce'],
-  'meituan.com':['Food & Dining','Shopping & E-Commerce'],
-  'ele.me':['Food & Dining'],'dianping.com':['Food & Dining','Reference'],
-  'ctrip.com':['Travel'],'trip.com':['Travel'],'qunar.com':['Travel'],
-  'alipay.com':['Finance & Banking'],'ant.com':['Finance & Banking'],
-  'tenpay.com':['Finance & Banking'],
-  'icbc.com.cn':['Finance & Banking'],'ccb.com':['Finance & Banking'],
-  'boc.cn':['Finance & Banking'],'abchina.com':['Finance & Banking'],
-  'cmbchina.com':['Finance & Banking'],'bankcomm.com':['Finance & Banking'],
-  'standardchartered.com.hk':['Finance & Banking'],
-  'dbs.com.hk':['Finance & Banking'],'sc.com':['Finance & Banking'],
-  'hkma.gov.hk':['Government','Finance & Banking'],
-  'sfc.hk':['Government','Finance & Banking'],
-  'ifeng.com':['News & Media'],'sohu.com':['News & Media'],
-  'xinhuanet.com':['News & Media'],'people.com.cn':['News & Media'],
-  'chinadaily.com.cn':['News & Media'],
-  'thestandard.com.hk':['News & Media'],'hkfp.com':['News & Media'],
-  'ejinsight.com':['News & Media'],'bastillepost.com':['News & Media'],
-  'on.cc':['News & Media'],'orientaldaily.on.cc':['News & Media'],
-  'am730.com.hk':['News & Media'],'hket.com':['News & Media'],
-  'singtao.com':['News & Media'],'takungpao.com':['News & Media'],
-  // More Shopping (Asia)
-  'lazada.com':['Shopping & E-Commerce'],'shopee.com':['Shopping & E-Commerce'],
-  'zalora.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'uniqlo.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'zara.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'hm.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'asos.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'sephora.com':['Shopping & E-Commerce','Fashion & Apparel'],
-  'strawberrynet.com':['Shopping & E-Commerce'],
-  'price.com.hk':['Shopping & E-Commerce','Reference'],
-  'gmarket.co.kr':['Shopping & E-Commerce'],
-  'rakuten.co.jp':['Shopping & E-Commerce'],
-  'mercari.com':['Shopping & E-Commerce'],
-  // More Streaming/Entertainment
-  'pandora.com':['Music','Streaming Media'],'deezer.com':['Music','Streaming Media'],
-  'applemusic.com':['Music','Streaming Media'],'music.apple.com':['Music','Streaming Media'],
-  'music.youtube.com':['Music','Streaming Media'],
-  'tv.apple.com':['Streaming Media','Entertainment'],
-  'discoveryplus.com':['Streaming Media','Entertainment'],
-  'showtime.com':['Streaming Media','Entertainment'],
-  'starz.com':['Streaming Media','Entertainment'],
-  'mytvsuper.com':['Streaming Media','Entertainment'],
-  'viu.com':['Streaming Media','Entertainment'],
-  'wetv.vip':['Streaming Media','Entertainment'],
-  'mgtv.com':['Streaming Media','Entertainment'],
-  'youku.com':['Streaming Media','Entertainment'],
-  // VPN & Proxy - Extended
-  'surfshark.com':['VPN & Proxy'],'cyberghostvpn.com':['VPN & Proxy'],
-  'privateinternetaccess.com':['VPN & Proxy'],'protonvpn.com':['VPN & Proxy'],
-  'mullvad.net':['VPN & Proxy'],'ipvanish.com':['VPN & Proxy'],
-  'windscribe.com':['VPN & Proxy'],'hide.me':['VPN & Proxy'],
-  'purevpn.com':['VPN & Proxy'],'astrill.com':['VPN & Proxy'],
-  // Typosquatting/Phishing common
-  'googel.com':['Phishing','Suspicious'],'gogle.com':['Phishing','Suspicious'],
-  'gooogle.com':['Phishing','Suspicious'],'g00gle.com':['Phishing','Suspicious'],
-  'faceb00k.com':['Phishing','Suspicious'],'faceboook.com':['Phishing','Suspicious'],
-  'arnazon.com':['Phishing','Suspicious'],'armazon.com':['Phishing','Suspicious'],
-  'arnazon.com':['Phishing','Suspicious'],'armazon.com':['Phishing','Suspicious'],
-  'paypa1.com':['Phishing','Suspicious'],'paypaI.com':['Phishing','Suspicious'],
-  'mircosoft.com':['Phishing','Suspicious'],'micorsoft.com':['Phishing','Suspicious'],
-  'microsfot.com':['Phishing','Suspicious'],'microsotf.com':['Phishing','Suspicious'],
-  'netfliix.com':['Phishing','Suspicious'],'netfl1x.com':['Phishing','Suspicious'],
-  'lnstagram.com':['Phishing','Suspicious'],'1nstagram.com':['Phishing','Suspicious'],
-  'twltter.com':['Phishing','Suspicious'],'tw1tter.com':['Phishing','Suspicious'],
-  'linkedln.com':['Phishing','Suspicious'],'llnkedin.com':['Phishing','Suspicious'],
-  'app1e.com':['Phishing','Suspicious'],'appIe.com':['Phishing','Suspicious'],
-  // More Finance/Crypto
-  'crypto.com':['Cryptocurrency','Finance & Banking'],
-  'blockchain.com':['Cryptocurrency'],'gemini.com':['Cryptocurrency'],
-  'ftx.com':['Cryptocurrency'],'kucoin.com':['Cryptocurrency'],
-  'bitfinex.com':['Cryptocurrency'],'huobi.com':['Cryptocurrency'],
-  'okx.com':['Cryptocurrency'],'bybit.com':['Cryptocurrency'],
-  'gate.io':['Cryptocurrency'],'mexc.com':['Cryptocurrency'],
-  'uniswap.org':['Cryptocurrency','Finance & Banking'],
-  'aave.com':['Cryptocurrency','Finance & Banking'],
-  'lido.fi':['Cryptocurrency'],'curve.fi':['Cryptocurrency'],
-  // Weapons & Controversial
-  'gunbroker.com':['Weapons'],'budsgunshop.com':['Weapons'],
-  'palmettostatearmory.com':['Weapons'],'smith-wesson.com':['Weapons'],
-  // More Education
-  'udacity.com':['Education'],'codecademy.com':['Education','Software Development'],
-  'pluralsight.com':['Education','Software Development'],
-  'linkedin.com/learning':['Education'],
-  'brilliant.org':['Education'],'ted.com':['Education','Entertainment'],
-  'hkust.edu.hk':['Education'],'polyu.edu.hk':['Education'],
-  'cityu.edu.hk':['Education'],'ln.edu.hk':['Education'],
-  'eduhk.hk':['Education'],'hkbu.edu.hk':['Education'],
-  // More Social Media
-  'threads.net':['Social Media'],'mastodon.social':['Social Media'],
-  'tumblr.com':['Social Media','Blog & Personal'],
-  'lemon8-app.com':['Social Media'],
-  'clubhouse.com':['Social Media'],
-  'kuaishou.com':['Social Media','Streaming Media'],
-  // Dating - Extended
-  'hinge.co':['Dating'],'okcupid.com':['Dating'],
-  'pof.com':['Dating'],'grindr.com':['Dating'],
-  'tantan.com':['Dating'],'momo.com':['Dating','Social Media'],
-  // Real Estate HK
-  '28hse.com':['Real Estate'],'midland.com.hk':['Real Estate'],
-  'centaline.com':['Real Estate'],'ricacorp.com':['Real Estate'],
-  'squarefoot.com.hk':['Real Estate'],'spacious.hk':['Real Estate'],
-  'hongkongproperty.com':['Real Estate'],
-  // More Travel
-  'agoda.com':['Travel'],'klook.com':['Travel','Entertainment'],
-  'kkday.com':['Travel','Entertainment'],
-  'hotels.com':['Travel'],'trivago.com':['Travel'],
-  'hkexpress.com':['Travel'],'hongkongairlines.com':['Travel'],
-  'dragonair.com':['Travel'],'airasia.com':['Travel'],
-  // ISP/Telecom
-  'pccw.com':['Technology','Telecommunications'],
-  'hkt.com':['Technology','Telecommunications'],
-  '3hk.com.hk':['Technology','Telecommunications'],
-  'smartone.com':['Technology','Telecommunications'],
-  'chinaunicom.com.hk':['Technology','Telecommunications'],
-  'cmhk.com':['Technology','Telecommunications'],
+  // Social
+  'facebook.com':['Social Networking'],'instagram.com':['Social Networking'],'twitter.com':['Social Networking'],'x.com':['Social Networking'],
+  'linkedin.com':['Professional Networking'],'tiktok.com':['Social Networking'],'snapchat.com':['Social Networking'],'pinterest.com':['Social Networking'],
+  'reddit.com':['Forums/Communities'],'threads.net':['Social Networking'],'mastodon.social':['Social Networking'],
+  'weibo.com':['Social Networking'],'xiaohongshu.com':['Social Networking','Shopping'],'douyin.com':['Social Networking','Streaming Video'],
+  // Messaging & Collaboration
+  'discord.com':['Messaging','Team Collaboration'],'slack.com':['Team Collaboration'],'telegram.org':['Messaging'],'whatsapp.com':['Messaging'],
+  'signal.org':['Messaging'],'line.me':['Messaging'],'wechat.com':['Messaging'],'qq.com':['Messaging'],
+  'zoom.us':['Video Conferencing'],'webex.com':['Web Meetings'],'teams.microsoft.com':['Team Collaboration','Video Conferencing'],
+  // Email & Productivity
+  'gmail.com':['Email'],'outlook.com':['Email','Productivity Suites'],'protonmail.com':['Email'],'proton.me':['Email'],
+  'office.com':['Productivity Suites'],'office365.com':['Productivity Suites'],'notion.so':['Team Collaboration','Document Collaboration'],
+  'figma.com':['Team Collaboration'],'canva.com':['Productivity Suites'],'trello.com':['Project Management'],'asana.com':['Project Management'],
+  'airtable.com':['Project Management'],'miro.com':['Team Collaboration'],'loom.com':['Video Conferencing'],
+  'calendly.com':['Scheduling/Booking'],'doodle.com':['Scheduling/Booking'],
+  // Business SaaS
+  'salesforce.com':['CRM'],'hubspot.com':['CRM'],'zendesk.com':['Customer Support/Chat'],'intercom.com':['Customer Support/Chat'],
+  'servicenow.com':['ITSM/Helpdesk'],'atlassian.com':['Team Collaboration','Project Management'],
+  'sap.com':['ERP'],'oracle.com':['ERP','Cloud Infrastructure'],'netsuite.com':['ERP','Accounting/Finance SaaS'],
+  'workday.com':['HR/Payroll'],'bamboohr.com':['HR/Payroll'],
+  'xero.com':['Accounting/Finance SaaS'],'freshbooks.com':['Accounting/Finance SaaS'],
+  'docusign.com':['E-Signature'],'hellosign.com':['E-Signature'],
+  'surveymonkey.com':['Forms/Survey Tools'],'typeform.com':['Forms/Survey Tools'],'mailchimp.com':['Forms/Survey Tools'],
+  // News & Media
+  'cnn.com':['News/Media'],'bbc.com':['News/Media'],'nytimes.com':['News/Media'],'reuters.com':['News/Media'],
+  'bloomberg.com':['News/Media','Trading/Investment'],'wsj.com':['News/Media','Trading/Investment'],
+  'techcrunch.com':['News/Media'],'theverge.com':['News/Media'],'wired.com':['News/Media'],'arstechnica.com':['News/Media'],
+  'scmp.com':['News/Media'],'hk01.com':['News/Media'],'mingpao.com':['News/Media'],'rthk.hk':['News/Media'],
+  'theguardian.com':['News/Media'],'washingtonpost.com':['News/Media'],'apnews.com':['News/Media'],'aljazeera.com':['News/Media'],
+  'forbes.com':['News/Media'],'fortune.com':['News/Media'],'cnet.com':['News/Media'],'zdnet.com':['News/Media'],
+  'medium.com':['Personal Blogs','News/Media'],'substack.com':['Personal Blogs','News/Media'],
+  'xinhuanet.com':['News/Media'],'people.com.cn':['News/Media'],'sina.com.cn':['News/Media'],'163.com':['News/Media'],
+  // Streaming Video
+  'netflix.com':['Streaming Video'],'youtube.com':['Streaming Video'],'hulu.com':['Streaming Video'],
+  'disneyplus.com':['Streaming Video'],'twitch.tv':['Streaming Video','Games'],'bilibili.com':['Streaming Video'],
+  'vimeo.com':['Streaming Video'],'primevideo.com':['Streaming Video'],'mytvsuper.com':['Streaming Video'],
+  'viu.com':['Streaming Video'],'youku.com':['Streaming Video'],'iqiyi.com':['Streaming Video'],
+  // Streaming Audio
+  'spotify.com':['Streaming Audio/Radio'],'soundcloud.com':['Streaming Audio/Radio'],'tidal.com':['Streaming Audio/Radio'],
+  'music.apple.com':['Streaming Audio/Radio'],'music.youtube.com':['Streaming Audio/Radio'],
+  // Games
+  'steam.com':['Games'],'store.steampowered.com':['Games'],'epicgames.com':['Games'],'roblox.com':['Games'],
+  'blizzard.com':['Games'],'ea.com':['Games'],'nintendo.com':['Games'],'playstation.com':['Games'],'xbox.com':['Games'],
+  // Finance & Banking
+  'paypal.com':['Payments/Wallets'],'stripe.com':['Payments/Wallets'],'wise.com':['Payments/Wallets'],'revolut.com':['Payments/Wallets'],
+  'alipay.com':['Payments/Wallets'],'hsbc.com':['Banking'],'citibank.com':['Banking'],'chase.com':['Banking'],
+  'hangseng.com':['Banking'],'bochk.com':['Banking'],'icbc.com.cn':['Banking'],'ccb.com':['Banking'],
+  'standardchartered.com.hk':['Banking'],'dbs.com.hk':['Banking'],
+  'hkex.com.hk':['Trading/Investment'],'robinhood.com':['Trading/Investment'],'fidelity.com':['Trading/Investment'],
+  'coinbase.com':['Cryptocurrency'],'binance.com':['Cryptocurrency'],'kraken.com':['Cryptocurrency'],'okx.com':['Cryptocurrency'],
+  'crypto.com':['Cryptocurrency'],'opensea.io':['Cryptocurrency'],'coingecko.com':['Cryptocurrency'],
+  // Shopping
+  'amazon.com':['Shopping','Marketplaces'],'ebay.com':['Marketplaces','Auctions/Classifieds'],'shopify.com':['Shopping'],
+  'etsy.com':['Marketplaces'],'aliexpress.com':['Shopping','Marketplaces'],'taobao.com':['Shopping','Marketplaces'],
+  'jd.com':['Shopping'],'hktvmall.com':['Shopping'],'walmart.com':['Shopping'],'ikea.com':['Shopping'],
+  'lazada.com':['Shopping','Marketplaces'],'shopee.com':['Shopping','Marketplaces'],
+  'craigslist.org':['Auctions/Classifieds'],'zillow.com':['Real Estate'],
+  // Cloud & Infrastructure
+  'aws.amazon.com':['Cloud Infrastructure'],'cloud.google.com':['Cloud Infrastructure'],'azure.microsoft.com':['Cloud Infrastructure'],
+  'cloudflare.com':['CDN','Cloud Infrastructure'],'vercel.com':['Cloud Infrastructure','CI/CD'],
+  'digitalocean.com':['Cloud Infrastructure'],'heroku.com':['Cloud Infrastructure'],'netlify.com':['Cloud Infrastructure'],
+  'cloudfront.net':['CDN'],'fastly.net':['CDN'],'akamai.net':['CDN'],'jsdelivr.net':['CDN'],
+  'google.com':['Cloud Infrastructure','Productivity Suites'],'microsoft.com':['Software Updates','Productivity Suites'],
+  'apple.com':['Shopping','Software Updates'],
+  // Storage & File
+  'dropbox.com':['Cloud Storage'],'box.com':['Cloud Storage'],'mega.nz':['Cloud Storage','File Sharing'],
+  'wetransfer.com':['Large File Transfer'],'pastebin.com':['Paste Sites'],
+  // Developer & AI
+  'github.com':['Code Hosting'],'gitlab.com':['Code Hosting'],'stackoverflow.com':['Technical Forums'],
+  'npmjs.com':['Package Repositories'],'pypi.org':['Package Repositories'],'docker.com':['Container Registries'],
+  'datadog.com':['DevOps Tools'],'newrelic.com':['DevOps Tools'],'sentry.io':['DevOps Tools'],'grafana.com':['DevOps Tools'],
+  'openai.com':['Generative AI Chat'],'chatgpt.com':['Generative AI Chat'],'claude.ai':['Generative AI Chat'],
+  'perplexity.ai':['Generative AI Chat'],'gemini.google.com':['Generative AI Chat'],
+  'copilot.microsoft.com':['AI Coding Assistants'],'huggingface.co':['AI Model Platforms'],
+  // Identity & VPN
+  'okta.com':['Identity/SSO'],'auth0.com':['Identity/SSO'],'duo.com':['MFA/Authenticator'],
+  '1password.com':['Password Managers'],'lastpass.com':['Password Managers'],'bitwarden.com':['Password Managers'],
+  'nordvpn.com':['VPN Services'],'expressvpn.com':['VPN Services'],'surfshark.com':['VPN Services'],'torproject.org':['Proxy/Anonymizer'],
+  'teamviewer.com':['Remote Access Portals'],'anydesk.com':['Remote Access Portals'],
+  // URL Shorteners
+  'bit.ly':['URL Shorteners'],'tinyurl.com':['URL Shorteners'],'t.co':['URL Shorteners'],
+  // Education
+  'coursera.org':['Education'],'udemy.com':['Education'],'wikipedia.org':['Education'],
+  'mit.edu':['Education'],'harvard.edu':['Education'],'hku.hk':['Education'],'cuhk.edu.hk':['Education'],
+  'hkust.edu.hk':['Education'],'khanacademy.org':['Education'],'edx.org':['Education'],
+  // Government
+  'gov.hk':['Government'],'info.gov.hk':['Government'],'usa.gov':['Government'],'gov.uk':['Government'],
+  'hkma.gov.hk':['Government','Banking'],'sfc.hk':['Government','Trading/Investment'],
+  // Health
+  'who.int':['Health/Medicine'],'webmd.com':['Health/Medicine'],'mayoclinic.org':['Health/Medicine'],'ha.org.hk':['Health/Medicine'],
+  // Adult
+  'pornhub.com':['Adult'],'xvideos.com':['Adult'],'onlyfans.com':['Adult'],'xhamster.com':['Adult'],'xnxx.com':['Adult'],
+  // Gambling
+  'bet365.com':['Gambling'],'draftkings.com':['Gambling'],'hkjc.com':['Gambling'],'hkjc.com.hk':['Gambling'],
+  'sbobet.com':['Gambling'],'pokerstars.com':['Gambling'],'betway.com':['Gambling'],'888.com':['Gambling'],
+  'fanduel.com':['Gambling'],'venetianmacao.com':['Gambling'],'melco-resorts.com':['Gambling'],
+  // Travel & Food
+  'booking.com':['Travel/Transportation'],'airbnb.com':['Travel/Transportation'],'expedia.com':['Travel/Transportation'],
+  'agoda.com':['Travel/Transportation'],'klook.com':['Travel/Transportation'],'trip.com':['Travel/Transportation'],
+  'doordash.com':['Food/Dining'],'ubereats.com':['Food/Dining'],'foodpanda.com':['Food/Dining'],'openrice.com':['Food/Dining'],
+  // Real Estate
+  '28hse.com':['Real Estate'],'midland.com.hk':['Real Estate'],'centaline.com':['Real Estate'],
+  // Image Hosting
+  'flickr.com':['Image Hosting'],'unsplash.com':['Image Hosting'],'imgur.com':['Image Hosting'],
+  // Hosting
+  'wix.com':['Hosting/Colocation'],'squarespace.com':['Hosting/Colocation'],
+  'godaddy.com':['Domain/Registrar'],'namecheap.com':['Domain/Registrar'],
+  // Phishing typosquats
+  'googel.com':['Phishing','Suspicious'],'faceb00k.com':['Phishing','Suspicious'],
+  'arnazon.com':['Phishing','Suspicious'],'paypa1.com':['Phishing','Suspicious'],
+  'mircosoft.com':['Phishing','Suspicious'],'netfliix.com':['Phishing','Suspicious'],
+  // DNS
+  'dns.google':['DNS Services'],'cloudflare-dns.com':['DNS over HTTPS'],
+  // Reserved
+  'example.com':['Uncategorized'],'example.net':['Uncategorized'],
 };
 
+// SECTION 3 - KEYWORD RULES
 const CATEGORY_KEYWORDS: Array<{keywords:string[];categories:string[]}> = [
-  {keywords:['sport','nba','nfl','soccer','football','basketball','tennis','golf','cricket','rugby','hockey','boxing','wrestling','martial'],categories:['Sports']},
-  {keywords:['news','herald','times','post','daily','gazette','press','journal','tribune','chronicle','reporter','media','broadcast'],categories:['News & Media']},
-  {keywords:['bank','finance','invest','stock','trading','wallet','exchange','capital','fund','wealth','insurance','mortgage','loan','credit'],categories:['Finance & Banking']},
-  {keywords:['bitcoin','ethereum','crypto','nft','defi','blockchain','coin','token','mining','ledger','web3'],categories:['Cryptocurrency']},
-  {keywords:['shop','store','buy','mall','market','checkout','cart','deal','discount','sale','price','product','retail','ecommerce'],categories:['Shopping & E-Commerce']},
-  {keywords:['game','gaming','esport','guild','quest','rpg','steam','gamer','play','xbox','playstation','nintendo','mmorpg','fps'],categories:['Gaming']},
-  {keywords:['learn','course','school','university','college','academy','tutor','study','education','lecture','degree','campus','student'],categories:['Education']},
-  {keywords:['gov','government','ministry','department','bureau','federal','municipal','council','senate','parliament','civic','public'],categories:['Government']},
-  {keywords:['health','medical','clinic','hospital','pharma','doctor','patient','therapy','wellness','dental','surgery','diagnosis','medicine'],categories:['Healthcare']},
-  {keywords:['travel','hotel','flight','booking','tour','vacation','airline','hostel','resort','cruise','trip','destination','airfare'],categories:['Travel']},
-  {keywords:['porn','adult','xxx','sex','erotic','nsfw','nude','fetish'],categories:['Adult Content']},
-  {keywords:['casino','bet','poker','gambling','lottery','wager','slots','jackpot','bingo','roulette','blackjack','sportsbook'],categories:['Gambling']},
-  {keywords:['dating','tinder','single','romance','match','hookup','personals','cupid'],categories:['Dating']},
-  {keywords:['vpn','proxy','anonymous','tunnel','unblock','bypass','hide','socks5','shadowsocks'],categories:['VPN & Proxy']},
-  {keywords:['torrent','pirate','crack','warez','keygen','serial','nulled','cracked','p2p','magnet'],categories:['Torrent & P2P','Piracy']},
-  {keywords:['phish','scam','fake','fraud','spoof','impersonat'],categories:['Phishing','Suspicious']},
-  {keywords:['hack','exploit','malware','botnet','ransom','trojan','rootkit','keylog','backdoor','payload','shellcode','vulnerability','cve'],categories:['Hacking','Suspicious']},
-  {keywords:['food','recipe','restaurant','dining','kitchen','cook','chef','meal','delivery','eat','menu','cuisine'],categories:['Food & Dining']},
-  {keywords:['music','song','album','artist','lyrics','playlist','band','concert','dj','remix'],categories:['Music']},
-  {keywords:['cloud','hosting','devops','deploy','server','container','docker','kubernetes','saas','paas','iaas'],categories:['Cloud Services']},
-  {keywords:['ai','gpt','llm','chatbot','neural','openai','gemini','copilot','diffusion','transformer','deeplearn','machinelearn'],categories:['Generative AI','AI & Machine Learning']},
-  {keywords:['tech','software','code','develop','program','engineer','debug','compile','api','framework','library','sdk'],categories:['Technology','Software Development']},
-  {keywords:['blog','wordpress','medium','substack','newsletter','article','opinion','editorial'],categories:['Blog & Personal']},
-  {keywords:['email','mail','smtp','imap','inbox','webmail','postfix'],categories:['Email & Messaging']},
-  {keywords:['chat','messenger','messaging','signal','whatsapp','telegram','wechat','line'],categories:['Email & Messaging']},
-  {keywords:['video','stream','watch','movie','film','cinema','tv','series','episode','anime','cartoon'],categories:['Streaming Media','Entertainment']},
-  {keywords:['photo','image','gallery','picture','snapshot','camera','photography'],categories:['Photography & Images']},
-  {keywords:['forum','community','discuss','board','thread','topic','answer','question'],categories:['Forum & Community']},
-  {keywords:['wiki','encyclopedia','reference','dictionary','glossary','knowledge','library','archive'],categories:['Reference']},
-  {keywords:['real','estate','property','apartment','house','rent','lease','condo','mortgage','realty'],categories:['Real Estate']},
-  {keywords:['auto','car','vehicle','motor','drive','truck','suv','sedan','dealership'],categories:['Automotive']},
-  {keywords:['fashion','clothing','apparel','wear','style','outfit','designer','boutique'],categories:['Fashion & Apparel']},
-  {keywords:['pet','animal','dog','cat','vet','veterinary','puppy','kitten'],categories:['Pets & Animals']},
-  {keywords:['weather','forecast','climate','temperature','rain','storm','meteorolog'],categories:['Weather']},
-  {keywords:['legal','law','attorney','lawyer','court','justice','litigation','counsel'],categories:['Legal']},
-  {keywords:['recruit','hire','job','career','resume','employment','talent','staffing'],categories:['Job Search']},
-  {keywords:['charity','nonprofit','donate','volunteer','foundation','humanitarian','relief'],categories:['Charity & Nonprofit']},
-  {keywords:['religion','church','mosque','temple','faith','spiritual','prayer','worship'],categories:['Religion & Spirituality']},
+  {keywords:['news','herald','times','post','daily','gazette','press','journal','tribune','media','broadcast'],categories:['News/Media']},
+  {keywords:['bank','finance','invest','stock','trading','wallet','exchange','capital','fund','wealth','insurance','mortgage','loan'],categories:['Banking','Trading/Investment']},
+  {keywords:['bitcoin','ethereum','crypto','nft','defi','blockchain','coin','token','web3'],categories:['Cryptocurrency']},
+  {keywords:['shop','store','buy','mall','market','checkout','cart','deal','discount','sale','retail','ecommerce'],categories:['Shopping']},
+  {keywords:['game','gaming','esport','guild','quest','rpg','gamer','mmorpg'],categories:['Games']},
+  {keywords:['learn','course','school','university','college','academy','tutor','study','education','lecture','degree'],categories:['Education']},
+  {keywords:['gov','government','ministry','department','bureau','federal','municipal','council'],categories:['Government']},
+  {keywords:['health','medical','clinic','hospital','pharma','doctor','therapy','wellness','dental','surgery','medicine'],categories:['Health/Medicine']},
+  {keywords:['travel','hotel','flight','booking','tour','vacation','airline','resort','cruise','trip'],categories:['Travel/Transportation']},
+  {keywords:['porn','adult','xxx','sex','erotic','nsfw','nude','fetish'],categories:['Adult']},
+  {keywords:['casino','bet','poker','gambling','lottery','wager','slots','jackpot','bingo','roulette','sportsbook'],categories:['Gambling']},
+  {keywords:['vpn','proxy','anonymous','tunnel','unblock','bypass','socks5','shadowsocks'],categories:['VPN Services','Proxy/Anonymizer']},
+  {keywords:['phish','scam','fake','fraud','spoof','impersonat'],categories:['Phishing','Scam/Fraud']},
+  {keywords:['hack','exploit','malware','botnet','ransom','trojan','rootkit','keylog','backdoor','payload'],categories:['Malware','Exploit/Attack Tools']},
+  {keywords:['food','recipe','restaurant','dining','cook','chef','meal','delivery','menu','cuisine'],categories:['Food/Dining']},
+  {keywords:['music','song','album','artist','playlist','band','concert'],categories:['Streaming Audio/Radio']},
+  {keywords:['cloud','hosting','devops','deploy','server','container','docker','kubernetes'],categories:['Cloud Infrastructure']},
+  {keywords:['ai','gpt','llm','chatbot','neural','openai','gemini','copilot','transformer','deeplearn'],categories:['Generative AI Chat']},
+  {keywords:['code','develop','program','engineer','debug','compile','api','framework','sdk','github','gitlab'],categories:['Code Hosting']},
+  {keywords:['blog','wordpress','newsletter','editorial'],categories:['Personal Blogs']},
+  {keywords:['email','mail','smtp','imap','inbox','webmail'],categories:['Email']},
+  {keywords:['chat','messenger','messaging','signal','whatsapp','telegram','wechat'],categories:['Messaging']},
+  {keywords:['video','stream','watch','movie','film','cinema','tv','series','anime'],categories:['Streaming Video']},
+  {keywords:['forum','community','discuss','board','thread','topic','answer'],categories:['Forums/Communities']},
+  {keywords:['estate','property','apartment','house','rent','lease','condo','realty'],categories:['Real Estate']},
+  {keywords:['legal','law','attorney','lawyer','court','justice'],categories:['Legal']},
+  {keywords:['recruit','hire','job','career','resume','employment'],categories:['Professional Networking']},
+  {keywords:['religion','church','mosque','temple','faith','spiritual','prayer'],categories:['Religion']},
+  {keywords:['crm','salesforce','hubspot','pipedrive'],categories:['CRM']},
+  {keywords:['erp','sap','netsuite'],categories:['ERP']},
+  {keywords:['helpdesk','itsm','ticketing','servicenow','servicedesk'],categories:['ITSM/Helpdesk']},
+  {keywords:['payroll','humanresource','workday'],categories:['HR/Payroll']},
+  {keywords:['accounting','invoice','bookkeeping','xero','quickbooks'],categories:['Accounting/Finance SaaS']},
+  {keywords:['paste','pastebin','hastebin'],categories:['Paste Sites']},
+  {keywords:['shorten','bitly','tinyurl','shorturl'],categories:['URL Shorteners']},
 ];
 
+// SECTION 4 - TLD CATEGORIES
 const TLD_CATEGORIES: Record<string,string[]> = {
-  '.edu':['Education'],'.gov':['Government'],
-  '.mil':['Government'],'.org':['Reference'],
-  '.health':['Healthcare'],'.bank':['Finance & Banking'],
-  '.sport':['Sports'],'.media':['News & Media'],
-  '.travel':['Travel'],'.museum':['Education','Reference'],
-  '.aero':['Travel'],'.coop':['Business & Economy'],
-  '.jobs':['Job Search'],'.mobi':['Technology'],
-  '.tel':['Technology'],'.pro':['Business & Economy'],
-  '.church':['Religion & Spirituality'],
-  '.casino':['Gambling'],'.bet':['Gambling'],
-  '.dating':['Dating'],'.adult':['Adult Content'],
-  '.sexy':['Adult Content'],'.porn':['Adult Content'],
-  '.game':['Gaming'],'.games':['Gaming'],
-  '.app':['Technology'],'.dev':['Software Development'],
-  '.io':['Technology'],'.ai':['AI & Machine Learning','Technology'],
-  '.tech':['Technology'],'.cloud':['Cloud Services'],
-  '.shop':['Shopping & E-Commerce'],'.store':['Shopping & E-Commerce'],
-  '.market':['Shopping & E-Commerce'],'.buy':['Shopping & E-Commerce'],
-  '.news':['News & Media'],'.blog':['Blog & Personal'],
-  '.video':['Streaming Media'],'.tv':['Streaming Media'],
-  '.music':['Music'],'.film':['Entertainment'],
-  '.food':['Food & Dining'],'.restaurant':['Food & Dining'],
-  '.auto':['Automotive'],'.car':['Automotive'],'.cars':['Automotive'],
-  '.fashion':['Fashion & Apparel'],'.style':['Fashion & Apparel'],
-  '.beauty':['Fashion & Apparel'],
-  '.law':['Legal'],'.legal':['Legal'],
-  '.realty':['Real Estate'],'.property':['Real Estate'],
-  '.photo':['Photography & Images'],'.photography':['Photography & Images'],
-  '.wiki':['Reference'],
-  '.chat':['Email & Messaging'],'.email':['Email & Messaging'],
-  '.social':['Social Media'],
-  '.finance':['Finance & Banking'],'.money':['Finance & Banking'],
-  '.insurance':['Finance & Banking'],
+  '.edu':['Education'],'.gov':['Government'],'.mil':['Government'],'.health':['Health/Medicine'],
+  '.bank':['Banking'],'.travel':['Travel/Transportation'],'.jobs':['Professional Networking'],
+  '.casino':['Gambling'],'.bet':['Gambling'],'.adult':['Adult'],'.porn':['Adult'],
+  '.game':['Games'],'.games':['Games'],'.app':['Software Updates'],'.dev':['Code Hosting'],
+  '.io':['Code Hosting'],'.ai':['AI Model Platforms'],'.tech':['Cloud Infrastructure'],
+  '.cloud':['Cloud Infrastructure'],'.shop':['Shopping'],'.store':['Shopping'],
+  '.news':['News/Media'],'.blog':['Personal Blogs'],'.video':['Streaming Video'],
+  '.music':['Streaming Audio/Radio'],'.food':['Food/Dining'],'.law':['Legal'],
+  '.realty':['Real Estate'],'.photo':['Image Hosting'],'.social':['Social Networking'],
+  '.finance':['Banking'],'.money':['Payments/Wallets'],'.chat':['Messaging'],'.email':['Email'],
 };
 
-// Dynamic DNS providers - domains hosted here are suspicious
+// SECTION 5 - DYNAMIC DNS & SUSPICIOUS TLDS
 const DYNAMIC_DNS_PROVIDERS: string[] = [
-  'duckdns.org','no-ip.com','no-ip.org','noip.com',
-  'ddns.net','dynu.com','freedns.afraid.org',
-  'hopto.org','zapto.org','sytes.net','ddns.me',
-  'linkpc.net','n-e.kr','r-e.kr','e-e.kr',
-  'serveblog.net','servehttp.com','serveftp.com',
-  'redirectme.net','bounceme.net','myftp.biz',
-  'myftp.org','myvnc.com','synology.me',
-  'myds.me','diskstation.me','dscloud.biz',
-  'i234.me','myfritz.net','dyndns.org',
-  'dyndns.tv','dyndns.info','changeip.com',
-  'dns.army','dns.navy','ddnsking.com',
-  'publicvm.com','kozow.com','gotdns.ch',
-  'myddns.me','servecounterstrike.com',
-  'servehalflife.com','servequake.com',
-  'webhop.me','webredirect.org',
-  'blogsyte.com','brasilia.me','cable-modem.org',
-  'ciscofreak.com','collegefan.org',
-  'couchpotatofries.org','damnserver.com',
-  'ddns.info','ditchyourip.com','dnsfor.me',
-  'dnsforfamily.com','eat-organic.net',
-  'endofinternet.net','endofinternet.org',
-  'from-ak.com','from-al.com','from-ar.com',
-  'from-az.com','from-ca.com','from-co.com',
-  'game-host.org','game-server.cc',
-  'getmyip.com','giize.com','gleeze.com',
-  'mypets.ws','myphotos.cc','scrapper-site.net',
-  'twmail.cc','twmail.net','twmail.org',
+  'duckdns.org','no-ip.com','noip.com','ddns.net','dynu.com','freedns.afraid.org',
+  'hopto.org','zapto.org','sytes.net','ddns.me','synology.me','myds.me',
+  'myfritz.net','dyndns.org','changeip.com','ddnsking.com','publicvm.com',
+  'kozow.com','gotdns.ch','myddns.me','webhop.me','webredirect.org',
 ];
-
-// Suspicious TLDs commonly used in malware/phishing
 const SUSPICIOUS_TLDS: string[] = [
-  '.xyz','.top','.club','.work','.click',
-  '.link','.info','.biz','.cc','.ws',
-  '.tk','.ml','.ga','.cf','.gq',
-  '.pw','.buzz','.rest','.icu','.cam',
-  '.surf','.monster','.cyou','.cfd','.sbs',
-  '.uno','.best','.loan','.win','.bid',
-  '.stream','.racing','.download','.review',
-  '.accountant','.cricket','.date','.faith',
-  '.party','.science','.trade','.webcam',
-  '.run','.ltd','.vip','.life','.site',
-  '.online','.fun','.space','.host','.press',
-  '.website','.rocks','.lol','.wang','.kim',
+  '.xyz','.top','.club','.work','.click','.link','.info','.biz','.cc','.ws',
+  '.tk','.ml','.ga','.cf','.gq','.pw','.buzz','.rest','.icu','.cam',
+  '.surf','.monster','.cyou','.cfd','.sbs','.uno','.best','.loan','.win','.bid',
+  '.stream','.racing','.download','.review','.accountant','.date','.faith',
+  '.party','.science','.trade','.webcam','.run','.site','.online','.fun','.space',
 ];
-
-// Country-code TLDs for regional classification
 const CCTLD_REGIONS: Record<string,string> = {
-  '.cn':'China','.hk':'Hong Kong','.tw':'Taiwan','.jp':'Japan',
-  '.kr':'South Korea','.sg':'Singapore','.my':'Malaysia',
-  '.th':'Thailand','.vn':'Vietnam','.ph':'Philippines',
-  '.in':'India','.au':'Australia','.nz':'New Zealand',
-  '.uk':'United Kingdom','.de':'Germany','.fr':'France',
-  '.it':'Italy','.es':'Spain','.nl':'Netherlands',
-  '.ru':'Russia','.br':'Brazil','.mx':'Mexico',
-  '.ca':'Canada','.us':'United States',
+  '.cn':'China','.hk':'Hong Kong','.tw':'Taiwan','.jp':'Japan','.kr':'South Korea',
+  '.sg':'Singapore','.in':'India','.au':'Australia','.uk':'United Kingdom',
+  '.de':'Germany','.fr':'France','.ru':'Russia','.br':'Brazil','.ca':'Canada','.us':'United States',
 };
 
+// SECTION 6 - HELPER FUNCTIONS
 function isDynamicDNS(domain: string): boolean {
   return DYNAMIC_DNS_PROVIDERS.some(p => domain === p || domain.endsWith('.' + p));
 }
-
 function hasSuspiciousTLD(domain: string): boolean {
   const tld = '.' + domain.split('.').pop();
   return SUSPICIOUS_TLDS.includes(tld);
 }
-
 function hasRandomLookingName(domain: string): boolean {
   const name = domain.split('.')[0];
   if (name.length < 3) return false;
@@ -504,7 +340,6 @@ function hasRandomLookingName(domain: string): boolean {
   const hasDigitMix = /[a-z].*\d|\d.*[a-z]/i.test(name) && /\d{2,}/.test(name);
   return (ratio > 0.7 && name.length >= 3) || hasDigitMix;
 }
-
 function getCountryFromCCTLD(domain: string): string | null {
   for (const [tld, country] of Object.entries(CCTLD_REGIONS)) {
     if (domain.endsWith(tld)) return country;
@@ -512,247 +347,115 @@ function getCountryFromCCTLD(domain: string): string | null {
   return null;
 }
 
+// Typosquatting brands
+const TYPOSQUAT_BRANDS: Record<string,{patterns:RegExp[];category:string[]}> = {
+  'google':{patterns:[/^g[o0]{1,3}g[e3]?l[e3]?\./,/^go+gle\./],category:['Phishing','Suspicious']},
+  'facebook':{patterns:[/^f[a4]c[e3]b[o0]{1,2}k\./],category:['Phishing','Suspicious']},
+  'amazon':{patterns:[/^[a4]m[a4]z[o0]n\./],category:['Phishing','Suspicious']},
+  'microsoft':{patterns:[/^m[i1]cr[o0]s[o0]ft\./],category:['Phishing','Suspicious']},
+  'paypal':{patterns:[/^p[a4]yp[a4][l1]\./],category:['Phishing','Suspicious']},
+  'netflix':{patterns:[/^n[e3]tf[l1][i1]x\./],category:['Phishing','Suspicious']},
+};
+
+// Substring rules
+const SUBSTRING_RULES: Array<{substrings:string[];categories:string[]}> = [
+  {substrings:['slot','casino','poker','roulette','jackpot','bingo','lottery','gambl','betting'],categories:['Gambling']},
+  {substrings:['porn','xxx','nsfw','adult','erotic'],categories:['Adult']},
+  {substrings:['phish','scam','fraud'],categories:['Phishing','Suspicious']},
+  {substrings:['torrent','pirate','warez','crack','keygen'],categories:['Suspicious']},
+  {substrings:['vpngate','proxyfree','unblock'],categories:['Proxy/Anonymizer']},
+];
+
+// SECTION 7 - MAIN CATEGORIZATION ENGINE
 export function categorizeUrl(domain: string): string[] {
   let d = domain.toLowerCase();
   if (d.startsWith('http')) { try { d = new URL(d).hostname; } catch {} }
   d = d.replace(/^www\./, '');
-
   const cats = new Set<string>();
-
   // 1. Exact domain match
-  if (DOMAIN_CATEGORIES[d]) {
-    DOMAIN_CATEGORIES[d].forEach(c => cats.add(c));
-    return [...cats];
-  }
-
-
-  // 2.5 Typosquatting detection for major brands
-  const TYPOSQUAT_BRANDS: Record<string, {patterns: RegExp[]; category: string[]}> = {
-    'google': {patterns: [/^g[o0]{1,3}g[e3]?l[e3]?\./, /^go+gle\./, /^googl[e3]\./], category: ['Search Engine','Suspicious','Typosquatting']},
-    'facebook': {patterns: [/^f[a4]c[e3]b[o0]{1,2}k\./, /^facebo+k\./], category: ['Social Media','Suspicious','Typosquatting']},
-    'amazon': {patterns: [/^[a4]m[a4]z[o0]n\./, /^amaz[o0]n[s5]?\./], category: ['Shopping & E-Commerce','Suspicious','Typosquatting']},
-    'microsoft': {patterns: [/^m[i1]cr[o0]s[o0]ft\./, /^micros[o0]ft\./], category: ['Technology','Suspicious','Typosquatting']},
-    'apple': {patterns: [/^[a4]pp[l1][e3]\./, /^aple\./], category: ['Technology','Suspicious','Typosquatting']},
-    'paypal': {patterns: [/^p[a4]yp[a4][l1]\./, /^paypa[l1]\./], category: ['Finance & Banking','Suspicious','Typosquatting']},
-    'netflix': {patterns: [/^n[e3]tf[l1][i1]x\./, /^netfl[i1]x\./], category: ['Streaming Media','Suspicious','Typosquatting']},
-  };
+  if (DOMAIN_CATEGORIES[d]) { DOMAIN_CATEGORIES[d].forEach(c => cats.add(c)); return [...cats]; }
+  // 2. Typosquatting
   for (const [brand, info] of Object.entries(TYPOSQUAT_BRANDS)) {
-    const knownDomain = brand + '.com';
-    if (d !== knownDomain && d !== 'www.' + knownDomain) {
-      for (const pat of info.patterns) {
-        if (pat.test(d)) {
-          info.category.forEach(c => cats.add(c));
-          return [...cats];
-        }
-      }
+    if (d !== brand + '.com') {
+      for (const pat of info.patterns) { if (pat.test(d)) { info.category.forEach(c => cats.add(c)); return [...cats]; } }
     }
   }
-
-  // 2. Parent domain match (e.g. sub.google.com -> google.com)
-  for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) {
-    if (d.endsWith('.' + key)) c.forEach(x => cats.add(x));
-  }
+  // 3. Parent domain match
+  for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) { if (d.endsWith('.' + key)) c.forEach(x => cats.add(x)); }
   if (cats.size > 0) return [...cats];
-
-  // 3. Dynamic DNS detection (HIGH PRIORITY)
-  if (isDynamicDNS(d)) {
-    cats.add('Dynamic DNS');
-    cats.add('Suspicious');
-    // Still check keywords for additional context
-    const words = d.split(/[^a-z0-9]+/).join(' ');
-    for (const rule of CATEGORY_KEYWORDS) {
-      if (rule.keywords.some(kw => kw.length >= 4 && new RegExp('\b' + kw + '\b').test(words))) {
-        rule.categories.forEach(c => cats.add(c));
-      }
-    }
-    return [...cats];
-  }
-
-  // 4. TLD-based categories
-  for (const [tld, c] of Object.entries(TLD_CATEGORIES)) {
-    if (d.endsWith(tld)) c.forEach(x => cats.add(x));
-  }
-
-  // 5. Keyword-based categories
+  // 4. Dynamic DNS
+  if (isDynamicDNS(d)) { cats.add('Dynamic DNS'); cats.add('Suspicious'); return [...cats]; }
+  // 5. TLD categories
+  for (const [tld, c] of Object.entries(TLD_CATEGORIES)) { if (d.endsWith(tld)) c.forEach(x => cats.add(x)); }
+  // 6. Keyword match
   const words = d.split(/[^a-z0-9]+/).join(' ');
   for (const rule of CATEGORY_KEYWORDS) {
-    if (rule.keywords.some(kw => kw.length >= 4 && new RegExp('\b' + kw + '\b').test(words))) {
+    if (rule.keywords.some(kw => kw.length >= 4 && new RegExp('\\b' + kw + '\\b').test(words))) {
       rule.categories.forEach(c => cats.add(c));
-
-  // 5.5 Substring-based matching for commonly embedded category terms
-  const SUBSTRING_RULES: Array<{substrings: string[]; categories: string[]}> = [
-    {substrings: ['slot','casino','poker','roulette','blackjack','jackpot','bingo','lottery','gambl','sportsbet','wager','betting'], categories: ['Gambling']},
-    {substrings: ['porn','xxx','nsfw','adult','erotic'], categories: ['Adult Content']},
-    {substrings: ['phish','scam','fraud'], categories: ['Phishing','Suspicious']},
-    {substrings: ['torrent','pirate','warez','crack','keygen'], categories: ['Torrent & P2P','Piracy']},
-    {substrings: ['vpngate','proxyfree','unblock'], categories: ['VPN & Proxy']},
-  ];
+    }
+  }
+  // 6.5 Substring match
   const domainBase = d.split('.').slice(0, -1).join('');
-  for (const rule of SUBSTRING_RULES) {
-    if (rule.substrings.some(s => domainBase.includes(s))) {
-      rule.categories.forEach(c => cats.add(c));
-    }
-  }
-    }
-  }
-
-  // 6. If suspicious TLD and no category yet, mark suspicious
-  if (hasSuspiciousTLD(d)) {
-    cats.add('Suspicious TLD');
-  }
-
-  // 7. Random-looking domain name detection
-  if (hasRandomLookingName(d)) {
-    cats.add('Suspicious');
-  }
-
-  // 8. Country/region from ccTLD
+  for (const rule of SUBSTRING_RULES) { if (rule.substrings.some(s => domainBase.includes(s))) { rule.categories.forEach(c => cats.add(c)); } }
+  // 7. Suspicious TLD
+  if (hasSuspiciousTLD(d)) cats.add('Suspicious');
+  // 8. Random name
+  if (hasRandomLookingName(d)) cats.add('Suspicious');
+  // 9. Country from ccTLD
   const country = getCountryFromCCTLD(d);
-  if (country) {
-    cats.add('Regional - ' + country);
-  }
-
-  // 9. Common infrastructure patterns
-  if (/\b(cdn|cache|static|assets)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('CDN & Infrastructure');
-  }
-  if (/\b(api|gateway|endpoint)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('API & Web Services');
-  }
-  if (/\b(mail|smtp|mx)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('Email & Messaging');
-  }
-  if (/\b(ftp|upload|download|file)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('File Sharing');
-  }
-  if (/\b(login|auth|sso|account)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('Authentication');
-  }
-  if (/\b(tracker|analytics|pixel|telemetry)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('Tracking & Analytics');
-  }
-  if (/\b(adserver|adnetwork|adclick|adsense|adtech|doubleclick)\b/.test(d.split(/[^a-z0-9]+/).join(' '))) {
-    cats.add('Advertising');
-  }
-
-  // 10. IP-based or numeric domains
-  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(d)) {
-    cats.add('IP Address');
-    cats.add('Suspicious');
-  }
-
-  // If we found any categories, return them
+  if (country) cats.add('Regional - ' + country);
+  // 10. Infrastructure patterns
+  if (/\b(cdn|cache|static|assets)\b/.test(words)) cats.add('CDN');
+  if (/\b(api|gateway|endpoint)\b/.test(words)) cats.add('API Platforms');
+  if (/\b(mail|smtp|mx)\b/.test(words)) cats.add('Email');
+  if (/\b(ftp|upload|download|file)\b/.test(words)) cats.add('File Sharing');
+  if (/\b(login|auth|sso|account)\b/.test(words)) cats.add('Identity/SSO');
+  // 11. IP address
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(d)) cats.add('Suspicious');
   if (cats.size > 0) return [...cats];
-
-    const parts = d.split('.');    
-  // 11. Suspicious multi-level subdomain on unknown parent domain
-  // e.g. cacfn.despacito5.com, abc123.unknowndomain.com
-  if (parts.length >= 3) {
-    const parentDomain = parts.slice(-2).join('.');
-    if (!DOMAIN_CATEGORIES[parentDomain]) {
-      // Parent domain is not known - check if subdomain looks suspicious
-      const subdomain = parts.slice(0, -2).join('.');
-      if (hasRandomLookingName(d) || subdomain.length <= 6 || /\d/.test(subdomain)) {
-        cats.add('Suspicious Subdomain');
-        cats.add('Suspicious');
-      }
-    }
+  // 12. Suspicious subdomain
+  const parts = d.split('.');
+  if (parts.length >= 3 && !DOMAIN_CATEGORIES[parts.slice(-2).join('.')]) {
+    if (hasRandomLookingName(d) || /\d/.test(parts[0])) cats.add('Suspicious');
   }
-
-  // 12. Unknown but has digits in domain name (common in DGA/malware)
-  if (cats.size === 0 && /\d{2,}/.test(parts.slice(0, -1).join('.'))) {
-    cats.add('Suspicious');
-  }
-
   if (cats.size > 0) return [...cats];
-
   return ['Uncategorized'];
 }
 
-
-// =============================================
-// Cloudflare Intel API Integration v4.0
-// Commercial-grade URL categorization via Cloudflare
-// =============================================
-
-interface CfConfig {
-  accountId: string;
-  apiToken: string;
-}
-
-interface CfCacheEntry {
-  categories: string[];
-  timestamp: number;
-}
-
+// SECTION 8 - CLOUDFLARE INTEL API INTEGRATION
+interface CfConfig { accountId: string; apiToken: string; }
+interface CfCacheEntry { categories: string[]; timestamp: number; }
 const CF_CACHE = new Map<string, CfCacheEntry>();
-const CF_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
+const CF_CACHE_TTL = 24 * 60 * 60 * 1000;
 function getCfConfig(): CfConfig | null {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN;
   if (!accountId || !apiToken) return null;
   return { accountId, apiToken };
 }
-
-// Cloudflare category ID to human-readable name mapping
 const CF_CATEGORY_MAP: Record<number, string> = {
-  1: 'Technology', 2: 'Education', 3: 'Business & Economy',
-  4: 'Government', 5: 'News & Media', 6: 'Entertainment',
-  7: 'Shopping & E-Commerce', 8: 'Sports', 9: 'Health & Medicine',
-  10: 'Travel', 11: 'Society', 12: 'Finance & Banking',
-  13: 'Real Estate', 14: 'Reference', 15: 'Science',
-  16: 'Recreation', 17: 'Automotive', 18: 'Food & Dining',
-  19: 'Arts', 20: 'Fashion & Apparel', 21: 'Legal',
-  22: 'Religion & Spirituality', 23: 'Pets & Animals',
-  24: 'Weather', 25: 'Job Search', 26: 'Military',
-  27: 'Personal Sites & Blogs', 28: 'Photography & Images',
-  29: 'Home & Garden', 30: 'Kids & Family',
-  32: 'Gambling', 33: 'Dating', 34: 'Adult Content',
-  35: 'Alcohol & Tobacco', 36: 'Drugs', 37: 'Weapons',
-  38: 'Violence', 39: 'Hate & Discrimination',
-  40: 'Abortion', 41: 'Nudity',
-  64: 'Social Media', 65: 'Email & Messaging',
-  66: 'Streaming Media', 67: 'Gaming',
-  68: 'Software Development', 69: 'Cloud Services',
-  70: 'File Sharing', 71: 'VPN & Proxy',
-  72: 'Generative AI', 73: 'Cryptocurrency',
-  80: 'Search Engine', 81: 'Forum & Community',
-  82: 'Advertising', 83: 'CDN & Infrastructure',
-  84: 'URL Shortener', 85: 'Paste Site',
-  // Security categories
-  128: 'Malware', 129: 'Phishing', 130: 'Spam',
-  131: 'Spyware', 132: 'Botnet', 133: 'Dynamic DNS',
-  134: 'Newly Seen Domain', 135: 'Parked Domain',
-  136: 'Suspicious', 137: 'Command & Control',
-  138: 'DGA Domain',
+  1:'Cloud Infrastructure',2:'Education',3:'CRM',4:'Government',5:'News/Media',6:'Streaming Video',
+  7:'Shopping',8:'Games',9:'Health/Medicine',10:'Travel/Transportation',11:'Forums/Communities',12:'Banking',
+  13:'Real Estate',14:'Education',15:'Education',16:'Recreation/Hobbies',17:'Shopping',18:'Food/Dining',
+  21:'Legal',22:'Religion',25:'Professional Networking',27:'Personal Blogs',28:'Image Hosting',
+  32:'Gambling',33:'Social Networking',34:'Adult',35:'Alcohol/Tobacco',
+  64:'Social Networking',65:'Email',66:'Streaming Video',67:'Games',
+  68:'Code Hosting',69:'Cloud Infrastructure',70:'File Sharing',71:'VPN Services',
+  72:'Generative AI Chat',73:'Cryptocurrency',80:'Cloud Infrastructure',81:'Forums/Communities',
+  82:'CDN',83:'CDN',84:'URL Shorteners',85:'Paste Sites',
+  128:'Malware',129:'Phishing',130:'Suspicious',131:'Malware',132:'Botnet/C2',
+  133:'Dynamic DNS',134:'Newly Registered Domain',135:'Parked/For Sale',136:'Suspicious',137:'Botnet/C2',138:'Suspicious',
 };
-
 async function queryCloudflareIntel(domain: string): Promise<string[]> {
   const config = getCfConfig();
   if (!config) return [];
-
-  // Check cache first
   const cached = CF_CACHE.get(domain);
-  if (cached && (Date.now() - cached.timestamp) < CF_CACHE_TTL) {
-    return cached.categories;
-  }
-
+  if (cached && (Date.now() - cached.timestamp) < CF_CACHE_TTL) return cached.categories;
   try {
-    const res = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/intel/domain?domain=${encodeURIComponent(domain)}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${config.apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(8000),
-      }
-    );
-
+    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/intel/domain?domain=${encodeURIComponent(domain)}`,
+      { headers: { 'Authorization': `Bearer ${config.apiToken}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
     const data = await res.json();
-
     const cats: string[] = [];
     if (data?.result?.content_categories) {
       for (const c of data.result.content_categories) {
@@ -768,68 +471,34 @@ async function queryCloudflareIntel(domain: string): Promise<string[]> {
         else if (r?.name) cats.push(r.name);
       }
     }
-    if (data?.result?.application?.name) {
-      cats.push(data.result.application.name);
-    }
-
-    // Cache the result
     CF_CACHE.set(domain, { categories: cats, timestamp: Date.now() });
     return cats;
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
-
-// Batch query Cloudflare Intel for multiple domains
 async function queryCloudflareIntelBatch(domains: string[]): Promise<Map<string, string[]>> {
   const config = getCfConfig();
   const result = new Map<string, string[]>();
   if (!config) return result;
-
-  // Process in parallel batches of 10
   const batchSize = 10;
   for (let i = 0; i < domains.length; i += batchSize) {
     const batch = domains.slice(i, i + batchSize);
-    const promises = batch.map(async (d) => {
-      const cats = await queryCloudflareIntel(d);
-      return { domain: d, categories: cats };
-    });
+    const promises = batch.map(async (d) => ({ domain: d, categories: await queryCloudflareIntel(d) }));
     try {
       const results = await Promise.allSettled(promises);
-      for (const r of results) {
-        if (r.status === 'fulfilled' && r.value.categories.length > 0) {
-          result.set(r.value.domain, r.value.categories);
-        }
-      }
+      for (const r of results) { if (r.status === 'fulfilled' && r.value.categories.length > 0) result.set(r.value.domain, r.value.categories); }
     } catch { continue; }
   }
   return result;
 }
-
-// Main async categorization: Cloudflare API first, local fallback
 export async function categorizeUrlAsync(domain: string): Promise<string[]> {
   let d = domain.toLowerCase();
   if (d.startsWith('http')) { try { d = new URL(d).hostname; } catch {} }
   d = d.replace(/^www\./, '');
-
-  // 1. Try local exact match first (instant, no API call needed)
   if (DOMAIN_CATEGORIES[d]) return DOMAIN_CATEGORIES[d];
-  for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) {
-    if (d.endsWith('.' + key)) return c;
-  }
-
-  // 2. Try Cloudflare Intel API
+  for (const [key, c] of Object.entries(DOMAIN_CATEGORIES)) { if (d.endsWith('.' + key)) return c; }
   const cfCats = await queryCloudflareIntel(d);
   if (cfCats.length > 0) return cfCats;
-
-  // 3. Fallback to local heuristic categorization
   return categorizeUrl(domain);
 }
-
-// Check if Cloudflare API is configured
-export function isCloudflareIntelConfigured(): boolean {
-  return getCfConfig() !== null;
-}
-
-// Export batch query for use in threat-intel
+export function isCloudflareIntelConfigured(): boolean { return getCfConfig() !== null; }
 export { queryCloudflareIntelBatch };
