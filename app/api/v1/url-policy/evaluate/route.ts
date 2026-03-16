@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categorizeUrl, URL_TAXONOMY } from '@/lib/url-categories';
-import { checkUrl } from '@/lib/threat-intel';
 import { getDB } from '@/lib/db';
 
 const ACTION_PRIORITY: Record<string, number> = {
