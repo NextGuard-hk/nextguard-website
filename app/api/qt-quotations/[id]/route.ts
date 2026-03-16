@@ -1,5 +1,5 @@
 // app/api/qt-quotations/[id]/route.ts
-// Single Quotation - GET, PUT (update), DELETE
+// Single Quotation - GET, PUT (update), DELETE, PATCH (status)
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateQtRequest } from '@/lib/quotation-auth'
 import { getDB } from '@/lib/db'
@@ -17,7 +17,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (qtResult.rows.length === 0) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
   const quotation = qtResult.rows[0] as any
 
-  // Permission check - sales can only view own quotations
   if (auth.role !== 'admin' && quotation.created_by !== auth.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -25,11 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const linesResult = await db.execute({ sql: `SELECT * FROM qt_lines WHERE quotation_id = ? ORDER BY sort_order`, args: [id] })
   const filesResult = await db.execute({ sql: `SELECT id, file_name, file_type, version, created_at FROM qt_files WHERE quotation_id = ? ORDER BY created_at DESC`, args: [id] })
 
-  return NextResponse.json({
-    quotation,
-    lines: linesResult.rows,
-    files: filesResult.rows,
-  })
+  return NextResponse.json({ quotation, lines: linesResult.rows, files: filesResult.rows })
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -40,23 +35,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDB()
   const body = await req.json().catch(() => ({}))
 
-  // Check exists & permission
   const qtResult = await db.execute({ sql: `SELECT * FROM qt_quotations WHERE id = ?`, args: [id] })
   if (qtResult.rows.length === 0) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
   const existing = qtResult.rows[0] as any
+
   if (auth.role !== 'admin' && existing.created_by !== auth.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const {
-    customerName, partnerName, endUserName, projectName, customerType,
-    termYears, paymentModel, currency, status,
-    includePs, includeAnnualService, psDescription, annualServiceDescription,
-    validityDays, leadTime, deliveryLocation, remarks,
-    lines, discountPercent, targetFinalPrice,
-  } = body
+  const { customerName, partnerName, endUserName, projectName, customerType, termYears, paymentModel, currency, status, includePs, includeAnnualService, psDescription, annualServiceDescription, validityDays, leadTime, deliveryLocation, remarks, lines, discountPercent, targetFinalPrice } = body
 
-  // Recompute pricing if lines are provided
   let pricing = null
   if (lines) {
     const lineInputs: PriceLineInput[] = lines.map((l: any) => ({
@@ -77,8 +65,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       targetFinalPrice: targetFinalPrice !== undefined ? parseFloat(targetFinalPrice) : undefined,
       currency: currency || existing.currency || 'HKD',
     })
-
-    // Replace line items
     await db.execute({ sql: `DELETE FROM qt_lines WHERE quotation_id = ?`, args: [id] })
     for (const pl of pricing.lines) {
       const lineId = generateId('line')
@@ -89,7 +75,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
   }
 
-  // Update quotation header
   const updates: string[] = []
   const args: any[] = []
   const set = (col: string, val: any) => { if (val !== undefined) { updates.push(`${col} = ?`); args.push(val) } }
@@ -124,7 +109,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   if (status === 'sent') set('sent_at', new Date().toISOString())
-
   updates.push(`updated_at = datetime('now')`)
   args.push(id)
 
@@ -150,7 +134,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   await db.execute({ sql: `DELETE FROM qt_quotations WHERE id = ?`, args: [id] })
   await writeQuotationAudit(auth.userId, auth.email, 'quotation_deleted', 'quotation', id)
 
-  // PATCH - quick status update (used by detail page)
+  return NextResponse.json({ success: true })
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = authenticateQtRequest(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -171,16 +157,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!status) return NextResponse.json({ error: 'status is required' }, { status: 400 })
 
   const updates: string[] = [`status = ?`, `updated_at = datetime('now')`]
-  const args: any[] = [status]
-  if (status === 'sent') { updates.push(`sent_at = ?`); args.push(new Date().toISOString()) }
-  args.push(id)
+  const uArgs: any[] = [status]
+  if (status === 'sent') { updates.push(`sent_at = ?`); uArgs.push(new Date().toISOString()) }
+  uArgs.push(id)
 
-  await db.execute({ sql: `UPDATE qt_quotations SET ${updates.join(', ')} WHERE id = ?`, args })
+  await db.execute({ sql: `UPDATE qt_quotations SET ${updates.join(', ')} WHERE id = ?`, args: uArgs })
   await writeQuotationAudit(auth.userId, auth.email, 'status_updated', 'quotation', id, { status })
 
   const updated = await db.execute({ sql: `SELECT * FROM qt_quotations WHERE id = ?`, args: [id] })
   return NextResponse.json({ quotation: updated.rows[0] })
-}
-
-  return NextResponse.json({ success: true })
 }
