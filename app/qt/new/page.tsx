@@ -2,47 +2,38 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+interface Category {
+  id: string; name: string; code_prefix: string; sort_order: number
+}
 interface Product {
   id: string; code: string; name: string; type: string
-  description: string; sort_order: number
+  category_id: string; description: string; sort_order: number
   prices: { term_years: number; appliance_unit_price: number; license_unit_price: number; min_qty: number }[]
 }
-
 interface LineItem {
   id: string; productId: string; productCode: string; description: string
-  siteType: string; qty: number
+  categoryId: string; siteType: string; qty: number
   applianceUnitPrice: number; licenseUnitPrice: number
   isIncluded: boolean; notes: string
 }
 
-const S: React.CSSProperties = {}
-
-function newLine(prod?: Product, termYears = 1): LineItem {
-  const price = prod?.prices?.find(p => p.term_years === termYears && p.min_qty <= 1) ??
-    prod?.prices?.[0]
+function newLine(): LineItem {
   return {
     id: Math.random().toString(36).slice(2),
-    productId: prod?.id ?? '',
-    productCode: prod?.code ?? '',
-    description: prod?.name ?? '',
-    siteType: 'production',
-    qty: 1,
-    applianceUnitPrice: price?.appliance_unit_price ?? 0,
-    licenseUnitPrice: price?.license_unit_price ?? 0,
-    isIncluded: false,
-    notes: '',
+    productId: '', productCode: '', description: '', categoryId: '',
+    siteType: 'production', qty: 1,
+    applianceUnitPrice: 0, licenseUnitPrice: 0,
+    isIncluded: false, notes: '',
   }
 }
-
 export default function NewQuotation() {
   const router = useRouter()
+  const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<any>(null)
-
-  // Form state
   const [customerName, setCustomerName] = useState('')
   const [partnerName, setPartnerName] = useState('')
   const [endUserName, setEndUserName] = useState('')
@@ -66,9 +57,14 @@ export default function NewQuotation() {
       if (!d.authenticated) router.replace('/qt-login')
     }).catch(() => router.replace('/qt-login'))
     fetch('/api/qt-products').then(r=>r.json()).then(d => {
+      setCategories(d.categories || [])
       setProducts(d.products || [])
     })
   }, [router])
+
+  const getModelsForCategory = useCallback((catId: string) => {
+    return products.filter(p => p.category_id === catId)
+  }, [products])
 
   const updateLine = useCallback((id: string, changes: Partial<LineItem>) => {
     setLines(ls => ls.map(l => l.id === id ? { ...l, ...changes } : l))
@@ -79,11 +75,11 @@ export default function NewQuotation() {
   }, [])
 
   const addLine = useCallback(() => {
-    setLines(ls => [...ls, newLine(undefined, termYears)])
-  }, [termYears])
+    setLines(ls => [...ls, newLine()])
+  }, [])
 
   const getPrice = useCallback((productId: string, qty: number) => {
-    const prod = products.find(p => p.id === productId || p.code === productId)
+    const prod = products.find(p => p.id === productId)
     if (!prod) return { app: 0, lic: 0 }
     const price = prod.prices
       .filter(p => p.term_years === termYears && p.min_qty <= qty)
@@ -91,18 +87,16 @@ export default function NewQuotation() {
     return { app: price?.appliance_unit_price ?? 0, lic: price?.license_unit_price ?? 0 }
   }, [products, termYears])
 
+  function onCategoryChange(lineId: string, catId: string) {
+    updateLine(lineId, { categoryId: catId, productId: '', productCode: '', description: '', applianceUnitPrice: 0, licenseUnitPrice: 0 })
+  }
+
   function onProductChange(lineId: string, productId: string) {
     const prod = products.find(p => p.id === productId)
     if (!prod) return
     const line = lines.find(l => l.id === lineId)
     const { app, lic } = getPrice(productId, line?.qty ?? 1)
-    updateLine(lineId, {
-      productId: prod.id,
-      productCode: prod.code,
-      description: prod.name,
-      applianceUnitPrice: app,
-      licenseUnitPrice: lic,
-    })
+    updateLine(lineId, { productId: prod.id, productCode: prod.code, description: prod.name, applianceUnitPrice: app, licenseUnitPrice: lic })
   }
 
   function onQtyChange(lineId: string, qty: number) {
@@ -113,90 +107,65 @@ export default function NewQuotation() {
   }
 
   async function calcPreview() {
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
-      const res = await fetch('/api/qt-quotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(true)),
-      })
+      const res = await fetch('/api/qt-quotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload(true)) })
       if (res.status === 401) { router.replace('/qt-login'); return }
       const d = await res.json()
       if (d.error) { setError(d.error); return }
       setPreview(d.pricing)
-    } catch (e: any) {
-      setError(e.message)
-    } finally { setLoading(false) }
+    } catch (e: any) { setError(e.message) } finally { setLoading(false) }
   }
 
   function buildPayload(previewOnly = false) {
     return {
       customerName, partnerName: partnerName || undefined,
-      endUserName: endUserName || undefined,
-      projectName: projectName || undefined,
+      endUserName: endUserName || undefined, projectName: projectName || undefined,
       customerType, termYears, paymentModel, currency,
-      includePs, includeAnnualService,
-      validityDays, leadTime, deliveryLocation,
+      includePs, includeAnnualService, validityDays, leadTime, deliveryLocation,
       remarks: remarks || undefined,
       discountPercent: discountPercent || undefined,
       targetFinalPrice: targetPrice ? parseFloat(targetPrice) : undefined,
-      lines: lines.map(l => ({
-        productId: l.productId,
-        productCode: l.productCode,
-        siteType: l.siteType,
-        qty: l.qty,
-        applianceUnitPrice: l.applianceUnitPrice,
-        licenseUnitPrice: l.licenseUnitPrice,
-        isIncluded: l.isIncluded,
-        notes: l.notes,
-      })),
+      lines: lines.map(l => ({ productId: l.productId, productCode: l.productCode, siteType: l.siteType, qty: l.qty, applianceUnitPrice: l.applianceUnitPrice, licenseUnitPrice: l.licenseUnitPrice, isIncluded: l.isIncluded, notes: l.notes })),
     }
   }
 
   async function handleSave() {
     if (!customerName.trim()) { setError('Customer name is required'); return }
     if (lines.length === 0) { setError('Add at least one product line'); return }
-    setSaving(true)
-    setError('')
+    setSaving(true); setError('')
     try {
-      const res = await fetch('/api/qt-quotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload()),
-      })
+      const res = await fetch('/api/qt-quotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()) })
       if (res.status === 401) { router.replace('/qt-login'); return }
       const d = await res.json()
       if (d.error) { setError(d.error); return }
       router.push('/qt/' + d.quotation.id)
-    } catch (e: any) {
-      setError(e.message)
-    } finally { setSaving(false) }
+    } catch (e: any) { setError(e.message) } finally { setSaving(false) }
   }
 
   const fmt = (n: number) => new Intl.NumberFormat('en-HK', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n)
-
-  const inp = { background: '#111827', border: '1px solid #1f2937', borderRadius: 8, color: '#e0e0e0', padding: '9px 12px', fontSize: 14, outline: 'none', width: '100%' }
-  const lbl = { color: '#9ca3af', fontSize: 13, marginBottom: 4, display: 'block' as const }
-  const card = { background: '#0d1117', border: '1px solid #1f2937', borderRadius: 12, padding: 20, marginBottom: 16 }
-  const btn = (color: string) => ({ background: color, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer' })
+  const inp: React.CSSProperties = { background: '#111827', border: '1px solid #1f2937', borderRadius: 8, color: '#e0e0e0', padding: '9px 12px', fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box' }
+  const lbl: React.CSSProperties = { color: '#9ca3af', fontSize: 13, marginBottom: 4, display: 'block' }
+  const card: React.CSSProperties = { background: '#0d1117', border: '1px solid #1f2937', borderRadius: 12, padding: 20, marginBottom: 16 }
+  const btn = (color: string): React.CSSProperties => ({ background: color, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' as const })
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0e17', color: '#e0e0e0', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ background: '#0d1117', borderBottom: '1px solid #1f2937', padding: '0 24px', display: 'flex', alignItems: 'center', height: 56 }}>
-        <span style={{ fontWeight: 700, fontSize: 16 }}>NEXT GUARD &nbsp;|&nbsp; New Quotation</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+      {/* Header */}
+      <div style={{ background: '#0d1117', borderBottom: '1px solid #1f2937', padding: '0 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, minHeight: 56 }}>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>NEXT GUARD | New Quotation</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => router.push('/qt')} style={btn('#374151')}>Cancel</button>
-          <button onClick={calcPreview} disabled={loading} style={btn('#3b82f6')}>{loading ? 'Calculating...' : 'Preview Pricing'}</button>
-          <button onClick={handleSave} disabled={saving} style={btn('#22c55e')}>{saving ? 'Saving...' : 'Save Quotation'}</button>
+          <button onClick={calcPreview} disabled={loading} style={btn('#3b82f6')}>{loading ? 'Calc...' : 'Preview'}</button>
+          <button onClick={handleSave} disabled={saving} style={btn('#22c55e')}>{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </div>
-
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: 24 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px' }}>
         {error && <div style={{ background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: 8, padding: '12px 16px', marginBottom: 16, color: '#fca5a5' }}>{error}</div>}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+          {/* Left column */}
           <div>
+            {/* Customer Info */}
             <div style={card}>
               <div style={{ fontWeight: 600, marginBottom: 16, color: '#f9fafb' }}>Customer Info</div>
               <div style={{ marginBottom: 12 }}>
@@ -210,24 +179,22 @@ export default function NewQuotation() {
                 <label style={lbl}>Customer Name *</label>
                 <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder='e.g. ABC Company Ltd' style={inp} />
               </div>
-              {customerType === 'partner' && (
+              {customerType === 'partner' && (<>
                 <div style={{ marginBottom: 12 }}>
                   <label style={lbl}>Partner Name</label>
                   <input value={partnerName} onChange={e => setPartnerName(e.target.value)} placeholder='Partner / Reseller' style={inp} />
                 </div>
-              )}
-              {customerType === 'partner' && (
                 <div style={{ marginBottom: 12 }}>
                   <label style={lbl}>End User Name</label>
                   <input value={endUserName} onChange={e => setEndUserName(e.target.value)} placeholder='End User Company' style={inp} />
                 </div>
-              )}
-              <div style={{ marginBottom: 0 }}>
+              </>)}
+              <div>
                 <label style={lbl}>Project Name</label>
                 <input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder='e.g. Network Security Upgrade' style={inp} />
               </div>
             </div>
-
+            {/* Contract Terms */}
             <div style={card}>
               <div style={{ fontWeight: 600, marginBottom: 16, color: '#f9fafb' }}>Contract Terms</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -266,17 +233,17 @@ export default function NewQuotation() {
                   <input value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} style={inp} />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#e0e0e0', fontSize: 14 }}>
-                  <input type='checkbox' checked={includePs} onChange={e => setIncludePs(e.target.checked)} />Include Professional Services
+              <div style={{ display: 'flex', gap: 20, marginTop: 12, flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                  <input type='checkbox' checked={includePs} onChange={e => setIncludePs(e.target.checked)} /> Include Professional Services
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#e0e0e0', fontSize: 14 }}>
-                  <input type='checkbox' checked={includeAnnualService} onChange={e => setIncludeAnnualService(e.target.checked)} />Include Annual Maintenance
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                  <input type='checkbox' checked={includeAnnualService} onChange={e => setIncludeAnnualService(e.target.checked)} /> Include Annual Maintenance
                 </label>
               </div>
             </div>
           </div>
-
+          {/* Right column - Pricing & Remarks */}
           <div>
             <div style={card}>
               <div style={{ fontWeight: 600, marginBottom: 16, color: '#f9fafb' }}>Pricing</div>
@@ -287,84 +254,143 @@ export default function NewQuotation() {
                 </div>
                 <div>
                   <label style={lbl}>Target Final Price (override)</label>
-                  <input type='number' value={targetPrice} onChange={e => { setTargetPrice(e.target.value); setDiscountPercent(0) }} placeholder='Leave blank to use discount%' style={inp} />
+                  <input type='number' value={targetPrice} onChange={e => { setTargetPrice(e.target.value); setDiscountPercent(0) }} placeholder='Leave blank for discount%' style={inp} />
                 </div>
               </div>
-
               {preview && (
-                <div style={{ background: '#111827', borderRadius: 8, padding: 16, marginTop: 8 }}>
+                <div style={{ background: '#111827', borderRadius: 8, padding: 16 }}>
                   <div style={{ fontWeight: 600, marginBottom: 10, color: '#22c55e' }}>Pricing Preview</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
                     <div style={{ color: '#9ca3af' }}>Appliance Total:</div><div>{fmt(preview.totals.applianceTotal)}</div>
                     <div style={{ color: '#9ca3af' }}>License Total:</div><div>{fmt(preview.totals.licenseTotal)}</div>
                     {preview.totals.serviceTotal > 0 && <><div style={{ color: '#9ca3af' }}>Service Total:</div><div>{fmt(preview.totals.serviceTotal)}</div></>}
                     <div style={{ color: '#9ca3af' }}>Grand Total:</div><div>{fmt(preview.totals.grandTotal)}</div>
-                    {preview.totals.discountAmount > 0 && <><div style={{ color: '#9ca3af' }}>Discount ({preview.discountPercent.toFixed(1)}%):</div><div style={{ color: '#ef4444' }}>-{fmt(preview.totals.discountAmount)}</div></>}
-                    <div style={{ color: '#f9fafb', fontWeight: 700 }}>FINAL PRICE:</div><div style={{ color: '#22c55e', fontWeight: 700, fontSize: 16 }}>{fmt(preview.totals.finalPrice)}</div>
+                    {preview.totals.discountAmount > 0 && <><div style={{ color: '#9ca3af' }}>Discount:</div><div style={{ color: '#ef4444' }}>-{fmt(preview.totals.discountAmount)}</div></>}
+                    <div style={{ color: '#f9fafb', fontWeight: 700 }}>FINAL PRICE:</div>
+                    <div style={{ color: '#22c55e', fontWeight: 700, fontSize: 16 }}>{fmt(preview.totals.finalPrice)}</div>
                   </div>
-                  {preview.totals.yearlyBreakdown?.length > 1 && (
-                    <div style={{ marginTop: 10, fontSize: 12, color: '#9ca3af' }}>
-                      Payment Schedule: {preview.totals.yearlyBreakdown.map((y: any) => `Year ${y.year}: ${fmt(y.amount)}`).join(' | ')}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
-
             <div style={card}>
               <div style={{ fontWeight: 600, marginBottom: 16, color: '#f9fafb' }}>Remarks</div>
-              <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={6} placeholder='Remarks will be auto-generated if left blank' style={{ ...inp, resize: 'vertical' as const }} />
+              <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={5} placeholder='Remarks will be auto-generated if blank' style={{ ...inp, resize: 'vertical' as const }} />
             </div>
           </div>
         </div>
-
+        {/* Product Lines */}
         <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, color: '#f9fafb' }}>Product Lines</div>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontWeight: 600, color: '#f9fafb', fontSize: 16 }}>Product Lines</div>
             <button onClick={addLine} style={{ marginLeft: 'auto', ...btn('#1f2937'), border: '1px solid #374151', fontSize: 13 }}>+ Add Line</button>
           </div>
-
+          {/* Mobile: card-style rows; Desktop: table */}
+          <div style={{ display: 'none' }} className='mobile-lines'>
+            {lines.map((line, idx) => (
+              <div key={line.id} style={{ background: '#111827', borderRadius: 8, padding: 12, marginBottom: 12, border: '1px solid #1f2937' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#9ca3af', fontSize: 13 }}>Line {idx + 1}</span>
+                  <button onClick={() => removeLine(line.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <label style={lbl}>Product Category</label>
+                  <select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} style={inp}>
+                    <option value=''>-- Select Category --</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                {line.categoryId && (
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={lbl}>Model</label>
+                    <select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} style={inp}>
+                      <option value=''>-- Select Model --</option>
+                      {getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <label style={lbl}>Site Type</label>
+                    <select value={line.siteType} onChange={e => updateLine(line.id, { siteType: e.target.value })} style={inp}>
+                      <option value='production'>Production</option>
+                      <option value='dr'>DR</option>
+                      <option value='test'>Test</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Qty</label>
+                    <input type='number' min='1' value={line.qty} onChange={e => onQtyChange(line.id, parseInt(e.target.value)||1)} style={inp} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <label style={lbl}>Appliance Price</label>
+                    <input type='number' value={line.applianceUnitPrice} onChange={e => updateLine(line.id, { applianceUnitPrice: parseFloat(e.target.value)||0 })} style={inp} />
+                  </div>
+                  <div>
+                    <label style={lbl}>License/yr Price</label>
+                    <input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, { licenseUnitPrice: parseFloat(e.target.value)||0 })} style={inp} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
+                    <input type='checkbox' checked={line.isIncluded} onChange={e => updateLine(line.id, { isIncluded: e.target.checked })} /> Included (no charge)
+                  </label>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <input value={line.notes} onChange={e => updateLine(line.id, { notes: e.target.value })} placeholder='Notes' style={inp} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #374151' }}>
-                  {['Product','Site Type','Qty','Appliance Unit Price','License/yr Unit','Included?','Notes',''].map(h => (
+                  {['Category','Model','Site Type','Qty','Appliance Unit','License/yr Unit','Incl?','Notes',''].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: '#9ca3af', fontWeight: 500 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {lines.map((line, idx) => (
+                {lines.map((line) => (
                   <tr key={line.id} style={{ borderBottom: '1px solid #1f2937' }}>
-                    <td style={{ padding: '6px 8px', minWidth: 200 }}>
-                      <select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} style={{ ...inp, width: 'auto', minWidth: 180, padding: '6px 10px' }}>
-                        <option value=''>-- Select Product --</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
+                    <td style={{ padding: '6px 4px', minWidth: 160 }}>
+                      <select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: '#e0e0e0', padding: '6px 8px', fontSize: 13, width: '100%' }}>
+                        <option value=''>-- Category --</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </td>
-                    <td style={{ padding: '6px 8px' }}>
-                      <select value={line.siteType} onChange={e => updateLine(line.id, { siteType: e.target.value })} style={{ ...inp, width: 'auto', padding: '6px 10px' }}>
-                        <option value='production'>Production</option>
+                    <td style={{ padding: '6px 4px', minWidth: 180 }}>
+                      <select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} disabled={!line.categoryId} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: line.categoryId ? '#e0e0e0' : '#6b7280', padding: '6px 8px', fontSize: 13, width: '100%' }}>
+                        <option value=''>-- Model --</option>
+                        {line.categoryId && getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ padding: '6px 4px' }}>
+                      <select value={line.siteType} onChange={e => updateLine(line.id, { siteType: e.target.value })} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: '#e0e0e0', padding: '6px 8px', fontSize: 13 }}>
+                        <option value='production'>Prod</option>
                         <option value='dr'>DR</option>
                         <option value='test'>Test</option>
                       </select>
                     </td>
-                    <td style={{ padding: '6px 8px', width: 70 }}>
-                      <input type='number' min='1' value={line.qty} onChange={e => onQtyChange(line.id, parseInt(e.target.value)||1)} style={{ ...inp, width: 60, padding: '6px 8px' }} />
+                    <td style={{ padding: '6px 4px', width: 60 }}>
+                      <input type='number' min='1' value={line.qty} onChange={e => onQtyChange(line.id, parseInt(e.target.value)||1)} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: '#e0e0e0', padding: '6px 8px', fontSize: 13, width: 55 }} />
                     </td>
-                    <td style={{ padding: '6px 8px', width: 130 }}>
-                      <input type='number' value={line.applianceUnitPrice} onChange={e => updateLine(line.id, { applianceUnitPrice: parseFloat(e.target.value)||0 })} style={{ ...inp, width: 110, padding: '6px 8px' }} />
+                    <td style={{ padding: '6px 4px', width: 110 }}>
+                      <input type='number' value={line.applianceUnitPrice} onChange={e => updateLine(line.id, { applianceUnitPrice: parseFloat(e.target.value)||0 })} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: '#e0e0e0', padding: '6px 8px', fontSize: 13, width: 100 }} />
                     </td>
-                    <td style={{ padding: '6px 8px', width: 130 }}>
-                      <input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, { licenseUnitPrice: parseFloat(e.target.value)||0 })} style={{ ...inp, width: 110, padding: '6px 8px' }} />
+                    <td style={{ padding: '6px 4px', width: 110 }}>
+                      <input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, { licenseUnitPrice: parseFloat(e.target.value)||0 })} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: '#e0e0e0', padding: '6px 8px', fontSize: 13, width: 100 }} />
                     </td>
-                    <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                    <td style={{ padding: '6px 4px', textAlign: 'center' }}>
                       <input type='checkbox' checked={line.isIncluded} onChange={e => updateLine(line.id, { isIncluded: e.target.checked })} title='Include in scope (no charge)' />
                     </td>
-                    <td style={{ padding: '6px 8px', minWidth: 120 }}>
-                      <input value={line.notes} onChange={e => updateLine(line.id, { notes: e.target.value })} placeholder='Notes' style={{ ...inp, padding: '6px 8px' }} />
+                    <td style={{ padding: '6px 4px', minWidth: 100 }}>
+                      <input value={line.notes} onChange={e => updateLine(line.id, { notes: e.target.value })} placeholder='Notes' style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: '#e0e0e0', padding: '6px 8px', fontSize: 13, width: '100%' }} />
                     </td>
-                    <td style={{ padding: '6px 8px' }}>
+                    <td style={{ padding: '6px 4px' }}>
                       <button onClick={() => removeLine(line.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>✕</button>
                     </td>
                   </tr>
@@ -372,7 +398,7 @@ export default function NewQuotation() {
               </tbody>
             </table>
           </div>
-          {lines.length === 0 && <div style={{ textAlign: 'center', color: '#6b7280', padding: '24px 0' }}>No product lines added yet</div>}
+          {lines.length === 0 && <div style={{ textAlign: 'center', color: '#6b7280', padding: '24px 0' }}>No product lines added yet. Click &quot;+ Add Line&quot; to start.</div>}
         </div>
       </div>
     </div>
