@@ -8,81 +8,77 @@ const ACTION_PRIORITY: Record<string, number> = {
 
 const DEFAULT_POLICY: Record<string, string> = {
   'adult': 'Block', 'gambling': 'Block', 'malware': 'Block',
-  'phishing': 'Block', 'botnet/c2': 'Block', 'command-and-control': 'Block',
-  'spyware': 'Block', 'exploit/attack tools': 'Block', 'hacking': 'Block',
-  'drugs': 'Block', 'weapons': 'Block', 'violence': 'Block',
-  'hate-speech': 'Block', 'terrorism': 'Block', 'child-abuse': 'Block',
-  'warez': 'Block', 'scam/fraud': 'Block', 'suspicious': 'Warn',
-  'peer-to-peer': 'Warn', 'torrent': 'Warn', 'proxy/anonymizer': 'Warn',
+  'phishing': 'Block', 'botnet/c2': 'Block', 'suspicious': 'Warn',
+  'spyware': 'Block', 'exploit/attack tools': 'Block',
+  'scam/fraud': 'Block', 'proxy/anonymizer': 'Warn',
   'vpn services': 'Warn', 'cryptocurrency': 'Warn',
-  'social networking': 'Warn', 'messaging': 'Warn',
-  'streaming video': 'Warn', 'games': 'Warn',
+  'social networking': 'Warn', 'streaming video': 'Warn',
+  'games': 'Warn', 'messaging': 'Warn', 'dynamic dns': 'Warn',
 };
 
 function getDefaultAction(cat: string): string {
-  const slug = cat.toLowerCase();
-  return DEFAULT_POLICY[slug] || 'Allow';
+  return DEFAULT_POLICY[cat.toLowerCase()] || 'Allow';
 }
 
 function getHighestAction(categories: string[]): string {
-  if (categories.length === 0) return 'Allow';
+  if (!categories.length) return 'Allow';
   return categories.reduce((best, cat) => {
-    const action = getDefaultAction(cat);
-    return (ACTION_PRIORITY[action] || 0) > (ACTION_PRIORITY[best] || 0) ? action : best;
+    const a = getDefaultAction(cat);
+    return (ACTION_PRIORITY[a] || 0) > (ACTION_PRIORITY[best] || 0) ? a : best;
   }, 'Allow');
 }
 
 function normalizeDomain(input: string): string {
-  let domain = input.toLowerCase().trim();
+  let d = input.toLowerCase().trim();
   try {
-    if (!domain.startsWith('http')) domain = 'https://' + domain;
-    const u = new URL(domain);
-    domain = u.hostname;
+    if (!d.startsWith('http')) d = 'https://' + d;
+    d = new URL(d).hostname;
   } catch {}
-  return domain.replace(/^www\./, '');
+  return d.replace(/^www\./, '');
 }
 
 async function queryDbCategory(domain: string): Promise<string | null> {
   try {
     const db = getDB();
-    const result = await db.execute({
-      sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1',
-      args: [domain],
-    });
-    if (result.rows.length > 0) return result.rows[0].category as string;
+    const r = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [domain] });
+    if (r.rows.length > 0) return r.rows[0].category as string;
     const parts = domain.split('.');
     if (parts.length > 2) {
       const apex = parts.slice(-2).join('.');
       const r2 = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] });
       if (r2.rows.length > 0) return r2.rows[0].category as string;
     }
-  } catch (e) { console.error('DB category query failed:', e); }
+  } catch {}
   return null;
 }
 
 async function queryThreatIntel(domain: string): Promise<{isMalicious:boolean;riskLevel:string;threatType:string|null}> {
   try {
     const db = getDB();
-    const result = await db.execute({
+    const r = await db.execute({
       sql: 'SELECT risk_level, categories FROM indicators WHERE value_normalized = ? AND is_active = 1 ORDER BY confidence DESC LIMIT 1',
       args: [domain],
     });
-    if (result.rows.length > 0) {
-      const risk = result.rows[0].risk_level as string;
+    if (r.rows.length > 0) {
+      const risk = r.rows[0].risk_level as string;
       let cats: string[] = [];
-      try { cats = JSON.parse((result.rows[0].categories as string) || '[]'); } catch {}
-      const isMalicious = ['known_malicious', 'high_risk'].includes(risk);
-      return { isMalicious, riskLevel: risk, threatType: cats[0] || null };
+      try { cats = JSON.parse((r.rows[0].categories as string) || '[]'); } catch {}
+      return { isMalicious: ['known_malicious','high_risk'].includes(risk), riskLevel: risk, threatType: cats[0] || null };
     }
-  } catch (e) { console.error('Threat intel query failed:', e); }
+  } catch {}
   return { isMalicious: false, riskLevel: 'unknown', threatType: null };
 }
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url') || '';
   if (!url) return NextResponse.json({ error: 'url parameter required' }, { status: 400 });
-  const result = await evaluateUrl(url);
-  return NextResponse.json(result);
+  try {
+    const result = await evaluateUrl(url);
+    return NextResponse.json(result);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -94,8 +90,9 @@ export async function POST(request: NextRequest) {
     }
     if (body.url) return NextResponse.json(await evaluateUrl(body.url));
     return NextResponse.json({ error: 'url or urls required' }, { status: 400 });
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -103,16 +100,17 @@ async function evaluateUrl(inputUrl: string) {
   const domain = normalizeDomain(inputUrl);
   const startTime = Date.now();
 
-  // Layer 1: Static taxonomy (categorizeUrl returns string[])
+  // Layer 1: Static taxonomy
   const staticCategories = categorizeUrl(inputUrl);
 
-  // Layer 2: DB-backed category (UT1/Shallalist)
-  const dbCategory = await queryDbCategory(domain);
+  // Layer 2: DB category (graceful fallback)
+  let dbCategory: string | null = null;
+  try { dbCategory = await queryDbCategory(domain); } catch {}
 
-  // Layer 3: Threat intelligence check
-  const threatIntel = await queryThreatIntel(domain);
+  // Layer 3: Threat intel (graceful fallback)
+  let threatIntel = { isMalicious: false, riskLevel: 'unknown', threatType: null as string | null };
+  try { threatIntel = await queryThreatIntel(domain); } catch {}
 
-  // Build final categories
   const allCategories = [...staticCategories];
   let categorySource = 'static-taxonomy';
   let confidence = staticCategories.length > 0 && staticCategories[0] !== 'Uncategorized' ? 80 : 40;
@@ -122,39 +120,28 @@ async function evaluateUrl(inputUrl: string) {
     categorySource = 'database';
     confidence = Math.min(confidence + 15, 95);
   }
-
   if (threatIntel.isMalicious) {
-    const threatCat = threatIntel.threatType || 'Malware';
-    if (!allCategories.includes(threatCat)) allCategories.push(threatCat);
+    const tc = threatIntel.threatType || 'Malware';
+    if (!allCategories.includes(tc)) allCategories.push(tc);
     categorySource = 'threat-intel';
     confidence = 99;
   }
 
-  // Determine action
   let action = getHighestAction(allCategories);
   if (threatIntel.isMalicious) action = 'Block';
 
-  // Find taxonomy entry
-  const taxonomyEntries = Object.values(URL_TAXONOMY);
-  const taxonomyEntry = taxonomyEntries.find((t: any) =>
+  const taxonomyEntries = Object.values(URL_TAXONOMY) as Array<{slug:string;name:string;group:string;defaultAction:string}>;
+  const te = taxonomyEntries.find(t =>
     staticCategories.some(c => c.toLowerCase() === t.name.toLowerCase() || c.toLowerCase() === t.slug.toLowerCase())
-  ) as any;
+  );
 
   return {
-    url: inputUrl,
-    domain,
-    action,
-    confidence,
-    categorySource,
+    url: inputUrl, domain, action, confidence, categorySource,
     categories: allCategories,
     primaryCategory: allCategories[0] || 'Uncategorized',
-    class: taxonomyEntry?.group || null,
-    superCategory: taxonomyEntry?.group || null,
-    threatIntel: {
-      isMalicious: threatIntel.isMalicious,
-      riskLevel: threatIntel.riskLevel,
-      threatType: threatIntel.threatType,
-    },
+    group: te?.group || null,
+    defaultAction: te?.defaultAction || null,
+    threatIntel,
     dbCategoryMatch: dbCategory,
     evalMs: Date.now() - startTime,
     timestamp: new Date().toISOString(),
