@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { categorizeUrl, URL_TAXONOMY } from '@/lib/url-categories'
 import { getDB } from '@/lib/db'
 import { classifyUrlWithAI, isAIClassificationAvailable } from '@/lib/ai-url-classifier'
-
+import { detectDGA } from '@/lib/dga-detector'
 const ACTION_PRIORITY: Record<string, number> = {
   'Block': 4, 'Warn': 3, 'Isolate': 2, 'Allow': 1,
 };
-
-// Risk level scoring: high/medium/low (like PAN-DB)
 const RISK_HIGH_CATEGORIES = [
   'malware', 'phishing', 'botnet/c2', 'exploit/attack tools',
   'scam/fraud', 'ransomware', 'cryptojacking', 'spyware'
@@ -18,7 +16,6 @@ const RISK_MEDIUM_CATEGORIES = [
   'cryptocurrency', 'dns over HTTPS'
 ]
 const SUSPICIOUS_TLDS = ['xyz','top','club','buzz','tk','ml','ga','cf','gq','icu','cam','rest','click','link']
-
 function computeRiskLevel(
   categories: string[],
   domain: string,
@@ -27,28 +24,19 @@ function computeRiskLevel(
 ): { riskLevel: 'high' | 'medium' | 'low' | 'none'; riskScore: number; riskFactors: string[] } {
   const factors: string[] = []
   let score = 0
-
   if (isMalicious) { score += 100; factors.push('confirmed-malicious') }
-
   for (const cat of categories) {
     const c = cat.toLowerCase()
     if (RISK_HIGH_CATEGORIES.includes(c)) { score += 80; factors.push(`high-risk-category:${cat}`) }
     else if (RISK_MEDIUM_CATEGORIES.includes(c)) { score += 40; factors.push(`medium-risk-category:${cat}`) }
   }
-
   const tld = domain.split('.').pop() || ''
   if (SUSPICIOUS_TLDS.includes(tld)) { score += 25; factors.push(`suspicious-tld:.${tld}`) }
-
-  // Low confidence AI classification on unknown domain
   if (categories.includes('Uncategorized') && confidence < 40) { score += 15; factors.push('uncategorized-low-confidence') }
-
-  // Numeric subdomains pattern (common in malware)
   if (/\d{4,}/.test(domain.split('.')[0])) { score += 10; factors.push('numeric-subdomain-pattern') }
-
   const riskLevel = score >= 70 ? 'high' : score >= 30 ? 'medium' : score > 0 ? 'low' : 'none'
   return { riskLevel, riskScore: Math.min(score, 100), riskFactors: factors }
 }
-
 const DEFAULT_POLICY: Record<string, string> = {
   'adult': 'Block', 'gambling': 'Block', 'malware': 'Block',
   'phishing': 'Block', 'botnet/c2': 'Block', 'suspicious': 'Warn',
@@ -58,11 +46,9 @@ const DEFAULT_POLICY: Record<string, string> = {
   'social networking': 'Warn', 'streaming video': 'Warn',
   'games': 'Warn', 'messaging': 'Warn', 'dynamic dns': 'Warn',
 };
-
 function getDefaultAction(cat: string): string {
   return DEFAULT_POLICY[cat.toLowerCase()] || 'Allow';
 }
-
 function getHighestAction(categories: string[]): string {
   if (!categories.length) return 'Allow';
   return categories.reduce((best, cat) => {
@@ -70,7 +56,6 @@ function getHighestAction(categories: string[]): string {
     return (ACTION_PRIORITY[a] || 0) > (ACTION_PRIORITY[best] || 0) ? a : best;
   }, 'Allow');
 }
-
 function normalizeDomain(input: string): string {
   let d = input.toLowerCase().trim();
   try {
@@ -79,7 +64,6 @@ function normalizeDomain(input: string): string {
   } catch {}
   return d.replace(/^www\./, '');
 }
-
 async function queryDbCategory(domain: string): Promise<string | null> {
   try {
     const db = getDB();
@@ -94,7 +78,6 @@ async function queryDbCategory(domain: string): Promise<string | null> {
   } catch {}
   return null;
 }
-
 async function queryCustomCategory(domain: string): Promise<{ category: string; action: string } | null> {
   try {
     const db = getDB();
@@ -108,7 +91,6 @@ async function queryCustomCategory(domain: string): Promise<{ category: string; 
   } catch {}
   return null;
 }
-
 async function queryThreatIntel(domain: string): Promise<{isMalicious:boolean;riskLevel:string;threatType:string|null}> {
   try {
     const db = getDB();
@@ -125,7 +107,18 @@ async function queryThreatIntel(domain: string): Promise<{isMalicious:boolean;ri
   } catch {}
   return { isMalicious: false, riskLevel: 'unknown', threatType: null };
 }
-
+async function queryOverride(domain: string): Promise<{ action: string } | null> {
+  try {
+    const db = getDB();
+    const r = await db.execute({
+      sql: `SELECT action FROM url_policy_overrides
+            WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`,
+      args: [domain]
+    });
+    if (r.rows.length > 0) return { action: r.rows[0].action as string };
+  } catch {}
+  return null;
+}
 async function logUrlEvent(domain: string, action: string, category: string, riskLevel: string) {
   try {
     const db = getDB();
@@ -136,7 +129,6 @@ async function logUrlEvent(domain: string, action: string, category: string, ris
     });
   } catch {}
 }
-
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url') || '';
   if (!url) return NextResponse.json({ error: 'url parameter required' }, { status: 400 });
@@ -148,7 +140,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -163,43 +154,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-
 async function evaluateUrl(inputUrl: string) {
   const domain = normalizeDomain(inputUrl);
   const startTime = Date.now();
-
-  // Layer 0: Custom URL categories (highest priority - overrides everything)
+  // Layer 0a: Override check (highest priority - admin/user manual overrides)
+  const override = await queryOverride(domain);
+  // Layer 0b: Custom URL categories
   const customMatch = await queryCustomCategory(domain);
-
   // Layer 1: Static taxonomy
   const staticCategories = categorizeUrl(inputUrl);
-
   // Layer 2: DB category
   let dbCategory: string | null = null;
   try { dbCategory = await queryDbCategory(domain); } catch {}
-
   // Layer 3: Threat intel
   let threatIntel = { isMalicious: false, riskLevel: 'unknown', threatType: null as string | null };
   try { threatIntel = await queryThreatIntel(domain); } catch {}
-
+  // Layer 4: DGA Detection (P2-2)
+  const dgaResult = detectDGA(domain);
   const allCategories = [...staticCategories];
   let categorySource = 'static-taxonomy';
   let confidence = staticCategories.length > 0 && staticCategories[0] !== 'Uncategorized' ? 80 : 40;
-
   if (dbCategory && !allCategories.includes(dbCategory)) {
     allCategories.push(dbCategory);
     categorySource = 'database';
     confidence = Math.min(confidence + 15, 95);
   }
-
   if (threatIntel.isMalicious) {
     const tc = threatIntel.threatType || 'Malware';
     if (!allCategories.includes(tc)) allCategories.push(tc);
     categorySource = 'threat-intel';
     confidence = 99;
   }
-
-  // Layer 4: AI classification for uncategorized URLs
+  // Add DGA category if detected
+  if (dgaResult.isDGA) {
+    if (!allCategories.includes('DGA/Suspicious')) allCategories.push('DGA/Suspicious');
+    if (categorySource === 'static-taxonomy') categorySource = 'dga-detection';
+  }
+  // Layer 5: AI classification for uncategorized
   let aiClassified = false;
   if (isAIClassificationAvailable() && (allCategories.length === 0 || (allCategories.length === 1 && allCategories[0] === 'Uncategorized'))) {
     try {
@@ -212,14 +203,10 @@ async function evaluateUrl(inputUrl: string) {
       }
     } catch {}
   }
-
-  // Compute risk level (P0 feature - like PAN-DB High/Medium/Low)
   const riskAssessment = computeRiskLevel(allCategories, domain, threatIntel.isMalicious, confidence);
-
   let action = getHighestAction(allCategories);
   if (threatIntel.isMalicious) action = 'Block';
-
-  // Custom category overrides action (highest priority)
+  if (dgaResult.isDGA && ACTION_PRIORITY[action] < ACTION_PRIORITY['Warn']) action = 'Warn';
   let customCategory: string | null = null;
   if (customMatch) {
     customCategory = customMatch.category;
@@ -228,28 +215,32 @@ async function evaluateUrl(inputUrl: string) {
     categorySource = 'custom';
     confidence = 100;
   }
-
+  // Override takes highest priority (after custom)
+  let overrideApplied = false;
+  if (override) {
+    action = override.action;
+    overrideApplied = true;
+    if (categorySource !== 'custom') categorySource = 'override';
+  }
   const taxonomyEntries = Object.values(URL_TAXONOMY) as Array<{slug:string;name:string;group:string;defaultAction:string}>;
   const te = taxonomyEntries.find(t =>
     staticCategories.some(c => c.toLowerCase() === t.name.toLowerCase() || c.toLowerCase() === t.slug.toLowerCase())
   );
-
-  // Log for analytics
   await logUrlEvent(domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel);
-
   return {
     url: inputUrl, domain, action, confidence, categorySource,
     categories: allCategories,
     primaryCategory: allCategories[0] || 'Uncategorized',
     group: te?.group || null,
     defaultAction: te?.defaultAction || null,
-    // P0: Risk Scoring (like PAN-DB High/Medium/Low)
     riskLevel: riskAssessment.riskLevel,
     riskScore: riskAssessment.riskScore,
     riskFactors: riskAssessment.riskFactors,
     threatIntel,
     dbCategoryMatch: dbCategory,
     customCategoryMatch: customCategory,
+    overrideApplied,
+    dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors },
     evalMs: Date.now() - startTime,
     aiClassified,
     timestamp: new Date().toISOString(),
