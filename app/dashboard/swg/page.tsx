@@ -133,7 +133,8 @@ export default function SWGDashboard() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center">
+    <div className="min-h-screen 150
+      flex items-center justify-center">
       <div className="text-xl">Loading SWG Dashboard...</div>
     </div>
   )
