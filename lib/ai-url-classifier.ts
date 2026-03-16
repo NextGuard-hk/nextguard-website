@@ -1,228 +1,253 @@
 // lib/ai-url-classifier.ts
-// AI-powered URL classification using Gemini API
-// Provides real-time categorization for unknown/uncategorized URLs
+// AI-powered URL classification using Perplexity (primary) and Gemini (backup)
+// Provides real-time categorization for unknown URLs
 
 import { getDB } from './db'
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || ''
+// Perplexity API config (Primary)
+const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY || ''
+const PERPLEXITY_URL = 'https://api.perplexity.ai/chat/completions'
+const PERPLEXITY_MODEL = 'sonar'
+
+// Gemini API config (Backup)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
 const GEMINI_MODEL = 'gemini-2.0-flash-lite'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
 
 // Valid categories matching our taxonomy
 const VALID_CATEGORIES = [
-  'Search Engines', 'News', 'Social Networking', 'Streaming Video',
-  'Streaming Audio', 'Shopping', 'Finance', 'Business', 'Technology',
-  'Education', 'Government', 'Health', 'Travel', 'Food & Dining',
-  'Entertainment', 'Sports', 'Games', 'Adult', 'Gambling',
-  'Malware', 'Phishing', 'Botnet/C2', 'Spyware',
-  'Exploit/Attack Tools', 'Scam/Fraud', 'Cryptocurrency',
-  'Proxy/Anonymizer', 'VPN Services', 'Dynamic DNS',
-  'File Sharing', 'Cloud Storage', 'Messaging', 'Email',
-  'Developer Tools', 'CDN/Infrastructure', 'Advertising',
-  'Analytics/Tracking', 'IoT/Smart Home', 'Automotive',
-  'Real Estate', 'Job Search', 'Dating', 'Religion',
-  'Political', 'Weapons', 'Drug Related', 'Suspicious',
-  'Uncategorized'
+  'Search Engines', 'News', 'Social Networking', 'Email',
+  'Streaming Audio', 'Shopping', 'Financial Services',
+  'Education', 'Government', 'Health', 'Technology',
+  'Entertainment', 'Sports', 'Games', 'Advertising',
+  'Malware', 'Phishing', 'Botnet/C2', 'Spam',
+  'Exploit/Attack Tools', 'Scam/Fraud', 'Cryptojacking',
+  'Proxy/Anonymizer', 'VPN Services', 'DNS over HTTPS',
+  'File Sharing', 'Cloud Storage', 'Messaging',
+  'Developer Tools', 'CDN/Infrastructure', 'Business',
+  'Analytics/Tracking', 'IoT/Smart Home', 'AI/ML Services',
+  'Cryptocurrency', 'Gambling', 'Dating',
+  'Adult Content', 'Weapons', 'Drugs',
+  'Suspicious', 'Uncategorized'
 ]
+
+const CLASSIFICATION_PROMPT = `You are a URL categorization engine for a cybersecurity web gateway. Classify the given URL into exactly ONE category from this list:
+
+${VALID_CATEGORIES.join(', ')}
+
+Rules:
+1. Return ONLY the category name, nothing else
+2. If the URL appears malicious, phishing, or suspicious, use the appropriate security category
+3. If unsure, use "Suspicious" rather than guessing
+4. Consider the domain name, TLD, and any path information
+5. Known brands should be categorized by their primary business
+
+URL to classify: `
 
 export interface AIClassificationResult {
   url: string
-  domain: string
-  categories: string[]
-  primaryCategory: string
+  category: string
   confidence: number
-  reasoning: string
-  source: 'ai-gemini'
+  source: 'perplexity' | 'gemini' | 'fallback'
   cached: boolean
-  classificationMs: number
+  responseTimeMs: number
 }
 
-// In-memory cache for AI classifications (TTL: 1 hour)
-const classificationCache = new Map<string, { result: AIClassificationResult; expiry: number }>()
-const CACHE_TTL = 3600 * 1000 // 1 hour
-
-function getCached(domain: string): AIClassificationResult | null {
-  const entry = classificationCache.get(domain)
-  if (entry && entry.expiry > Date.now()) {
-    return { ...entry.result, cached: true }
-  }
-  if (entry) classificationCache.delete(domain)
-  return null
-}
-
-function setCache(domain: string, result: AIClassificationResult) {
-  // Limit cache size to 10000 entries
-  if (classificationCache.size > 10000) {
-    const oldest = classificationCache.keys().next().value
-    if (oldest) classificationCache.delete(oldest)
-  }
-  classificationCache.set(domain, { result, expiry: Date.now() + CACHE_TTL })
-}
-
-export function isAIClassificationAvailable(): boolean {
-  return !!GEMINI_API_KEY
-}
-
-export async function classifyUrlWithAI(url: string): Promise<AIClassificationResult> {
-  const startTime = Date.now()
-  let domain = url.toLowerCase().trim()
-  try {
-    if (!domain.startsWith('http')) domain = 'https://' + domain
-    domain = new URL(domain).hostname
-  } catch {}
-  domain = domain.replace(/^www\./, '')
-
-  // Check memory cache first
-  const cached = getCached(domain)
-  if (cached) return { ...cached, classificationMs: Date.now() - startTime }
-
-  // Check DB cache
-  try {
-    const db = getDB()
-    const dbCache = await db.execute({
-      sql: 'SELECT category, confidence, reasoning FROM ai_url_cache WHERE domain = ? AND expires_at > datetime("now") LIMIT 1',
-      args: [domain]
-    })
-    if (dbCache.rows.length > 0) {
-      const row = dbCache.rows[0]
-      const result: AIClassificationResult = {
-        url, domain,
-        categories: [row.category as string],
-        primaryCategory: row.category as string,
-        confidence: row.confidence as number,
-        reasoning: row.reasoning as string || '',
-        source: 'ai-gemini',
-        cached: true,
-        classificationMs: Date.now() - startTime
-      }
-      setCache(domain, result)
-      return result
-    }
-  } catch {}
-
-  if (!GEMINI_API_KEY) {
-    return {
-      url, domain,
-      categories: ['Uncategorized'],
-      primaryCategory: 'Uncategorized',
-      confidence: 0,
-      reasoning: 'AI classification unavailable: GEMINI_API_KEY not configured',
-      source: 'ai-gemini',
-      cached: false,
-      classificationMs: Date.now() - startTime
-    }
+// Perplexity classification (Primary)
+async function classifyWithPerplexity(url: string): Promise<{ category: string; confidence: number }> {
+  if (!PERPLEXITY_API_KEY) {
+    throw new Error('Perplexity API key not configured')
   }
 
-  // Call Gemini API
-  const prompt = `You are a URL classification engine for a web security gateway. Classify the following domain into exactly ONE primary category.
-
-Domain: ${domain}
-
-Valid categories: ${VALID_CATEGORIES.join(', ')}
-
-Respond in this exact JSON format only, no other text:
-{"category": "<category>", "confidence": <0-100>, "reasoning": "<brief reason>"}
-
-Rules:
-- Choose the MOST specific matching category
-- Confidence 90+ for well-known domains
-- Confidence 60-89 for domains with clear indicators
-- Confidence 30-59 for ambiguous domains
-- If truly unknown, use "Uncategorized" with low confidence`
-
-  try {
-    const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 200,
-          responseMimeType: 'application/json'
+  const response = await fetch(PERPLEXITY_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: PERPLEXITY_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a URL categorization engine. Return ONLY the category name.'
+        },
+        {
+          role: 'user',
+          content: CLASSIFICATION_PROMPT + url
         }
-      }),
-    })
+      ],
+      max_tokens: 50,
+      temperature: 0.1,
+    }),
+  })
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`)
-    }
+  if (!response.ok) {
+    throw new Error(`Perplexity API error: ${response.status}`)
+  }
 
-    const data = await response.json()
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    
-    let parsed: { category: string; confidence: number; reasoning: string }
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      // Try to extract JSON from response
-      const jsonMatch = text.match(/\{[^}]+\}/)
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error('Failed to parse AI response')
-      }
-    }
+  const data = await response.json()
+  const rawCategory = data.choices?.[0]?.message?.content?.trim() || ''
+  const category = VALID_CATEGORIES.find(
+    c => c.toLowerCase() === rawCategory.toLowerCase()
+  ) || 'Uncategorized'
 
-    // Validate category
-    const category = VALID_CATEGORIES.find(
-      c => c.toLowerCase() === (parsed.category || '').toLowerCase()
-    ) || 'Uncategorized'
-
-    const result: AIClassificationResult = {
-      url, domain,
-      categories: [category],
-      primaryCategory: category,
-      confidence: Math.min(Math.max(parsed.confidence || 50, 0), 100),
-      reasoning: parsed.reasoning || '',
-      source: 'ai-gemini',
-      cached: false,
-      classificationMs: Date.now() - startTime
-    }
-
-    // Cache in memory
-    setCache(domain, result)
-
-    // Cache in DB (async, don't await)
-    cacheInDB(domain, result).catch(() => {})
-
-    return result
-  } catch (e) {
-    return {
-      url, domain,
-      categories: ['Uncategorized'],
-      primaryCategory: 'Uncategorized',
-      confidence: 0,
-      reasoning: `AI classification error: ${e instanceof Error ? e.message : String(e)}`,
-      source: 'ai-gemini',
-      cached: false,
-      classificationMs: Date.now() - startTime
-    }
+  return {
+    category,
+    confidence: category !== 'Uncategorized' ? 85 : 30,
   }
 }
 
-async function cacheInDB(domain: string, result: AIClassificationResult) {
-  try {
-    const db = getDB()
-    await db.execute(`CREATE TABLE IF NOT EXISTS ai_url_cache (
-      domain TEXT PRIMARY KEY,
-      category TEXT NOT NULL,
-      confidence INTEGER DEFAULT 50,
-      reasoning TEXT,
-      source TEXT DEFAULT 'ai-gemini',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      expires_at TEXT NOT NULL DEFAULT (datetime('now', '+24 hours'))
-    )`)
-    await db.execute({
-      sql: `INSERT OR REPLACE INTO ai_url_cache (domain, category, confidence, reasoning, expires_at)
-            VALUES (?, ?, ?, ?, datetime('now', '+24 hours'))`,
-      args: [domain, result.primaryCategory, result.confidence, result.reasoning]
-    })
-  } catch {}
+// Gemini classification (Backup)
+async function classifyWithGemini(url: string): Promise<{ category: string; confidence: number }> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured')
+  }
+
+  const response = await fetch(GEMINI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: CLASSIFICATION_PROMPT + url }]
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 50,
+      }
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Gemini API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  const rawCategory = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+  const category = VALID_CATEGORIES.find(
+    c => c.toLowerCase() === rawCategory.toLowerCase()
+  ) || 'Uncategorized'
+
+  return {
+    category,
+    confidence: category !== 'Uncategorized' ? 80 : 25,
+  }
 }
 
-// Batch classify multiple URLs
-export async function batchClassifyWithAI(urls: string[]): Promise<AIClassificationResult[]> {
-  const results = await Promise.all(urls.slice(0, 50).map(u => classifyUrlWithAI(u)))
-  return results
+// Main classification with Perplexity primary, Gemini backup
+export async function classifyURL(url: string): Promise<AIClassificationResult> {
+  const startTime = Date.now()
+
+  // Check cache first
+  try {
+    const db = getDB()
+    const cached = await db.execute({
+      sql: 'SELECT category, confidence, source FROM ai_url_cache WHERE url = ? AND created_at > datetime("now", "-24 hours")',
+      args: [url]
+    })
+    if (cached.rows.length > 0) {
+      const row = cached.rows[0]
+      return {
+        url,
+        category: row.category as string,
+        confidence: row.confidence as number,
+        source: row.source as 'perplexity' | 'gemini' | 'fallback',
+        cached: true,
+        responseTimeMs: Date.now() - startTime,
+      }
+    }
+  } catch (e) {
+    console.error('Cache lookup failed:', e)
+  }
+
+  let result: { category: string; confidence: number }
+  let source: 'perplexity' | 'gemini' | 'fallback' = 'fallback'
+
+  // Try Perplexity first (primary)
+  try {
+    result = await classifyWithPerplexity(url)
+    source = 'perplexity'
+  } catch (perplexityError) {
+    console.error('Perplexity classification failed, trying Gemini backup:', perplexityError)
+    // Try Gemini as backup
+    try {
+      result = await classifyWithGemini(url)
+      source = 'gemini'
+    } catch (geminiError) {
+      console.error('Gemini backup also failed:', geminiError)
+      // Final fallback - heuristic
+      result = heuristicClassify(url)
+      source = 'fallback'
+    }
+  }
+
+  // Cache the result
+  try {
+    const db = getDB()
+    await db.execute({
+      sql: 'INSERT OR REPLACE INTO ai_url_cache (url, category, confidence, source, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+      args: [url, result.category, result.confidence, source]
+    })
+  } catch (e) {
+    console.error('Cache write failed:', e)
+  }
+
+  return {
+    url,
+    category: result.category,
+    confidence: result.confidence,
+    source,
+    cached: false,
+    responseTimeMs: Date.now() - startTime,
+  }
+}
+
+// Heuristic fallback when both AI services fail
+function heuristicClassify(url: string): { category: string; confidence: number } {
+  const domain = url.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]
+  const tld = domain.split('.').pop() || ''
+
+  // Security-suspicious TLDs
+  const suspiciousTLDs = ['xyz', 'top', 'club', 'buzz', 'tk', 'ml', 'ga', 'cf', 'gq', 'icu', 'cam', 'rest']
+  if (suspiciousTLDs.includes(tld)) {
+    return { category: 'Suspicious', confidence: 60 }
+  }
+
+  // Known patterns
+  const patterns: Record<string, string> = {
+    'google': 'Search Engines', 'bing': 'Search Engines', 'yahoo': 'Search Engines',
+    'facebook': 'Social Networking', 'twitter': 'Social Networking', 'instagram': 'Social Networking', 'linkedin': 'Social Networking',
+    'youtube': 'Entertainment', 'netflix': 'Entertainment', 'spotify': 'Streaming Audio',
+    'amazon': 'Shopping', 'ebay': 'Shopping', 'shopify': 'Shopping',
+    'github': 'Developer Tools', 'stackoverflow': 'Developer Tools',
+    'bank': 'Financial Services', 'paypal': 'Financial Services',
+    '.gov': 'Government', '.edu': 'Education',
+  }
+
+  for (const [pattern, category] of Object.entries(patterns)) {
+    if (domain.includes(pattern)) {
+      return { category, confidence: 70 }
+    }
+  }
+
+  return { category: 'Uncategorized', confidence: 20 }
+}
+
+// Initialize AI cache table
+export async function initAICacheTable() {
+  try {
+    const db = getDB()
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS ai_url_cache (
+        url TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        confidence INTEGER DEFAULT 0,
+        source TEXT DEFAULT 'fallback',
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `)
+    console.log('AI URL cache table ready')
+  } catch (e) {
+    console.error('Failed to init AI cache table:', e)
+  }
 }
