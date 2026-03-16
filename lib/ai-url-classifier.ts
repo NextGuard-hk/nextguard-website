@@ -251,3 +251,17 @@ export async function initAICacheTable() {
     console.error('Failed to init AI cache table:', e)
   }
 }
+
+// Legacy wrapper functions for backward compatibility with route.ts
+export function isAIClassificationAvailable(): boolean {
+  return !!(PERPLEXITY_API_KEY || GEMINI_API_KEY)
+}
+
+export async function classifyUrlWithAI(url: string): Promise<{ primaryCategory: string; confidence: number; source: string }> {
+  const result = await classifyURL(url)
+  return {
+    primaryCategory: result.category,
+    confidence: result.confidence,
+    source: result.source,
+  }
+}
