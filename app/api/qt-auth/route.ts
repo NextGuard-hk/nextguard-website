@@ -113,19 +113,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
 
+    // Check if master admin password is being used
+    const isMasterAdmin = ADMIN_PASSWORD && password === ADMIN_PASSWORD
+
     const users = await getUsers()
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
-    if (!user) {
+
+    if (!user && !isMasterAdmin) {
       recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
-    if (!user.active) {
+
+    // If user exists, check if account is active
+    if (user && !user.active) {
       return NextResponse.json({ error: 'Account is disabled.' }, { status: 403 })
     }
 
-    // Accept EITHER: 1) per-user passwordHash match, OR 2) master admin password
-    const hash = await hashPassword(password)
-    const passwordValid = (hash === user.passwordHash) || (ADMIN_PASSWORD && password === ADMIN_PASSWORD)
+    // Validate password
+    let passwordValid = false
+    if (isMasterAdmin) {
+      passwordValid = true
+    } else if (user) {
+      const hash = await hashPassword(password)
+      passwordValid = hash === user.passwordHash
+    }
+
     if (!passwordValid) {
       recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
@@ -133,71 +145,99 @@ export async function POST(req: NextRequest) {
 
     clearAttempts(ip)
 
+    // Determine user info (use DB user if exists, otherwise use admin identity)
+    const userId = user?.id || 'admin'
+    const userName = user?.contactName || email.split('@')[0]
+
     // Send OTP email for 2FA
     const otp = generateOTP()
-    user.otp = otp
-    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
-    await saveUsers(users)
+    if (user) {
+      user.otp = otp
+      user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+      await saveUsers(users)
+    }
 
     const preMfaToken = signQtToken(
-      { userId: user.id, email: user.email, name: user.contactName || user.email, role: 'admin', mfaVerified: false },
+      { userId, email, name: userName, role: 'admin', mfaVerified: false },
       600
     )
 
+    // Store OTP in token for admin users not in DB
+    const otpToken = base64url(JSON.stringify({ otp, email, exp: Date.now() + 10 * 60 * 1000 }))
+
     try {
-      await sendEmail(email, 'NextGuard Quotation - Login Verification Code',
-        `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;background:#0d1117;color:#e0e0e0;border-radius:12px">
-        <h2 style="color:#22c55e">NextGuard Quotation System</h2>
-        <p>Your login verification code is:</p>
-        <div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#111827;border-radius:8px;color:#22c55e">${otp}</div>
-        <p style="color:#9ca3af;font-size:13px">This code expires in 10 minutes.</p>
-        </div>`
-      )
+      await sendEmail(email, 'NextGuard Quotation - Login Verification Code', `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0f1a;color:#e0e0e0;border-radius:12px">
+          <h2 style="color:#22c55e;margin-bottom:8px">NextGuard Quotation System</h2>
+          <p style="color:#6b7280;margin-bottom:24px">Internal Sales Only</p>
+          <p>Your login verification code is:</p>
+          <div style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#22c55e;padding:16px;background:#111827;border-radius:8px;text-align:center;margin:16px 0">${otp}</div>
+          <p style="color:#6b7280;font-size:13px">This code expires in 10 minutes.</p>
+        </div>
+      `)
     } catch (e) {
       return NextResponse.json({ error: 'Failed to send verification email.' }, { status: 500 })
     }
 
-    return NextResponse.json({ requireOtp: true, preMfaToken, message: 'Verification code sent to your email.' })
+    return NextResponse.json({ requireOtp: true, preMfaToken, otpToken, message: 'Verification code sent to your email.' })
   }
 
   // STEP 2: Verify OTP code
   if (action === 'verify-otp') {
-    const { preMfaToken, otpCode } = body
+    const { preMfaToken, otpToken, otpCode } = body
     if (!preMfaToken || !otpCode) {
       return NextResponse.json({ error: 'Token and OTP code are required.' }, { status: 400 })
     }
+
     const rawPayload = verifyQtToken(preMfaToken)
     if (!rawPayload || rawPayload.mfaVerified) {
       return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 })
     }
+
     const users = await getUsers()
     const user = users.find(u => u.email.toLowerCase() === rawPayload.email.toLowerCase())
-    if (!user) {
-      return NextResponse.json({ error: 'User not found.' }, { status: 401 })
+
+    let otpValid = false
+
+    if (user && user.otp) {
+      // Check OTP from DB
+      if (user.otp === otpCode) {
+        if (user.otpExpires && new Date(user.otpExpires) < new Date()) {
+          return NextResponse.json({ error: 'Verification code expired. Please login again.' }, { status: 401 })
+        }
+        otpValid = true
+      }
     }
-    if (!user.otp || user.otp !== otpCode) {
+
+    if (!otpValid && otpToken) {
+      // Check OTP from token (for admin users not in DB)
+      try {
+        const decoded = JSON.parse(atob(otpToken.replace(/-/g, '+').replace(/_/g, '/')))
+        if (decoded.otp === otpCode && decoded.email === rawPayload.email && decoded.exp > Date.now()) {
+          otpValid = true
+        }
+      } catch {}
+    }
+
+    if (!otpValid) {
       recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid verification code.' }, { status: 401 })
     }
-    if (user.otpExpires && new Date(user.otpExpires) < new Date()) {
-      return NextResponse.json({ error: 'Verification code expired. Please login again.' }, { status: 401 })
-    }
 
     clearAttempts(ip)
-    delete user.otp
-    delete user.otpExpires
-    user.lastLogin = new Date().toISOString()
-    user.loginCount = (user.loginCount || 0) + 1
-    await saveUsers(users)
 
-    const token = signQtToken({
-      userId: user.id, email: user.email,
-      name: user.contactName || user.email, role: 'admin', mfaVerified: true
-    })
+    if (user) {
+      delete user.otp
+      delete user.otpExpires
+      user.lastLogin = new Date().toISOString()
+      user.loginCount = (user.loginCount || 0) + 1
+      await saveUsers(users)
+    }
 
+    const token = signQtToken({ userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin', mfaVerified: true })
     const response = NextResponse.json({
       success: true,
-      user: { id: user.id, email: user.email, name: user.contactName || user.email, role: 'admin' },
+      user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin' },
     })
     response.cookies.set('qt_session', token, {
       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/'
