@@ -6,12 +6,14 @@ import { usePathname } from "next/navigation"
 import { useLanguage } from "@/lib/language-context"
 import { Menu, X, Globe, ChevronDown } from "lucide-react"
 import type { Locale } from "@/lib/i18n"
+
 export function Header() {
   const { locale, setLocale, t } = useLanguage()
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
   const langRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (langRef.current && !langRef.current.contains(e.target as Node)) {
@@ -21,45 +23,48 @@ export function Header() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
   const links = [
     { href: "/company", label: t.nav.aboutUs },
     { href: "/products", label: t.nav.products },
     { href: "/solutions", label: t.nav.solutions },
     { href: "/contact", label: t.nav.contact },
     { href: "/partner-day-2026-registration", label: "RSVP" },
-        { href: "/news/ai-feed", label: t.nav.aiFeed || "AI News" },
+    { href: "/news/ai-feed", label: t.nav.aiFeed || "AI News" },
     { href: "https://kb.next-guard.com", label: t.nav.kb },
-        { href: "/soc-review", label: "AI SOC" },
-        
+    { href: "/soc-review", label: "AI SOC" },
     { href: "/console", label: "Console" },
   ]
+
   const languages: { code: Locale; label: string }[] = [
     { code: "en", label: "English" },
     { code: "zh-CN", label: "简体中文" },
     { code: "zh-TW", label: "繁體中文" },
   ]
   const currentLang = languages.find((l) => l.code === locale)
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between pl-2 pr-6 py-4">
-        <Link href="/" className="flex items-center gap-2 mr-8 mix-blend-screen" onClick={() => setMobileOpen(false)}>
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-6 lg:py-4">
+        <Link href="/" className="flex items-center gap-2 shrink-0 mix-blend-screen" onClick={() => setMobileOpen(false)}>
           <Image
             src="/images/nextguard-logo.png"
             alt="Nextguard Technology Limited"
             width={234}
             height={52}
-            className="h-[42px] w-auto"
+            className="h-8 lg:h-[42px] w-auto"
             priority
           />
         </Link>
+
         {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-10 md:flex">
+        <nav className="hidden items-center gap-4 xl:gap-6 lg:flex">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               {...(link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              className={`text-[18px] transition-colors duration-200 ${
+              className={`text-sm xl:text-[15px] whitespace-nowrap transition-colors duration-200 ${
                 pathname === link.href
                   ? "text-primary font-medium"
                   : "text-muted-foreground hover:text-foreground"
@@ -69,9 +74,10 @@ export function Header() {
             </Link>
           ))}
         </nav>
+
         <div className="flex items-center gap-3">
           {/* Language Dropdown */}
-          <div ref={langRef} className="relative hidden md:block">
+          <div ref={langRef} className="relative hidden lg:block">
             <button
               onClick={() => setLangOpen(!langOpen)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground border border-border/50 rounded-md hover:text-foreground hover:border-primary/50 transition-colors duration-200"
@@ -99,26 +105,28 @@ export function Header() {
               </div>
             )}
           </div>
+
           {/* Mobile Menu Toggle */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="text-muted-foreground transition-colors hover:text-foreground md:hidden"
+            className="text-muted-foreground transition-colors hover:text-foreground lg:hidden"
             aria-label="Toggle menu"
           >
             {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
       </div>
+
       {/* Mobile Navigation */}
       {mobileOpen && (
-        <div className="border-t border-border/50 bg-background/95 px-6 py-4 md:hidden">
+        <div className="border-t border-border/50 bg-background/95 px-6 py-4 lg:hidden max-h-[80vh] overflow-y-auto">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               {...(link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
               onClick={() => setMobileOpen(false)}
-              className={`block py-3 text-[18px] transition-colors duration-200 ${
+              className={`block py-3 text-base transition-colors duration-200 ${
                 pathname === link.href
                   ? "text-primary font-medium"
                   : "text-muted-foreground hover:text-foreground"
