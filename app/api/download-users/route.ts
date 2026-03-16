@@ -367,6 +367,18 @@ export async function PUT(req: NextRequest) {
       await notifyAdminNewUser(contactName, email, company, 'admin-create')
       await writeLog({ type: 'download-user', action: 'admin-create', email, company })
       return NextResponse.json({ success: true, message: 'Account created successfully' })
+    if (action === 'set-password') {
+      const targetEmail = req.nextUrl.searchParams.get('email') || ''
+      const newPassword = req.nextUrl.searchParams.get('password') || ''
+      if (!targetEmail || !newPassword) return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
+      const user = users.find(u => u.email.toLowerCase() === targetEmail.toLowerCase())
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      user.passwordHash = await hashPassword(newPassword)
+      user.mustResetPassword = false
+      await saveUsers(users)
+      await writeLog({ type: 'download-user', action: 'admin-set-password', email: user.email })
+      return NextResponse.json({ success: true, message: 'Password updated successfully' })
+    }
     }
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch {
