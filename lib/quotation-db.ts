@@ -229,6 +229,9 @@ export async function seedDefaultProducts(): Promise<void> {
       sql: `INSERT OR IGNORE INTO qt_products (id, code, name, type, deployment, description, features, is_active, sort_order)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
       args: [p.id, p.code, p.name, p.type, p.deployment, p.description, p.features],
+          })
+  }
+}
 
       // Seed default pricing for all products
 export async function seedDefaultPrices(): Promise<void> {
@@ -297,9 +300,6 @@ export async function seedDefaultPrices(): Promise<void> {
     await db.execute({
       sql: `INSERT OR IGNORE INTO qt_prices (id, product_id, term_years, min_qty, max_qty, appliance_unit_price, license_unit_price, currency) VALUES (?, ?, ?, ?, 999999, ?, ?, 'HKD')`,
       args: [id, productId, termYears, minQty, appPrice, licPrice],
-    })
-  }
-}
     })
   }
 }
