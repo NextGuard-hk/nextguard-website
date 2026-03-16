@@ -6,6 +6,16 @@ import { getDB } from '@/lib/db'
 import { generateId, generateQuotationRef, writeQuotationAudit } from '@/lib/quotation-db'
 import { computePricing, generateDefaultRemarks, type PriceLineInput } from '@/lib/quotation-engine'
 
+// Ensure authenticated user exists in qt_admin_users (sync from main admin system)
+async function ensureQtUser(auth: { userId: string; email: string; name?: string; role?: string }) {
+  const db = getDB()
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO qt_admin_users (id, email, password_hash, name, role, is_active)
+          VALUES (?, ?, 'synced_from_admin', ?, ?, 1)`,
+    args: [auth.userId, auth.email, auth.name || auth.email.split('@')[0], auth.role || 'sales'],
+  })
+}
+
 export async function GET(req: NextRequest) {
   const auth = authenticateQtRequest(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -49,6 +59,10 @@ export async function POST(req: NextRequest) {
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const body = await req.json().catch(() => ({}))
     const db = getDB()
+
+    // Sync user into qt_admin_users so FK constraint is satisfied
+    await ensureQtUser(auth)
+
     const {
       customerName, partnerName, endUserName, projectName, customerType,
       termYears, paymentModel, currency,
