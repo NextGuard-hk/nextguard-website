@@ -264,8 +264,25 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ error: 'Invalid action.' }, { status: 400 })
 }
 
-// GET: verify current session
+// GET: verify current session OR set password (admin)
 export async function GET(req: NextRequest) {
+  const adminSecret = req.nextUrl.searchParams.get('secret')
+  const setAction = req.nextUrl.searchParams.get('action')
+
+  // Admin set-password via GET (for easy browser access)
+  if (adminSecret === 'nextguard-cron-2024-secure' && setAction === 'set-password') {
+    const email = req.nextUrl.searchParams.get('email') || ''
+    const newPw = req.nextUrl.searchParams.get('password') || ''
+    if (!email || !newPw) return NextResponse.json({ error: 'email and password required' }, { status: 400 })
+    const users = await getUsers()
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    user.passwordHash = await hashPassword(newPw)
+    user.mustResetPassword = false
+    await saveUsers(users)
+    return NextResponse.json({ success: true, message: 'Password updated for ' + email })
+  }
+
   const auth = authenticateQtRequest(req)
   if (!auth) {
     return NextResponse.json({ authenticated: false }, { status: 401 })
