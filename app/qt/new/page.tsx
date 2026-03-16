@@ -365,7 +365,7 @@ export default function NewQuotation() {
                     <td style={{ padding: '6px 4px', minWidth: 180 }}>
                       <select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} disabled={!line.categoryId} style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6, color: line.categoryId ? '#e0e0e0' : '#6b7280', padding: '6px 8px', fontSize: 13, width: '100%' }}>
                         <option value=''>-- Model --</option>
-                        {line.categoryId && getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+                        {line.categoryId && getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
                       </select>
                     </td>
                     <td style={{ padding: '6px 4px' }}>
