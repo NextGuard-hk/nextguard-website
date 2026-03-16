@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categorizeUrl, URL_TAXONOMY } from '@/lib/url-categories';
-import { getDB } from '@/lib/db';
+import { getDB } from '@/lib/db'; import { classifyUrlWithAI, isAIClassificationAvailable } from '@/lib/ai-url-classifier';
 
 const ACTION_PRIORITY: Record<string, number> = {
   'Block': 4, 'Warn': 3, 'Isolate': 2, 'Allow': 1,
@@ -127,6 +127,19 @@ async function evaluateUrl(inputUrl: string) {
     confidence = 99;
   }
 
+    // Layer 4: AI classification for uncategorized URLs
+  let aiClassified = false;
+  if (isAIClassificationAvailable() && (allCategories.length === 0 || (allCategories.length === 1 && allCategories[0] === 'Uncategorized'))) {
+    try {
+      const aiResult = await classifyUrlWithAI(domain);
+      if (aiResult.primaryCategory && aiResult.primaryCategory !== 'Uncategorized' && aiResult.confidence >= 50) {
+        allCategories.push(aiResult.primaryCategory);
+        categorySource = 'ai-gemini';
+        confidence = aiResult.confidence;
+        aiClassified = true;
+      }
+    } catch {}
+  }
   let action = getHighestAction(allCategories);
   if (threatIntel.isMalicious) action = 'Block';
 
@@ -144,6 +157,7 @@ async function evaluateUrl(inputUrl: string) {
     threatIntel,
     dbCategoryMatch: dbCategory,
     evalMs: Date.now() - startTime,
+        aiClassified,
     timestamp: new Date().toISOString(),
   };
 }
