@@ -134,7 +134,7 @@ async function evaluateUrl(inputUrl: string) {
       const aiResult = await classifyUrlWithAI(domain);
       if (aiResult.primaryCategory && aiResult.primaryCategory !== 'Uncategorized' && aiResult.confidence >= 50) {
         allCategories.push(aiResult.primaryCategory);
-        categorySource = 'ai-gemini';
+                categorySource = 'ai-' + aiResult.source;
         confidence = aiResult.confidence;
         aiClassified = true;
       }
