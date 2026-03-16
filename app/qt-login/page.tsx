@@ -4,6 +4,32 @@ import { useRouter } from 'next/navigation'
 
 type Step = 'login' | 'otp'
 
+const CSS = `
+  * { box-sizing: border-box; }
+  .ql-root { min-height:100vh; background:#0a0f1a; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; font-family:system-ui,sans-serif; }
+  .ql-logo { font-size:28px; font-weight:800; color:#fff; letter-spacing:2px; text-align:center; margin-bottom:4px; }
+  .ql-logo span { color:#22c55e; }
+  .ql-subtitle { color:#6b7280; font-size:13px; text-align:center; margin-bottom:32px; }
+  .ql-card { background:#0d1117; border:1px solid #1f2937; border-radius:16px; padding:32px; width:100%; max-width:420px; }
+  .ql-card-title { font-size:20px; font-weight:700; color:#f9fafb; margin-bottom:20px; }
+  .ql-field { margin-bottom:16px; }
+  .ql-label { color:#9ca3af; font-size:13px; margin-bottom:6px; display:block; }
+  .ql-input { width:100%; padding:12px 14px; background:#111827; border:1px solid #1f2937; border-radius:8px; color:#e0e0e0; font-size:15px; outline:none; }
+  .ql-input:focus { border-color:#374151; }
+  .ql-otp-input { text-align:center; font-size:28px; letter-spacing:10px; }
+  .ql-btn { width:100%; padding:13px; background:#22c55e; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:4px; }
+  .ql-btn:disabled { opacity:0.7; cursor:not-allowed; }
+  .ql-btn-ghost { background:transparent; color:#6b7280; }
+  .ql-error { background:#1f1212; border:1px solid #ef4444; color:#ef4444; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:16px; }
+  .ql-message { background:#0d1f12; border:1px solid #22c55e; color:#22c55e; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:16px; }
+  .ql-hint { font-size:12px; color:#6b7280; text-align:center; margin-top:8px; }
+  .ql-footer { color:#4b5563; font-size:12px; text-align:center; margin-top:24px; }
+  @media (max-width:480px) {
+    .ql-card { padding:20px 16px; border-radius:12px; }
+    .ql-logo { font-size:24px; }
+  }
+`
+
 export default function QtLoginPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>('login')
@@ -53,46 +79,56 @@ export default function QtLoginPage() {
     finally { setLoading(false) }
   }
 
-  const inp: React.CSSProperties = { width: '100%', padding: '12px 14px', background: '#111827', border: '1px solid #1f2937', borderRadius: 8, color: '#e0e0e0', fontSize: 15, outline: 'none', boxSizing: 'border-box' }
-  const btn: React.CSSProperties = { width: '100%', padding: '12px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
-
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0e17', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <h1 style={{ color: '#f9fafb', margin: 0, fontSize: 28 }}>NEXT<span style={{ color: '#22c55e' }}>GUARD</span></h1>
-        <div style={{ color: '#6b7280', fontSize: 14, marginTop: 6 }}>Quotation System &mdash; Internal Sales Only</div>
-      </div>
-      <div style={{ background: '#111827', borderRadius: 16, padding: '32px 28px', width: '100%', maxWidth: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+    <div className="ql-root">
+      <style>{CSS}</style>
+      <div className="ql-logo"><span>NEXT</span>GUARD</div>
+      <div className="ql-subtitle">Quotation System — Internal Sales Only</div>
+      <div className="ql-card">
         {step === 'login' ? (
           <form onSubmit={handleLogin}>
-            <h2 style={{ color: '#f9fafb', margin: '0 0 20px', fontSize: 20, fontWeight: 600 }}>Sign In</h2>
-            {error && <div style={{ background: '#ef4444', color: '#fff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>{error}</div>}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 6 }}>Email Address</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inp} placeholder="your@company.com" required />
+            <div className="ql-card-title">Sign In</div>
+            {error && <div className="ql-error">{error}</div>}
+            <div className="ql-field">
+              <label className="ql-label">Email Address</label>
+              <input type="email" className="ql-input" value={email}
+                onChange={e=>setEmail(e.target.value)}
+                placeholder="your@company.com" required />
             </div>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 6 }}>Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inp} placeholder="••••••••" required />
+            <div className="ql-field">
+              <label className="ql-label">Password</label>
+              <input type="password" className="ql-input" value={password}
+                onChange={e=>setPassword(e.target.value)}
+                placeholder="••••••••" required />
             </div>
-            <button type="submit" style={btn} disabled={loading}>{loading ? 'Signing in...' : 'Continue'}</button>
+            <button type="submit" className="ql-btn" disabled={loading}>
+              {loading ? 'Signing in...' : 'Continue'}
+            </button>
           </form>
         ) : (
           <form onSubmit={handleOtp}>
-            <h2 style={{ color: '#f9fafb', margin: '0 0 8px', fontSize: 20, fontWeight: 600 }}>Verify Email</h2>
-            {message && <div style={{ color: '#22c55e', fontSize: 13, marginBottom: 16 }}>{message}</div>}
-            {error && <div style={{ background: '#ef4444', color: '#fff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>{error}</div>}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 6 }}>Verification Code</label>
-              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value)} style={{ ...inp, fontSize: 24, letterSpacing: 8, textAlign: 'center' }} placeholder="000000" maxLength={6} required autoFocus />
-              <div style={{ color: '#6b7280', fontSize: 12, marginTop: 6 }}>Check your email: {email}</div>
+            <div className="ql-card-title">Verify Email</div>
+            {message && <div className="ql-message">{message}</div>}
+            {error && <div className="ql-error">{error}</div>}
+            <div className="ql-field">
+              <label className="ql-label">Verification Code</label>
+              <input type="text" className="ql-input ql-otp-input" value={otpCode}
+                onChange={e=>setOtpCode(e.target.value)}
+                placeholder="000000" maxLength={6} required autoFocus />
             </div>
-            <button type="submit" style={btn} disabled={loading}>{loading ? 'Verifying...' : 'Verify & Sign In'}</button>
-            <button type="button" onClick={() => { setStep('login'); setError(''); setOtpCode('') }} style={{ ...btn, background: 'transparent', color: '#6b7280', marginTop: 8 }}>Back</button>
+            <div className="ql-hint">Check your email: {email}</div>
+            <button type="submit" className="ql-btn" disabled={loading} style={{marginTop:16}}>
+              {loading ? 'Verifying...' : 'Verify & Sign In'}
+            </button>
+            <button type="button" className="ql-btn ql-btn-ghost"
+              onClick={()=>{ setStep('login'); setError(''); setOtpCode('') }}
+              style={{marginTop:8}}>
+              Back
+            </button>
           </form>
         )}
       </div>
-      <div style={{ color: '#374151', fontSize: 12, marginTop: 24 }}>Internal use only &middot; NextGuard Technology</div>
+      <div className="ql-footer">Internal use only · NextGuard Technology</div>
     </div>
   )
 }
