@@ -11,6 +11,7 @@ export default function QtLoginPage() {
   const [password, setPassword] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [token, setToken] = useState('')
+  const [otpToken, setOtpToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -28,6 +29,7 @@ export default function QtLoginPage() {
       if (d.error) { setError(d.error); return }
       if (d.requireOtp) {
         setToken(d.preMfaToken)
+        setOtpToken(d.otpToken || '')
         setMessage(d.message || 'Verification code sent to your email.')
         setStep('otp')
       }
@@ -42,7 +44,7 @@ export default function QtLoginPage() {
       const res = await fetch('/api/qt-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-otp', preMfaToken: token, otpCode }),
+        body: JSON.stringify({ action: 'verify-otp', preMfaToken: token, otpToken, otpCode }),
       })
       const d = await res.json()
       if (d.error) { setError(d.error); return }
@@ -60,35 +62,33 @@ export default function QtLoginPage() {
         <h1 style={{ color: '#f9fafb', margin: 0, fontSize: 28 }}>NEXT<span style={{ color: '#22c55e' }}>GUARD</span></h1>
         <div style={{ color: '#6b7280', fontSize: 14, marginTop: 6 }}>Quotation System &mdash; Internal Sales Only</div>
       </div>
-
-      <div style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 16, padding: 32, width: 380, maxWidth: '90vw' }}>
-        {step === 'login' && (
+      <div style={{ background: '#111827', borderRadius: 16, padding: '32px 28px', width: '100%', maxWidth: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+        {step === 'login' ? (
           <form onSubmit={handleLogin}>
-            <h2 style={{ color: '#f9fafb', margin: '0 0 20px', fontSize: 20 }}>Sign In</h2>
-            {error && <div style={{ background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#fca5a5', fontSize: 13 }}>{error}</div>}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 4 }}>Email Address</label>
-              <input type='email' value={email} onChange={e => setEmail(e.target.value)} required placeholder='your@company.com' style={inp} />
+            <h2 style={{ color: '#f9fafb', margin: '0 0 20px', fontSize: 20, fontWeight: 600 }}>Sign In</h2>
+            {error && <div style={{ background: '#ef4444', color: '#fff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>{error}</div>}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 6 }}>Email Address</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inp} placeholder="your@company.com" required />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 4 }}>Password</label>
-              <input type='password' value={password} onChange={e => setPassword(e.target.value)} required style={inp} />
+              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 6 }}>Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inp} placeholder="••••••••" required />
             </div>
-            <button type='submit' disabled={loading} style={{ ...btn, opacity: loading ? 0.7 : 1 }}>{loading ? 'Signing in...' : 'Continue'}</button>
+            <button type="submit" style={btn} disabled={loading}>{loading ? 'Signing in...' : 'Continue'}</button>
           </form>
-        )}
-
-        {step === 'otp' && (
+        ) : (
           <form onSubmit={handleOtp}>
-            <h2 style={{ color: '#f9fafb', margin: '0 0 8px', fontSize: 20 }}>Verify Your Identity</h2>
-            <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 20 }}>{message}</p>
-            {error && <div style={{ background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#fca5a5', fontSize: 13 }}>{error}</div>}
+            <h2 style={{ color: '#f9fafb', margin: '0 0 8px', fontSize: 20, fontWeight: 600 }}>Verify Email</h2>
+            {message && <div style={{ color: '#22c55e', fontSize: 13, marginBottom: 16 }}>{message}</div>}
+            {error && <div style={{ background: '#ef4444', color: '#fff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>{error}</div>}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 4 }}>Verification Code</label>
-              <input type='text' value={otpCode} onChange={e => setOtpCode(e.target.value)} required placeholder='Enter 6-digit code' maxLength={6} style={{ ...inp, textAlign: 'center', fontSize: 24, letterSpacing: 8 }} autoFocus />
+              <label style={{ color: '#9ca3af', fontSize: 13, display: 'block', marginBottom: 6 }}>Verification Code</label>
+              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value)} style={{ ...inp, fontSize: 24, letterSpacing: 8, textAlign: 'center' }} placeholder="000000" maxLength={6} required autoFocus />
+              <div style={{ color: '#6b7280', fontSize: 12, marginTop: 6 }}>Check your email: {email}</div>
             </div>
-            <button type='submit' disabled={loading} style={{ ...btn, opacity: loading ? 0.7 : 1 }}>{loading ? 'Verifying...' : 'Verify & Sign In'}</button>
-            <button type='button' onClick={() => { setStep('login'); setError(''); setOtpCode('') }} style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: '#6b7280', fontSize: 13, cursor: 'pointer', marginTop: 12 }}>Back to login</button>
+            <button type="submit" style={btn} disabled={loading}>{loading ? 'Verifying...' : 'Verify & Sign In'}</button>
+            <button type="button" onClick={() => { setStep('login'); setError(''); setOtpCode('') }} style={{ ...btn, background: 'transparent', color: '#6b7280', marginTop: 8 }}>Back</button>
           </form>
         )}
       </div>
