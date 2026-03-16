@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   // Initialize DB on first call
   await initQuotationDB().catch(() => {})
 
-  // ─── STEP 1: Email + Password Login ───
+  // STEP 1: Email + Password Login
   if (action === 'login') {
     if (isLoginRateLimited(ip)) {
       return NextResponse.json({ error: 'Too many login attempts. Please wait 15 minutes.' }, { status: 429 })
@@ -65,15 +65,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ requireTotpSetup: true, setupToken })
   }
 
-  // ─── STEP 2a: Verify TOTP code ───
+  // STEP 2a: Verify TOTP code
   if (action === 'verify-totp') {
     const { preMfaToken, totpCode } = body
     if (!preMfaToken || !totpCode) {
       return NextResponse.json({ error: 'Token and TOTP code are required.' }, { status: 400 })
     }
-    // Verify pre-MFA token (mfaVerified=false is ok here)
-    const { verifyQtToken: vt } = await import('@/lib/quotation-auth')
-    const rawPayload = vt(preMfaToken)
+    const rawPayload = verifyQtToken(preMfaToken)
     if (!rawPayload || rawPayload.mfaVerified) {
       return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 })
     }
@@ -96,23 +94,18 @@ export async function POST(req: NextRequest) {
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       token,
     })
-    response.cookies.set('qt_session', token, {
-      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/'
-    })
+    response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
     return response
   }
 
-  // ─── STEP 2b: Get TOTP setup QR code ───
+  // STEP 2b: Get TOTP setup QR code
   if (action === 'setup-totp-init') {
     const { setupToken } = body
     if (!setupToken) return NextResponse.json({ error: 'Setup token required.' }, { status: 400 })
-    const { verifyQtToken: vt } = await import('@/lib/quotation-auth')
-    const rawPayload = vt(setupToken)
+    const rawPayload = verifyQtToken(setupToken)
     if (!rawPayload) return NextResponse.json({ error: 'Invalid or expired setup token.' }, { status: 401 })
     const secret = generateTotpSecret()
     const uri = getTotpUri(secret, rawPayload.email)
-    // Temporarily store the secret (will be confirmed in setup-totp-confirm)
-    // We encode it in a short-lived token
     const confirmToken = signQtToken(
       { userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: rawPayload.role, mfaVerified: false },
       600
@@ -120,7 +113,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ otpUri: uri, secret, confirmToken })
   }
 
-  // ─── STEP 2c: Confirm TOTP setup with first code ───
+  // STEP 2c: Confirm TOTP setup with first code
   if (action === 'setup-totp-confirm') {
     const { confirmToken, totpCode } = body
     if (!confirmToken || !totpCode) {
@@ -130,8 +123,7 @@ export async function POST(req: NextRequest) {
     if (parts.length !== 4) return NextResponse.json({ error: 'Invalid confirm token.' }, { status: 400 })
     const jwtPart = parts.slice(0, 3).join('.')
     const secretB64 = parts[3]
-    const { verifyQtToken: vt } = await import('@/lib/quotation-auth')
-    const rawPayload = vt(jwtPart)
+    const rawPayload = verifyQtToken(jwtPart)
     if (!rawPayload) return NextResponse.json({ error: 'Invalid or expired confirm token.' }, { status: 401 })
     const secret = Buffer.from(secretB64, 'base64url').toString()
     const valid = await verifyTotpCode(secret, totpCode)
@@ -147,20 +139,18 @@ export async function POST(req: NextRequest) {
       user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: rawPayload.role },
       token,
     })
-    response.cookies.set('qt_session', token, {
-      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/'
-    })
+    response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
     return response
   }
 
-  // ─── Logout ───
+  // Logout
   if (action === 'logout') {
     const response = NextResponse.json({ success: true })
     response.cookies.delete('qt_session')
     return response
   }
 
-  // ─── Init DB + seed (Admin only, call once) ───
+  // Init DB + seed (Admin only)
   if (action === 'init-db') {
     const auth = authenticateQtRequest(req)
     if (!auth || auth.role !== 'admin') {
@@ -171,6 +161,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: 'DB initialized and products seeded.' })
   }
 
+  // Create admin user (setup secret required)
+  if (action === 'create-admin') {
     const { setupSecret, email, password, name, role } = body
     const expectedSecret = process.env.QT_SETUP_SECRET
     if (!expectedSecret || setupSecret !== expectedSecret) {
