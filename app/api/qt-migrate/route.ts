@@ -18,7 +18,6 @@ export async function POST() {
     // Add category_id to qt_products
     try { await db.execute(`ALTER TABLE qt_products ADD COLUMN category_id TEXT REFERENCES qt_product_categories(id)`) } catch(e) {}
     try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_qt_products_cat ON qt_products(category_id)`) } catch(e) {}
-
     // Seed categories
     const categories = [
       { id: 'cat_mgmt', name: 'Management Server', code_prefix: 'UCSS', description: 'Centralized management and policy server', sort_order: 1 },
@@ -31,7 +30,6 @@ export async function POST() {
     for (const c of categories) {
       await db.execute({ sql: `INSERT OR REPLACE INTO qt_product_categories (id, name, code_prefix, description, sort_order, is_active) VALUES (?, ?, ?, ?, ?, 1)`, args: [c.id, c.name, c.code_prefix, c.description, c.sort_order] })
     }
-
     // Update existing products with category_id
     const catMap: Record<string, string> = {
       'prod_ucss_5100': 'cat_mgmt', 'prod_ucss_5100_vm': 'cat_mgmt', 'prod_ucss_1100_vm': 'cat_mgmt',
@@ -48,7 +46,6 @@ export async function POST() {
     for (const [pid, cid] of Object.entries(catMap)) {
       await db.execute({ sql: `UPDATE qt_products SET category_id = ? WHERE id = ?`, args: [cid, pid] })
     }
-
     // Seed additional models that may be missing
     const newProducts = [
       { id: 'prod_ucss_1100', code: 'UCSS-1100', name: 'SecGator Management Server 1100', type: 'management', deployment: 'appliance', category_id: 'cat_mgmt', description: 'Hardware Appliance Management Server (Entry)', features: '[]' },
@@ -59,13 +56,12 @@ export async function POST() {
     for (const p of newProducts) {
       await db.execute({ sql: `INSERT OR IGNORE INTO qt_products (id, code, name, type, deployment, category_id, description, features, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)`, args: [p.id, p.code, p.name, p.type, p.deployment, p.category_id, p.description, p.features] })
     }
-
     return NextResponse.json({ success: true, message: 'Migration complete: categories created, products updated' })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
-
-  export async function GET() {
-  return POST()
 }
+
+export async function GET() {
+  return POST()
 }
