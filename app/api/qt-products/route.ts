@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const { action } = body
-
   const db = getDB()
 
   // Create product
@@ -67,8 +66,7 @@ export async function POST(req: NextRequest) {
     }
     const id = generateId('prod')
     await db.execute({
-      sql: `INSERT INTO qt_products (id, code, name, type, deployment, description, features, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO qt_products (id, code, name, type, deployment, description, features, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [id, code.toUpperCase(), name, type, deployment || 'appliance', description || '', JSON.stringify(features || []), sortOrder || 0],
     })
     await writeQuotationAudit(auth.userId, auth.email, 'product_created', 'product', id, { code })
@@ -84,8 +82,7 @@ export async function POST(req: NextRequest) {
     }
     const id = generateId('price')
     await db.execute({
-      sql: `INSERT INTO qt_prices (id, product_id, term_years, min_qty, max_qty, appliance_unit_price, license_unit_price, currency)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO qt_prices (id, product_id, term_years, min_qty, max_qty, appliance_unit_price, license_unit_price, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [id, productId, termYears, minQty || 1, maxQty || 999999, applianceUnitPrice || 0, licenseUnitPrice || 0, currency || 'HKD'],
     })
     await writeQuotationAudit(auth.userId, auth.email, 'price_created', 'price', id, { productId, termYears })
@@ -103,6 +100,8 @@ export async function POST(req: NextRequest) {
     })
     await writeQuotationAudit(auth.userId, auth.email, 'product_updated', 'product', id)
     const updated = await db.execute({ sql: `SELECT * FROM qt_products WHERE id = ?`, args: [id] })
+    return NextResponse.json({ product: updated.rows[0] })
+  }
 
   // Update price
   if (action === 'update-price') {
