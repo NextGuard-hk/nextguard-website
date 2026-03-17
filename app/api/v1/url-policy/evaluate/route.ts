@@ -21,23 +21,8 @@ const DEFAULT_POLICY: Record<string, string> = { 'adult': 'Block', 'gambling': '
 function getDefaultAction(cat: string): string { return DEFAULT_POLICY[cat.toLowerCase()] || 'Allow'; }
 function getHighestAction(categories: string[]): string { if (!categories.length) return 'Allow'; return categories.reduce((best, cat) => { const a = getDefaultAction(cat); return (ACTION_PRIORITY[a] || 0) > (ACTION_PRIORITY[best] || 0) ? a : best; }, 'Allow'); }
 function normalizeDomain(input: string): string { let d = input.toLowerCase().trim(); try { if (!d.startsWith('http')) d = 'https://' + d; d = new URL(d).hostname; } catch {} return d.replace(/^www\./, ''); }
-async function queryDbCategory(domain: string): Promise<string | null> {
- try { const db = getDB(); const r = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [domain] }); if (r.rows.length > 0) return r.rows[0].category as string; const parts = domain.split('.'); if (parts.length > 2) { const apex = parts.slice(-2).join('.'); const r2 = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] }); if (r2.rows.length > 0) return r2.rows[0].category as string; } } catch {} return null;
-}
-async function queryCustomCategory(domain: string): Promise<{ category: string; action: string } | null> {
- try { const db = getDB(); const r = await db.execute({ sql: `SELECT cc.name as category, cc.action FROM custom_url_entries cue JOIN custom_url_categories cc ON cc.id = cue.category_id WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`, args: [domain] }); if (r.rows.length > 0) return { category: r.rows[0].category as string, action: r.rows[0].action as string }; } catch {} return null;
-}
-async function queryThreatIntel(domain: string): Promise<{isMalicious:boolean;riskLevel:string;threatType:string|null}> {
- try { const db = getDB(); const r = await db.execute({ sql: 'SELECT risk_level, categories FROM indicators WHERE value_normalized = ? AND is_active = 1 ORDER BY confidence DESC LIMIT 1', args: [domain] }); if (r.rows.length > 0) { const risk = r.rows[0].risk_level as string; let cats: string[] = []; try { cats = JSON.parse((r.rows[0].categories as string) || '[]'); } catch {} return { isMalicious: ['known_malicious','high_risk'].includes(risk), riskLevel: risk, threatType: cats[0] || null }; } } catch {} return { isMalicious: false, riskLevel: 'unknown', threatType: null };
-}
-async function queryOverride(domain: string): Promise<{ action: string } | null> {
- try { const db = getDB(); const r = await db.execute({ sql: `SELECT action FROM url_policy_overrides WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`, args: [domain] }); if (r.rows.length > 0) return { action: r.rows[0].action as string }; } catch {} return null;
-}
 async function queryGroupPolicy(userId: string | null, category: string): Promise<{ action: string; groupName: string } | null> {
  if (!userId) return null; try { const db = getDB(); const r = await db.execute({ sql: `SELECT g.name as group_name, gr.action FROM url_policy_groups g JOIN url_policy_user_assignments a ON a.group_id = g.id JOIN url_policy_group_rules gr ON gr.group_id = g.id WHERE a.user_id = ? AND g.is_active = 1 AND LOWER(gr.category) = LOWER(?) ORDER BY g.priority ASC LIMIT 1`, args: [userId, category] }); if (r.rows.length > 0) return { action: r.rows[0].action as string, groupName: r.rows[0].group_name as string }; } catch {} return null;
-}
-async function logUrlEvent(domain: string, action: string, category: string, riskLevel: string, userId?: string | null) {
- try { const db = getDB(); await db.execute({ sql: `INSERT OR IGNORE INTO url_policy_log (domain, action, category, risk_level, user_id, evaluated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`, args: [domain, action, category, riskLevel, userId || null] }); } catch {}
 }
 export async function GET(request: NextRequest) {
  const url = request.nextUrl.searchParams.get('url') || ''; const userId = request.nextUrl.searchParams.get('userId') || null;
@@ -47,15 +32,34 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
  try { const body = await request.json(); const userId = body.userId || null; if (Array.isArray(body.urls)) { const results = await Promise.all(body.urls.slice(0, 50).map((u: string) => evaluateUrl(u, userId))); return NextResponse.json({ results, count: results.length }); } if (body.url) return NextResponse.json(await evaluateUrl(body.url, userId)); return NextResponse.json({ error: 'url or urls required' }, { status: 400 }); } catch (e: unknown) { return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
 }
-// Restored: sequential queries (Turso batch not working in serverless)
+// P0 FIX v4: Use transaction for single-connection pipelined queries
 async function evaluateUrl(inputUrl: string, userId: string | null = null) {
  const domain = normalizeDomain(inputUrl); const startTime = Date.now();
- const override = await queryOverride(domain);
- const customMatch = await queryCustomCategory(domain);
  const staticCategories = categorizeUrl(inputUrl);
- let dbCategory: string | null = null; try { dbCategory = await queryDbCategory(domain); } catch {}
- let threatIntel = { isMalicious: false, riskLevel: 'unknown', threatType: null as string | null }; try { threatIntel = await queryThreatIntel(domain); } catch {}
  const dgaResult = detectDGA(domain);
+ const apex = domain.split('.').length > 2 ? domain.split('.').slice(-2).join('.') : null;
+ let override: { action: string } | null = null;
+ let customMatch: { category: string; action: string } | null = null;
+ let dbCategory: string | null = null;
+ let threatIntel = { isMalicious: false, riskLevel: 'unknown', threatType: null as string | null };
+ try {
+ const db = getDB();
+ const tx = await db.transaction('read');
+ try {
+ const [r0, r1, r2, r3] = await Promise.all([
+ tx.execute({ sql: `SELECT action FROM url_policy_overrides WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`, args: [domain] }),
+ tx.execute({ sql: `SELECT cc.name as category, cc.action FROM custom_url_entries cue JOIN custom_url_categories cc ON cc.id = cue.category_id WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`, args: [domain] }),
+ tx.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [domain] }),
+ tx.execute({ sql: 'SELECT risk_level, categories FROM indicators WHERE value_normalized = ? AND is_active = 1 ORDER BY confidence DESC LIMIT 1', args: [domain] }),
+ ]);
+ if (r0.rows.length > 0) override = { action: r0.rows[0].action as string };
+ if (r1.rows.length > 0) customMatch = { category: r1.rows[0].category as string, action: r1.rows[0].action as string };
+ if (r2.rows.length > 0) { dbCategory = r2.rows[0].category as string; }
+ else if (apex) { const ra = await tx.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] }); if (ra.rows.length > 0) dbCategory = ra.rows[0].category as string; }
+ if (r3.rows.length > 0) { const risk = r3.rows[0].risk_level as string; let cats: string[] = []; try { cats = JSON.parse((r3.rows[0].categories as string) || '[]'); } catch {} threatIntel = { isMalicious: ['known_malicious','high_risk'].includes(risk), riskLevel: risk, threatType: cats[0] || null }; }
+ tx.close();
+ } catch (txErr) { try { tx.close(); } catch {} throw txErr; }
+ } catch (e) { console.error('Transaction query error:', e); }
  const allCategories = [...staticCategories]; let categorySource = 'static-taxonomy'; let confidence = staticCategories.length > 0 && staticCategories[0] !== 'Uncategorized' ? 80 : 40;
  if (dbCategory && !allCategories.includes(dbCategory)) { allCategories.push(dbCategory); categorySource = 'database'; confidence = Math.min(confidence + 15, 95); }
  if (threatIntel.isMalicious) { const tc = threatIntel.threatType || 'Malware'; if (!allCategories.includes(tc)) allCategories.push(tc); categorySource = 'threat-intel'; confidence = 99; }
@@ -71,6 +75,6 @@ async function evaluateUrl(inputUrl: string, userId: string | null = null) {
  let overrideApplied = false; if (override) { action = override.action; overrideApplied = true; if (categorySource !== 'custom') categorySource = 'override'; }
  const taxonomyEntries = Object.values(URL_TAXONOMY) as Array<{slug:string;name:string;group:string;defaultAction:string}>;
  const te = taxonomyEntries.find(t => staticCategories.some(c => c.toLowerCase() === t.name.toLowerCase() || c.toLowerCase() === t.slug.toLowerCase()));
- await logUrlEvent(domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel, userId);
+ try { const db = getDB(); db.execute({ sql: `INSERT OR IGNORE INTO url_policy_log (domain, action, category, risk_level, user_id, evaluated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`, args: [domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel, userId || null] }); } catch {}
  return { url: inputUrl, domain, action, confidence, categorySource, categories: allCategories, primaryCategory: allCategories[0] || 'Uncategorized', group: te?.group || null, defaultAction: te?.defaultAction || null, riskLevel: riskAssessment.riskLevel, riskScore: riskAssessment.riskScore, riskFactors: riskAssessment.riskFactors, threatIntel, dbCategoryMatch: dbCategory, customCategoryMatch: customCategory, overrideApplied, groupPolicyApplied, userId, dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors }, evalMs: Date.now() - startTime, aiClassified, timestamp: new Date().toISOString() };
 }
