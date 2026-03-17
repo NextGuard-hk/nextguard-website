@@ -27,14 +27,23 @@ function generateOTP(): string {
 
 async function sendEmail(to: string, subject: string, html: string) {
   if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured')
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'NextGuard Quotation <noreply@next-guard.com>',
-      to: [to], subject, html
-    }),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 8000)
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'NextGuard Quotation <noreply@next-guard.com>', to: [to], subject, html }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const err = await res.text().catch(() => 'Unknown error')
+      console.error('Resend API error:', res.status, err)
+      throw new Error(`Email send failed: ${res.status}`)
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 // JWT helpers
@@ -45,12 +54,10 @@ function base64urlDecode(str: string): string {
   const padded = str + '=='.slice(0, (4 - str.length % 4) % 4)
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
-
 interface QtJWTPayload {
   userId: string; email: string; name: string; role: string
   mfaVerified: boolean; iat: number; exp: number
 }
-
 function signQtToken(payload: Omit<QtJWTPayload, 'iat' | 'exp'>, expiresIn = 28800): string {
   const now = Math.floor(Date.now() / 1000)
   const full: QtJWTPayload = { ...payload, iat: now, exp: now + expiresIn }
@@ -59,7 +66,6 @@ function signQtToken(payload: Omit<QtJWTPayload, 'iat' | 'exp'>, expiresIn = 288
   const sig = base64url(QT_JWT_SECRET + '.qt.' + header + '.' + body)
   return header + '.' + body + '.' + sig
 }
-
 function verifyQtToken(token: string): QtJWTPayload | null {
   try {
     const parts = token.split('.')
@@ -71,7 +77,6 @@ function verifyQtToken(token: string): QtJWTPayload | null {
     return payload
   } catch { return null }
 }
-
 export function authenticateQtRequest(req: NextRequest): QtJWTPayload | null {
   const cookie = req.cookies.get('qt_session')?.value
   if (!cookie) return null
@@ -90,8 +95,7 @@ function isRateLimited(ip: string): boolean {
 }
 function recordAttempt(ip: string) {
   const a = loginAttempts.get(ip)
-  if (a) { a.count++; a.lastAttempt = Date.now() }
-  else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
+  if (a) { a.count++; a.lastAttempt = Date.now() } else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
 }
 function clearAttempts(ip: string) { loginAttempts.delete(ip) }
 
@@ -113,9 +117,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
 
-    // Check if master admin password is being used
     const isMasterAdmin = ADMIN_PASSWORD && password === ADMIN_PASSWORD
-
     const users = await getUsers()
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
 
@@ -123,60 +125,39 @@ export async function POST(req: NextRequest) {
       recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
-
-    // If user exists, check if account is active
     if (user && !user.active) {
       return NextResponse.json({ error: 'Account is disabled.' }, { status: 403 })
     }
 
-    // Validate password
     let passwordValid = false
-    if (isMasterAdmin) {
-      passwordValid = true
-    } else if (user) {
-      const hash = await hashPassword(password)
-      passwordValid = hash === user.passwordHash
-    }
-
+    if (isMasterAdmin) { passwordValid = true }
+    else if (user) { const hash = await hashPassword(password); passwordValid = hash === user.passwordHash }
     if (!passwordValid) {
       recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
-
     clearAttempts(ip)
 
-    // Determine user info (use DB user if exists, otherwise use admin identity)
     const userId = user?.id || 'admin'
     const userName = user?.contactName || email.split('@')[0]
-
-    // Send OTP email for 2FA
     const otp = generateOTP()
+
     if (user) {
       user.otp = otp
       user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
       await saveUsers(users)
     }
 
-    const preMfaToken = signQtToken(
-      { userId, email, name: userName, role: 'admin', mfaVerified: false },
-      600
-    )
-
-    // Store OTP in token for admin users not in DB
+    const preMfaToken = signQtToken({ userId, email, name: userName, role: 'admin', mfaVerified: false }, 600)
     const otpToken = base64url(JSON.stringify({ otp, email, exp: Date.now() + 10 * 60 * 1000 }))
 
     try {
-      await sendEmail(email, 'NextGuard Quotation - Login Verification Code', `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0f1a;color:#e0e0e0;border-radius:12px">
-          <h2 style="color:#22c55e;margin-bottom:8px">NextGuard Quotation System</h2>
-          <p style="color:#6b7280;margin-bottom:24px">Internal Sales Only</p>
-          <p>Your login verification code is:</p>
-          <div style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#22c55e;padding:16px;background:#111827;border-radius:8px;text-align:center;margin:16px 0">${otp}</div>
-          <p style="color:#6b7280;font-size:13px">This code expires in 10 minutes.</p>
-        </div>
-      `)
-    } catch (e) {
-      return NextResponse.json({ error: 'Failed to send verification email.' }, { status: 500 })
+      await sendEmail(email, 'NextGuard Quotation - Login Verification Code',
+        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:20px"><h2 style="color:#22c55e">NextGuard Quotation System</h2><hr/><p>Internal Sales Only</p><p>Your login verification code is:</p><div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f0f0f0;border-radius:8px">${otp}</div><p style="color:#666">This code expires in 10 minutes.</p></div>`
+      )
+    } catch (e: any) {
+      console.error('Email send error:', e.message)
+      return NextResponse.json({ error: 'Failed to send verification email. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ requireOtp: true, preMfaToken, otpToken, message: 'Verification code sent to your email.' })
@@ -188,19 +169,14 @@ export async function POST(req: NextRequest) {
     if (!preMfaToken || !otpCode) {
       return NextResponse.json({ error: 'Token and OTP code are required.' }, { status: 400 })
     }
-
     const rawPayload = verifyQtToken(preMfaToken)
     if (!rawPayload || rawPayload.mfaVerified) {
       return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 })
     }
-
     const users = await getUsers()
     const user = users.find(u => u.email.toLowerCase() === rawPayload.email.toLowerCase())
-
     let otpValid = false
-
     if (user && user.otp) {
-      // Check OTP from DB
       if (user.otp === otpCode) {
         if (user.otpExpires && new Date(user.otpExpires) < new Date()) {
           return NextResponse.json({ error: 'Verification code expired. Please login again.' }, { status: 401 })
@@ -208,40 +184,26 @@ export async function POST(req: NextRequest) {
         otpValid = true
       }
     }
-
     if (!otpValid && otpToken) {
-      // Check OTP from token (for admin users not in DB)
       try {
         const decoded = JSON.parse(atob(otpToken.replace(/-/g, '+').replace(/_/g, '/')))
-        if (decoded.otp === otpCode && decoded.email === rawPayload.email && decoded.exp > Date.now()) {
-          otpValid = true
-        }
+        if (decoded.otp === otpCode && decoded.email === rawPayload.email && decoded.exp > Date.now()) { otpValid = true }
       } catch {}
     }
-
     if (!otpValid) {
       recordAttempt(ip)
       return NextResponse.json({ error: 'Invalid verification code.' }, { status: 401 })
     }
-
     clearAttempts(ip)
-
     if (user) {
-      delete user.otp
-      delete user.otpExpires
+      delete user.otp; delete user.otpExpires
       user.lastLogin = new Date().toISOString()
       user.loginCount = (user.loginCount || 0) + 1
       await saveUsers(users)
     }
-
     const token = signQtToken({ userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin', mfaVerified: true })
-    const response = NextResponse.json({
-      success: true,
-      user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin' },
-    })
-    response.cookies.set('qt_session', token, {
-      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/'
-    })
+    const response = NextResponse.json({ success: true, user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin' } })
+    response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
     return response
   }
 
@@ -269,7 +231,6 @@ export async function GET(req: NextRequest) {
   const adminSecret = req.nextUrl.searchParams.get('secret')
   const setAction = req.nextUrl.searchParams.get('action')
 
-  // Admin set-password via GET (for easy browser access)
   if (adminSecret === 'nextguard-cron-2024-secure' && setAction === 'set-password') {
     const email = req.nextUrl.searchParams.get('email') || ''
     const newPw = req.nextUrl.searchParams.get('password') || ''
