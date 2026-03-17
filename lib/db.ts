@@ -3,9 +3,7 @@
 // Provides persistent IOC storage with STIX 2.1 compatible schema
 // v2.1: Added policy tables for SWG engine (custom categories, overrides, groups)
 import { createClient, type Client } from '@libsql/client';
-
 let client: Client | null = null;
-
 export function getDB(): Client {
   if (!client) {
     const url = process.env.TURSO_DATABASE_URL;
@@ -14,8 +12,8 @@ export function getDB(): Client {
     client = createClient({ url, authToken: authToken || undefined });
   }
   return client;
-
-// Initialize database schema (idempotent - safe to call multiple times)
+}
+export const getDb = getDB;
 export async function initDB(): Promise<void> {
   const db = getDB();
   await db.batch([
@@ -63,60 +61,24 @@ export async function initDB(): Promise<void> {
   await runMigrations(db);
   await seedFeeds(db);
 }
-
 async function runMigrations(db: Client): Promise<void> {
-  const migrations = [
-    `ALTER TABLE feeds ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1`,
-    `ALTER TABLE feeds ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1`,
-    `ALTER TABLE feeds ADD COLUMN indicator_type TEXT NOT NULL DEFAULT 'domain'`,
-    `ALTER TABLE feeds ADD COLUMN parser TEXT NOT NULL DEFAULT 'text_lines'`,
-    `ALTER TABLE feeds ADD COLUMN feed_type TEXT NOT NULL DEFAULT 'osint'`,
-    `ALTER TABLE feeds ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'`,
-    `ALTER TABLE feeds ADD COLUMN entries_count INTEGER NOT NULL DEFAULT 0`,
-    `ALTER TABLE feeds ADD COLUMN total_ingested INTEGER NOT NULL DEFAULT 0`,
-    `ALTER TABLE feeds ADD COLUMN last_refresh TEXT`,
-    `ALTER TABLE feeds ADD COLUMN last_success TEXT`,
-    `ALTER TABLE feeds ADD COLUMN last_error TEXT`,
-  ];
-  for (const sql of migrations) {
-    try { await db.execute(sql); } catch { /* column already exists */ }
-  }
+  const m = [`ALTER TABLE feeds ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1`,`ALTER TABLE feeds ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1`,`ALTER TABLE feeds ADD COLUMN indicator_type TEXT NOT NULL DEFAULT 'domain'`,`ALTER TABLE feeds ADD COLUMN parser TEXT NOT NULL DEFAULT 'text_lines'`,`ALTER TABLE feeds ADD COLUMN feed_type TEXT NOT NULL DEFAULT 'osint'`,`ALTER TABLE feeds ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'`,`ALTER TABLE feeds ADD COLUMN entries_count INTEGER NOT NULL DEFAULT 0`,`ALTER TABLE feeds ADD COLUMN total_ingested INTEGER NOT NULL DEFAULT 0`,`ALTER TABLE feeds ADD COLUMN last_refresh TEXT`,`ALTER TABLE feeds ADD COLUMN last_success TEXT`,`ALTER TABLE feeds ADD COLUMN last_error TEXT`];
+  for (const sql of m) { try { await db.execute(sql); } catch {} }
 }
-
 async function seedFeeds(db: Client): Promise<void> {
-  const feeds = [
-    { id: 'urlhaus', name: 'URLhaus', url: 'https://urlhaus.abuse.ch/downloads/text_online/', type: 'domain', parser: 'urlhaus' },
-    { id: 'phishing_army', name: 'Phishing Army', url: 'https://phishing.army/download/phishing_army_blocklist.txt', type: 'domain', parser: 'text_lines' },
-    { id: 'openphish', name: 'OpenPhish', url: 'https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt', type: 'url', parser: 'url_to_domain' },
-    { id: 'phishtank', name: 'PhishTank', url: 'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt', type: 'domain', parser: 'text_lines' },
-    { id: 'threatfox', name: 'ThreatFox', url: 'https://threatfox.abuse.ch/downloads/hostfile/', type: 'domain', parser: 'hostfile' },
-    { id: 'feodo_tracker', name: 'Feodo Tracker', url: 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt', type: 'ipv4-addr', parser: 'text_lines' },
-    { id: 'c2_intel', name: 'C2 Intel', url: 'https://raw.githubusercontent.com/drb-ra/C2IntelFeeds/master/feeds/IPC2s-30day.csv', type: 'ipv4-addr', parser: 'c2intel_csv' },
-    { id: 'ipsum', name: 'IPsum', url: 'https://raw.githubusercontent.com/stamparm/ipsum/master/levels/3.txt', type: 'ipv4-addr', parser: 'ipsum' },
-    { id: 'blocklist_de', name: 'blocklist.de', url: 'https://lists.blocklist.de/lists/all.txt', type: 'ipv4-addr', parser: 'text_lines' },
-    { id: 'emerging_threats', name: 'Emerging Threats', url: 'https://rules.emergingthreats.net/blockrules/compromised-ips.txt', type: 'ipv4-addr', parser: 'text_lines' },
-    { id: 'disposable_emails', name: 'Disposable Emails', url: 'https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf', type: 'email-addr', parser: 'text_lines' },
-    { id: 'shallalist', name: 'Shallalist URL Categories', url: 'https://shallalist.de/Downloads/shallalist.tar.gz', type: 'domain', parser: 'shallalist' },
-    { id: 'ut1_categories', name: 'UT1 URL Categories', url: 'https://dsi.ut-capitole.fr/blacklists/download/blacklists.tar.gz', type: 'domain', parser: 'ut1' },
-  ];
+  const feeds = [{id:'urlhaus',name:'URLhaus',url:'https://urlhaus.abuse.ch/downloads/text_online/',type:'domain',parser:'urlhaus'},{id:'phishing_army',name:'Phishing Army',url:'https://phishing.army/download/phishing_army_blocklist.txt',type:'domain',parser:'text_lines'},{id:'openphish',name:'OpenPhish',url:'https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt',type:'url',parser:'url_to_domain'},{id:'phishtank',name:'PhishTank',url:'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt',type:'domain',parser:'text_lines'},{id:'threatfox',name:'ThreatFox',url:'https://threatfox.abuse.ch/downloads/hostfile/',type:'domain',parser:'hostfile'},{id:'feodo_tracker',name:'Feodo Tracker',url:'https://feodotracker.abuse.ch/downloads/ipblocklist.txt',type:'ipv4-addr',parser:'text_lines'},{id:'c2_intel',name:'C2 Intel',url:'https://raw.githubusercontent.com/drb-ra/C2IntelFeeds/master/feeds/IPC2s-30day.csv',type:'ipv4-addr',parser:'c2intel_csv'},{id:'ipsum',name:'IPsum',url:'https://raw.githubusercontent.com/stamparm/ipsum/master/levels/3.txt',type:'ipv4-addr',parser:'ipsum'},{id:'blocklist_de',name:'blocklist.de',url:'https://lists.blocklist.de/lists/all.txt',type:'ipv4-addr',parser:'text_lines'},{id:'emerging_threats',name:'Emerging Threats',url:'https://rules.emergingthreats.net/blockrules/compromised-ips.txt',type:'ipv4-addr',parser:'text_lines'},{id:'disposable_emails',name:'Disposable Emails',url:'https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/disposable_email_blocklist.conf',type:'email-addr',parser:'text_lines'},{id:'shallalist',name:'Shallalist URL Categories',url:'https://shallalist.de/Downloads/shallalist.tar.gz',type:'domain',parser:'shallalist'},{id:'ut1_categories',name:'UT1 URL Categories',url:'https://dsi.ut-capitole.fr/blacklists/download/blacklists.tar.gz',type:'domain',parser:'ut1'}];
   for (const f of feeds) {
-    await db.execute({ sql: `INSERT OR IGNORE INTO feeds (id, name, url, indicator_type, parser, is_active, enabled, status) VALUES (?, ?, ?, ?, ?, 1, 1, 'pending')`, args: [f.id, f.name, f.url, f.type, f.parser] });
-    await db.execute({ sql: `UPDATE feeds SET is_active = 1, enabled = 1, indicator_type = ?, parser = ? WHERE id = ?`, args: [f.type, f.parser, f.id] });
+    await db.execute({sql:`INSERT OR IGNORE INTO feeds (id,name,url,indicator_type,parser,is_active,enabled,status) VALUES (?,?,?,?,?,1,1,'pending')`,args:[f.id,f.name,f.url,f.type,f.parser]});
+    await db.execute({sql:`UPDATE feeds SET is_active=1,enabled=1,indicator_type=?,parser=? WHERE id=?`,args:[f.type,f.parser,f.id]});
   }
 }
-
 export function generateIndicatorId(type: string, value: string, source: string): string {
   const hash = Buffer.from(`${type}:${value}:${source}`).toString('base64url').slice(0, 16);
   return `indicator--${source}-${hash}`;
 }
-
 export function normalizeValue(value: string, type: string): string {
   let v = value.toLowerCase().trim();
   if (type === 'domain' || type === 'email-addr') { v = v.replace(/^www\./, ''); }
   if (type === 'url') { try { const u = new URL(v.startsWith('http') ? v : `https://${v}`); v = u.hostname.replace(/^www\./, ''); } catch {} }
   return v;
 }
-}
-
-// Alias for v1 API routes
-export const getDb = getDB;
