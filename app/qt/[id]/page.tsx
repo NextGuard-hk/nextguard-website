@@ -1,8 +1,17 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-const STATUS_COLOR: Record<string,string> = { draft:'#6b7280', sent:'#3b82f6', accepted:'#22c55e', rejected:'#ef4444', expired:'#f59e0b', cancelled:'#9ca3af' }
-const STATUS_LABEL: Record<string,string> = { draft:'Draft', sent:'Sent', accepted:'Accepted', rejected:'Rejected', expired:'Expired', cancelled:'Cancelled' }
+
+const STATUS_COLOR: Record<string,string> = {
+  draft:'#6b7280', sent:'#3b82f6',
+  accepted:'#22c55e', rejected:'#ef4444',
+  expired:'#f59e0b', cancelled:'#9ca3af'
+}
+const STATUS_LABEL: Record<string,string> = {
+  draft:'Draft', sent:'Sent', accepted:'Accepted',
+  rejected:'Rejected', expired:'Expired', cancelled:'Cancelled'
+}
+
 const CSS = `
 .qd-root{min-height:100vh;background:#0a0e17;color:#e0e0e0;font-family:system-ui,sans-serif}
 .qd-root *{box-sizing:border-box}
@@ -32,21 +41,34 @@ const CSS = `
 .qd-fl{color:#f9fafb;font-weight:700;font-size:15px}
 .qd-fv{color:#22c55e;font-weight:700;font-size:18px}
 .qd-rmk{white-space:pre-wrap;color:#d1d5db;font-size:14px;line-height:1.6}
+.qd-ml{display:none}
+.qd-mc{background:#111827;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #1f2937}
+.qd-mc-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.qd-mc-label{color:#9ca3af}
+.qd-mc-val{color:#f9fafb;font-weight:500}
+.qd-mc-title{color:#f9fafb;font-weight:600;font-size:14px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #1f2937}
+.qd-sum-mobile{display:none}
 @media(max-width:768px){
-.qd-hdr{padding:10px 12px}
-.qd-hdr-r{width:100%;justify-content:flex-start}
-.qd-ctr{padding:12px 8px}
-.qd-g{grid-template-columns:1fr}
-.qd-row{grid-template-columns:1fr 1fr}
-.qd-c{padding:14px}
-.qd-b{padding:6px 12px;font-size:12px}
-.qd-tb{min-width:500px}
+  .qd-hdr{padding:10px 12px}
+  .qd-hdr-r{width:100%;justify-content:flex-start;overflow-x:auto;padding-bottom:4px}
+  .qd-ctr{padding:12px 8px}
+  .qd-g{grid-template-columns:1fr}
+  .qd-row{grid-template-columns:1fr 1fr}
+  .qd-c{padding:14px}
+  .qd-b{padding:6px 12px;font-size:12px}
+  .qd-tb{min-width:500px}
+  .qd-tw{display:none}
+  .qd-ml{display:block}
+  .qd-sum{display:none}
+  .qd-sum-mobile{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px}
 }
 @media(max-width:480px){
-.qd-row{grid-template-columns:1fr}
-.qd-hdr-t{font-size:13px}
+  .qd-row{grid-template-columns:1fr}
+  .qd-hdr-t{font-size:13px}
+  .qd-b{padding:5px 10px;font-size:11px}
 }
 `
+
 export default function QuotationDetail() {
   const router = useRouter()
   const params = useParams()
@@ -56,37 +78,62 @@ export default function QuotationDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusUpdating, setStatusUpdating] = useState(false)
+
   useEffect(() => {
-    fetch('/api/qt-auth').then(r=>r.json()).then(d => { if (!d.authenticated) router.replace('/qt-login') }).catch(() => router.replace('/qt-login'))
+    fetch('/api/qt-auth').then(r=>r.json()).then(d => {
+      if (!d.authenticated) router.replace('/qt-login')
+    }).catch(() => router.replace('/qt-login'))
   }, [router])
+
   useEffect(() => {
     if (!id) return; setLoading(true)
-    fetch(`/api/qt-quotations/${id}`).then(r => { if (r.status===401) { router.replace('/qt-login'); return r.json() } if (r.status===404) { setError('Quotation not found'); return r.json() } return r.json() }).then(d => { if (d?.quotation) { setQt(d.quotation); setLines(d.lines||[]) } }).catch(e => setError(e.message)).finally(() => setLoading(false))
+    fetch(`/api/qt-quotations/${id}`).then(r => {
+      if (r.status===401) { router.replace('/qt-login'); return r.json() }
+      if (r.status===404) { setError('Quotation not found'); return r.json() }
+      return r.json()
+    }).then(d => {
+      if (d?.quotation) { setQt(d.quotation); setLines(d.lines||[]) }
+    }).catch(e => setError(e.message)).finally(() => setLoading(false))
   }, [id, router])
+
   async function updateStatus(status: string) {
     setStatusUpdating(true)
-    try { const res = await fetch(`/api/qt-quotations/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); const d = await res.json(); if (d.quotation) setQt(d.quotation) } catch (e:any) { setError(e.message) } finally { setStatusUpdating(false) }
+    try {
+      const res = await fetch(`/api/qt-quotations/${id}`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({status})
+      }); const d = await res.json(); if (d.quotation) setQt(d.quotation)
+    } catch (e:any) { setError(e.message) } finally { setStatusUpdating(false) }
   }
-  const fmt = (n: number, c = qt?.currency||'HKD') => new Intl.NumberFormat('en-HK', { style:'currency', currency:c, minimumFractionDigits:0 }).format(n)
-  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-HK', { day:'2-digit', month:'short', year:'numeric' }) : '-'
-  if (loading) return <div className="qd-root"><style>{CSS}</style><div style={{padding:40,textAlign:'center',color:'#6b7280'}}>Loading...</div></div>
+
+  const fmt = (n: number, c = qt?.currency||'HKD') =>
+    new Intl.NumberFormat('en-HK', { style:'currency', currency:c, minimumFractionDigits:0 }).format(n)
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-HK', {
+    day:'2-digit', month:'short', year:'numeric'
+  }) : '-'
+
+  if (loading) return <div className="qd-root"><style>{CSS}</style><div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'60vh',color:'#9ca3af'}}>Loading...</div></div>
   if (error) return <div className="qd-root"><style>{CSS}</style><div className="qd-ctr"><div className="qd-err">{error}</div></div></div>
   if (!qt) return null
+
   return (
     <div className="qd-root">
       <style>{CSS}</style>
       <div className="qd-hdr">
-        <button onClick={() => router.push('/qt')} className="qd-back">←</button>
-        <span className="qd-hdr-t">NEXT GUARD | {qt.ref_number}</span>
-        <span className="qd-badge" style={{background:STATUS_COLOR[qt.status]}}>{STATUS_LABEL[qt.status]}</span>
+        <button onClick={() => router.push('/qt')} className="qd-back">{"\u2190"}</button>
+        <div className="qd-hdr-t">
+          NEXT GUARD | {qt.ref_number}
+          <span className="qd-badge" style={{background:STATUS_COLOR[qt.status]}}>{STATUS_LABEL[qt.status]}</span>
+        </div>
         <div className="qd-hdr-r">
-          {qt.status==='draft' && <button onClick={() => updateStatus('sent')} disabled={statusUpdating} className="qd-b" style={{background:'#3b82f6'}}>Mark Sent</button>}
-          {qt.status==='sent' && <button onClick={() => updateStatus('accepted')} disabled={statusUpdating} className="qd-b" style={{background:'#22c55e'}}>Accept</button>}
-          {qt.status==='sent' && <button onClick={() => updateStatus('rejected')} disabled={statusUpdating} className="qd-b" style={{background:'#ef4444'}}>Reject</button>}
-          {['draft','sent'].includes(qt.status) && <button onClick={() => updateStatus('cancelled')} disabled={statusUpdating} className="qd-b" style={{background:'#6b7280'}}>Cancel</button>}
-          <button onClick={() => router.push(`/qt/${id}/pdf`)} className="qd-b" style={{background:'#374151'}}>PDF</button>
+          {qt.status==='draft' && <button onClick={()=>updateStatus('sent')} disabled={statusUpdating} className="qd-b" style={{background:'#3b82f6'}}>Mark Sent</button>}
+          {qt.status==='sent' && <button onClick={()=>updateStatus('accepted')} disabled={statusUpdating} className="qd-b" style={{background:'#22c55e'}}>Accept</button>}
+          {qt.status==='sent' && <button onClick={()=>updateStatus('rejected')} disabled={statusUpdating} className="qd-b" style={{background:'#ef4444'}}>Reject</button>}
+          {['draft','sent'].includes(qt.status) && <button onClick={()=>updateStatus('cancelled')} disabled={statusUpdating} className="qd-b" style={{background:'#6b7280'}}>Cancel</button>}
+          <button onClick={()=>router.push(`/qt/${id}/pdf`)} className="qd-b" style={{background:'#374151'}}>PDF</button>
         </div>
       </div>
+
       <div className="qd-ctr">
         <div className="qd-g">
           <div className="qd-c">
@@ -94,11 +141,12 @@ export default function QuotationDetail() {
             <div className="qd-row">
               <div className="qd-f"><span className="qd-l">Customer Type</span><div className="qd-v">{qt.customer_type==='partner'?'Partner':'End User'}</div></div>
               <div className="qd-f"><span className="qd-l">Customer Name</span><div className="qd-v">{qt.customer_name}</div></div>
-              {qt.partner_name && <div className="qd-f"><span className="qd-l">Partner</span><div className="qd-v">{qt.partner_name}</div></div>}
-              {qt.end_user_name && <div className="qd-f"><span className="qd-l">End User</span><div className="qd-v">{qt.end_user_name}</div></div>}
-              {qt.project_name && <div className="qd-f"><span className="qd-l">Project</span><div className="qd-v">{qt.project_name}</div></div>}
             </div>
+            {qt.partner_name && <div className="qd-f"><span className="qd-l">Partner</span><div className="qd-v">{qt.partner_name}</div></div>}
+            {qt.end_user_name && <div className="qd-f"><span className="qd-l">End User</span><div className="qd-v">{qt.end_user_name}</div></div>}
+            {qt.project_name && <div className="qd-f"><span className="qd-l">Project</span><div className="qd-v">{qt.project_name}</div></div>}
           </div>
+
           <div className="qd-c">
             <div className="qd-ct">Contract Terms</div>
             <div className="qd-row">
@@ -113,11 +161,17 @@ export default function QuotationDetail() {
             </div>
           </div>
         </div>
+
         <div className="qd-c">
           <div className="qd-ct">Product Lines</div>
+          {/* Desktop table */}
           <div className="qd-tw">
             <table className="qd-tb">
-              <thead><tr><th>Product</th><th>Site</th><th>Qty</th><th>Appliance</th><th>App Total</th><th>License/yr</th>{Array.from({length:qt.term_years},(_,i) => <th key={i}>Yr {i+1}</th>)}<th>Line Total</th><th>Incl?</th></tr></thead>
+              <thead><tr>
+                <th>Product</th><th>Site</th><th>Qty</th><th>Appliance</th><th>App Total</th><th>License/yr</th>
+                {Array.from({length:qt.term_years},(_,i) => <th key={i}>Yr {i+1}</th>)}
+                <th>Line Total</th><th>Incl?</th>
+              </tr></thead>
               <tbody>
                 {lines.map((line: any) => (
                   <tr key={line.id}>
@@ -129,25 +183,53 @@ export default function QuotationDetail() {
                     <td>{fmt(line.license_unit_price)}</td>
                     {Array.from({length:qt.term_years},(_,i) => <td key={i}>{fmt([line.year1_fee,line.year2_fee,line.year3_fee,line.year4_fee,line.year5_fee][i]||0)}</td>)}
                     <td>{line.is_included ? <span style={{color:'#22c55e'}}>Included</span> : fmt(line.line_total)}</td>
-                    <td>{line.is_included ? '✓' : ''}</td>
+                    <td>{line.is_included ? '\u2713' : ''}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {/* Mobile cards */}
+          <div className="qd-ml">
+            {lines.map((line: any, idx: number) => (
+              <div key={line.id} className="qd-mc">
+                <div className="qd-mc-title">{line.description||line.product_code}</div>
+                <div className="qd-mc-row"><span className="qd-mc-label">Code</span><span className="qd-mc-val">{line.product_code}</span></div>
+                <div className="qd-mc-row"><span className="qd-mc-label">Site</span><span className="qd-mc-val">{line.site_type}</span></div>
+                <div className="qd-mc-row"><span className="qd-mc-label">Qty</span><span className="qd-mc-val">{line.qty}</span></div>
+                <div className="qd-mc-row"><span className="qd-mc-label">Appliance</span><span className="qd-mc-val">{fmt(line.appliance_unit_price)}</span></div>
+                <div className="qd-mc-row"><span className="qd-mc-label">App Total</span><span className="qd-mc-val">{fmt(line.appliance_total)}</span></div>
+                <div className="qd-mc-row"><span className="qd-mc-label">License/yr</span><span className="qd-mc-val">{fmt(line.license_unit_price)}</span></div>
+                {Array.from({length:qt.term_years},(_,i) => (
+                  <div key={i} className="qd-mc-row"><span className="qd-mc-label">Yr {i+1}</span><span className="qd-mc-val">{fmt([line.year1_fee,line.year2_fee,line.year3_fee,line.year4_fee,line.year5_fee][i]||0)}</span></div>
+                ))}
+                <div className="qd-mc-row"><span className="qd-mc-label">Line Total</span><span className="qd-mc-val" style={{color:line.is_included?'#22c55e':'#f9fafb'}}>{line.is_included ? 'Included' : fmt(line.line_total)}</span></div>
+              </div>
+            ))}
+          </div>
         </div>
+
         <div className="qd-g">
           <div className="qd-c">
             <div className="qd-ct">Pricing Summary</div>
             <div className="qd-sum">
-              <div className="qd-sl">Appliance Total</div><div className="qd-v">{fmt(qt.appliance_total)}</div>
-              <div className="qd-sl">License Total ({qt.term_years}yr)</div><div className="qd-v">{fmt(qt.license_total)}</div>
-              {qt.service_total > 0 && <><div className="qd-sl">Service Total</div><div className="qd-v">{fmt(qt.service_total)}</div></>}
-              <div className="qd-sl">Grand Total</div><div className="qd-v">{fmt(qt.grand_total)}</div>
-              {qt.discount_amount > 0 && <><div className="qd-sl">Discount ({qt.discount_percent?.toFixed(1)}%)</div><div style={{color:'#ef4444'}}>-{fmt(qt.discount_amount)}</div></>}
-              <div className="qd-fl">FINAL PRICE</div><div className="qd-fv">{fmt(qt.final_price)}</div>
+              <span className="qd-sl">Appliance Total</span><span>{fmt(qt.appliance_total)}</span>
+              <span className="qd-sl">License Total ({qt.term_years}yr)</span><span>{fmt(qt.license_total)}</span>
+              {qt.service_total > 0 && <><span className="qd-sl">Service Total</span><span>{fmt(qt.service_total)}</span></>}
+              <span className="qd-sl">Grand Total</span><span>{fmt(qt.grand_total)}</span>
+              {qt.discount_amount > 0 && <><span className="qd-sl">Discount ({qt.discount_percent?.toFixed(1)}%)</span><span>-{fmt(qt.discount_amount)}</span></>}
+              <span className="qd-fl">FINAL PRICE</span><span className="qd-fv">{fmt(qt.final_price)}</span>
+            </div>
+            <div className="qd-sum-mobile">
+              <span className="qd-sl">Appliance Total</span><span>{fmt(qt.appliance_total)}</span>
+              <span className="qd-sl">License Total ({qt.term_years}yr)</span><span>{fmt(qt.license_total)}</span>
+              {qt.service_total > 0 && <><span className="qd-sl">Service Total</span><span>{fmt(qt.service_total)}</span></>}
+              <span className="qd-sl">Grand Total</span><span>{fmt(qt.grand_total)}</span>
+              {qt.discount_amount > 0 && <><span className="qd-sl">Discount ({qt.discount_percent?.toFixed(1)}%)</span><span>-{fmt(qt.discount_amount)}</span></>}
+              <span className="qd-fl">FINAL PRICE</span><span className="qd-fv">{fmt(qt.final_price)}</span>
             </div>
           </div>
+
           <div className="qd-c">
             <div className="qd-ct">Remarks</div>
             <div className="qd-rmk">{qt.remarks}</div>
