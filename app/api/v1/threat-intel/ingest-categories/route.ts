@@ -1,14 +1,14 @@
 // app/api/v1/threat-intel/ingest-categories/route.ts
-// NextGuard URL Category Ingestion v1.6
+// NextGuard URL Category Ingestion v2.0
+// Supports pagination via ?offset= and ?limit= for large feeds
 // Uses GitHub mirror of UT1 Toulouse blacklists (olbat/ut1-blacklists)
-// v1.6: Use single bulk INSERT per batch to minimize Turso round-trips
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 
 const BASE = 'https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists';
 
-// Only categories with plain text 'domains' files (verified)
 const UT1_FEEDS: Record<string, string> = {
+  'adult':            `${BASE}/adult/domains`,
   'mixed_adult':      `${BASE}/mixed_adult/domains`,
   'gambling':         `${BASE}/gambling/domains`,
   'malware':          `${BASE}/malware/domains`,
@@ -40,10 +40,25 @@ const UT1_FEEDS: Record<string, string> = {
   'redirector':       `${BASE}/redirector/domains`,
   'lingerie':         `${BASE}/lingerie/domains`,
   'chat':             `${BASE}/chat/domains`,
+  'publicite':        `${BASE}/publicite/domains`,
+  'audio_video':      `${BASE}/audio-video/domains`,
+  'download':         `${BASE}/download/domains`,
+  'blog':             `${BASE}/blog/domains`,
+  'radio':            `${BASE}/radio/domains`,
+  'manga':            `${BASE}/manga/domains`,
+  'celebrity':        `${BASE}/celebrity/domains`,
+  'financial':        `${BASE}/financial/domains`,
+  'jobsearch':        `${BASE}/jobsearch/domains`,
+  'cleaning':         `${BASE}/cleaning/domains`,
+  'sect':             `${BASE}/sect/domains`,
+  'doh':              `${BASE}/doh/domains`,
+  'remote_control':   `${BASE}/remote-control/domains`,
+  'residential_proxies': `${BASE}/residential-proxies/domains`,
 };
 
 const CATEGORY_DISPLAY: Record<string, string> = {
-  'mixed_adult':      'Adult Content',
+  'adult':            'Adult Content',
+  'mixed_adult':      'Adult Content (Mixed)',
   'gambling':         'Gambling',
   'malware':          'Malware',
   'phishing':         'Phishing',
@@ -74,11 +89,24 @@ const CATEGORY_DISPLAY: Record<string, string> = {
   'redirector':       'Redirector',
   'lingerie':         'Lingerie & Adult Fashion',
   'chat':             'Chat & Messaging',
+  'publicite':        'Advertising',
+  'audio_video':      'Audio & Video',
+  'download':         'Software Download',
+  'blog':             'Blog',
+  'radio':            'Internet Radio',
+  'manga':            'Manga & Animation',
+  'celebrity':        'Celebrity & Entertainment',
+  'financial':        'Financial Information',
+  'jobsearch':        'Job Search',
+  'cleaning':         'Security Software',
+  'sect':             'Sect & Cult',
+  'doh':              'DNS over HTTPS',
+  'remote_control':   'Remote Control',
+  'residential_proxies': 'Residential Proxies',
 };
 
-// Max domains to ingest per category per run (to avoid timeouts)
-const MAX_DOMAINS_PER_CATEGORY = 5000;
-// Domains per single SQL statement (VALUES row count)
+// v2.0: Support offset/limit for paginated ingestion of large feeds
+const DEFAULT_LIMIT = 50000;
 const BATCH_SIZE = 500;
 
 function isAuthorized(request: NextRequest): boolean {
@@ -89,7 +117,6 @@ function isAuthorized(request: NextRequest): boolean {
   const adminKey = process.env.TI_ADMIN_KEY;
   if (adminKey && key === adminKey) return true;
   if (!cronSecret && !adminKey) return true;
-  // Fallback default key for initial setup
   if (key === 'nextguard-admin-2024') return true;
   return false;
 }
@@ -111,37 +138,38 @@ async function ensureUrlCategoriesTable(): Promise<void> {
   } catch { /* table already exists */ }
 }
 
-async function fetchDomainList(url: string, limit: number): Promise<string[]> {
+async function fetchDomainList(url: string, offset: number, limit: number): Promise<{ domains: string[]; totalAvailable: number }> {
   try {
     const res = await fetch(url, {
-      signal: AbortSignal.timeout(25000),
-      headers: { 'User-Agent': 'NextGuard-CategoryIngest/1.6' },
+      signal: AbortSignal.timeout(55000),
+      headers: { 'User-Agent': 'NextGuard-CategoryIngest/2.0' },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { domains: [], totalAvailable: 0 };
     const text = await res.text();
     const all = text
       .split('\n')
       .map(l => l.trim().toLowerCase())
       .filter(l => l && !l.startsWith('#') && l.includes('.') && l.length > 3 && l.length < 255);
-    // Return only up to limit to avoid timeout
-    return all.slice(0, limit);
+    const sliced = all.slice(offset, offset + limit);
+    return { domains: sliced, totalAvailable: all.length };
   } catch {
-    return [];
+    return { domains: [], totalAvailable: 0 };
   }
 }
 
 async function ingestCategoryFeed(
   displayName: string,
-  url: string
-): Promise<{ added: number; total_in_feed: number; errors: number }> {
+  url: string,
+  offset: number,
+  limit: number
+): Promise<{ added: number; total_in_feed: number; errors: number; totalAvailable: number }> {
   const db = getDB();
-  const domains = await fetchDomainList(url, MAX_DOMAINS_PER_CATEGORY);
-  if (domains.length === 0) return { added: 0, total_in_feed: 0, errors: 1 };
+  const { domains, totalAvailable } = await fetchDomainList(url, offset, limit);
+  if (domains.length === 0) return { added: 0, total_in_feed: 0, errors: totalAvailable === 0 ? 1 : 0, totalAvailable };
 
   let added = 0;
   let errors = 0;
 
-  // Use single bulk INSERT per batch - much faster than db.batch()
   for (let i = 0; i < domains.length; i += BATCH_SIZE) {
     const batch = domains.slice(i, i + BATCH_SIZE);
     try {
@@ -157,7 +185,7 @@ async function ingestCategoryFeed(
       errors++;
     }
   }
-  return { added, total_in_feed: domains.length, errors };
+  return { added, total_in_feed: domains.length, errors, totalAvailable };
 }
 
 export async function GET(request: NextRequest) {
@@ -166,8 +194,9 @@ export async function GET(request: NextRequest) {
   }
   const startTime = Date.now();
   const categoryParam = request.nextUrl.searchParams.get('category');
+  const offset = parseInt(request.nextUrl.searchParams.get('offset') || '0', 10);
+  const limit = parseInt(request.nextUrl.searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
 
-  // Ensure url_categories table exists
   await ensureUrlCategoriesTable();
 
   const results: Record<string, any> = {};
@@ -185,13 +214,17 @@ export async function GET(request: NextRequest) {
   for (const [key, url] of Object.entries(feedsToRun)) {
     const displayName = CATEGORY_DISPLAY[key] || key;
     try {
-      const result = await ingestCategoryFeed(displayName, url);
+      const result = await ingestCategoryFeed(displayName, url, offset, limit);
       results[key] = {
         category: displayName,
         domains_ingested: result.added,
-        domains_in_feed: result.total_in_feed,
-        limit_applied: result.total_in_feed >= MAX_DOMAINS_PER_CATEGORY,
-        errors: result.errors
+        domains_in_batch: result.total_in_feed,
+        total_available: result.totalAvailable,
+        offset,
+        limit,
+        has_more: (offset + result.total_in_feed) < result.totalAvailable,
+        next_offset: offset + result.total_in_feed,
+        errors: result.errors,
       };
     } catch (e: any) {
       results[key] = { category: displayName, domains_ingested: 0, error: e.message };
@@ -204,7 +237,7 @@ export async function GET(request: NextRequest) {
     success: true,
     message: 'URL category ingestion complete',
     source: 'UT1 Toulouse via olbat/ut1-blacklists GitHub mirror',
-    note: `Max ${MAX_DOMAINS_PER_CATEGORY} domains per category per run`,
+    pagination: { offset, limit },
     results,
     total_domains_ingested: totalDomains,
     categories_processed: Object.keys(results).length,
