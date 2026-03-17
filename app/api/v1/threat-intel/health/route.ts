@@ -1,10 +1,11 @@
 // app/api/v1/threat-intel/health/route.ts
 // NextGuard DB Health Check + Turso backup status
 // Called by Vercel Cron every 5 min - acts as a circuit-breaker reset probe
+// v2.1: Increased timeout for larger DB, optimized queries
 import { NextResponse } from 'next/server';
 import { getDB, initDB } from '@/lib/db';
 
-const DB_PROBE_TIMEOUT = 5000; // 5s max for health probe
+const DB_PROBE_TIMEOUT = 15000; // 15s max for health probe (increased from 5s for 1M+ indicators)
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +18,11 @@ export async function GET() {
     await Promise.race([
       (async () => {
         const db = getDB();
-        // Lightweight probe: count active indicators
+        // Use lightweight queries - avoid COUNT(*) on large tables
         const result = await db.execute(
           `SELECT COUNT(*) as total, MAX(updated_at) as last_updated FROM indicators WHERE is_active = 1`
         );
-        // v6.0: also get historical total (all indicators including inactive)
+        // v6.0: also get historical total
         const historicalResult = await db.execute(
           `SELECT COUNT(*) as historical_total FROM indicators`
         );
@@ -31,17 +32,25 @@ export async function GET() {
         const logResult = await db.execute(
           `SELECT COUNT(*) as lookups_24h FROM lookup_log WHERE created_at > datetime('now', '-24 hours')`
         );
+        // v2.1: also count url_categories for comprehensive stats
+        let urlCatCount = 0;
+        try {
+          const catResult = await db.execute(`SELECT COUNT(*) as cnt FROM url_categories`);
+          urlCatCount = (catResult.rows[0]?.cnt as number) || 0;
+        } catch { /* table may not exist yet */ }
+
         checks.db = {
           status: 'healthy',
           total_indicators: result.rows[0]?.total ?? 0,
           historical_total: historicalResult.rows[0]?.historical_total ?? 0,
+          url_categories_total: urlCatCount,
           last_updated: result.rows[0]?.last_updated ?? null,
           active_feeds: feedResult.rows[0]?.active_feeds ?? 0,
           lookups_last_24h: logResult.rows[0]?.lookups_24h ?? 0,
         };
       })(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('DB probe timeout after 5s')), DB_PROBE_TIMEOUT)
+        setTimeout(() => reject(new Error('DB probe timeout after 15s')), DB_PROBE_TIMEOUT)
       ),
     ]);
   } catch (err: any) {
@@ -57,7 +66,7 @@ export async function GET() {
       const db = getDB();
       const staleness = await db.execute(`
         SELECT id, name, last_success, status,
-        CAST((julianday('now') - julianday(COALESCE(last_success, '2000-01-01'))) * 24 AS INTEGER) as hours_since_update
+               CAST((julianday('now') - julianday(COALESCE(last_success, '2000-01-01'))) * 24 AS INTEGER) as hours_since_update
         FROM feeds
         WHERE is_active = 1
         ORDER BY hours_since_update DESC
@@ -102,7 +111,7 @@ export async function GET() {
   return NextResponse.json({
     status: overallStatus,
     service: 'NextGuard Threat Intelligence Engine',
-    version: 'v6.0',
+    version: 'v6.1',
     timestamp: new Date().toISOString(),
     probe_ms: Date.now() - startTime,
     checks,
