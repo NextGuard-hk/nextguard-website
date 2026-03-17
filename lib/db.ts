@@ -1,7 +1,7 @@
 // lib/db.ts
 // Turso (libSQL) database client for NextGuard Threat Intelligence
 // Provides persistent IOC storage with STIX 2.1 compatible schema
-// v2.1: Added policy tables for SWG engine (custom categories, overrides, groups)
+// v2.2: Added embedded replica for near-zero read latency on warm Vercel instances
 import { createClient, type Client } from '@libsql/client';
 
 let client: Client | null = null;
@@ -11,7 +11,20 @@ export function getDB(): Client {
     const url = process.env.TURSO_DATABASE_URL;
     const authToken = process.env.TURSO_AUTH_TOKEN;
     if (!url) throw new Error('TURSO_DATABASE_URL not configured');
-    client = createClient({ url, authToken: authToken || undefined });
+    // v2.2: Use embedded replica in /tmp for near-zero read latency
+    // On Vercel Serverless, /tmp persists within warm invocations
+    // First cold-start syncs from remote, subsequent reads are local SQLite
+    try {
+      client = createClient({
+        url: 'file:/tmp/turso/nextguard-replica.db',
+        syncUrl: url,
+        authToken: authToken || undefined,
+        syncInterval: 300,
+      });
+    } catch {
+      // Fallback: direct remote connection
+      client = createClient({ url, authToken: authToken || undefined });
+    }
   }
   return client;
 }
@@ -57,7 +70,6 @@ export async function initDB(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_indicators_active ON indicators(is_active)`,
     `CREATE INDEX IF NOT EXISTS idx_indicators_valid ON indicators(valid_from, valid_until)`,
     `CREATE INDEX IF NOT EXISTS idx_indicators_last_seen ON indicators(last_seen)`,
-
     // Feed management table
     `CREATE TABLE IF NOT EXISTS feeds (
       id TEXT PRIMARY KEY,
@@ -80,7 +92,6 @@ export async function initDB(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-
     `CREATE TABLE IF NOT EXISTS ingestion_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       feed_id TEXT NOT NULL,
@@ -96,7 +107,6 @@ export async function initDB(): Promise<void> {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_ingestion_feed ON ingestion_log(feed_id)`,
     `CREATE INDEX IF NOT EXISTS idx_ingestion_status ON ingestion_log(status)`,
-
     `CREATE TABLE IF NOT EXISTS lookup_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       indicator_value TEXT NOT NULL,
@@ -110,7 +120,6 @@ export async function initDB(): Promise<void> {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_lookup_created ON lookup_log(created_at)`,
     `CREATE INDEX IF NOT EXISTS idx_lookup_value ON lookup_log(indicator_value)`,
-
     `CREATE TABLE IF NOT EXISTS threat_indicators (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -135,7 +144,6 @@ export async function initDB(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_ti_type_value ON threat_indicators(type, value)`,
     `CREATE INDEX IF NOT EXISTS idx_ti_source ON threat_indicators(source_feed)`,
     `CREATE INDEX IF NOT EXISTS idx_ti_active ON threat_indicators(is_active)`,
-
     `CREATE TABLE IF NOT EXISTS threat_feeds (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE NOT NULL,
@@ -149,7 +157,6 @@ export async function initDB(): Promise<void> {
       last_error TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
-
     `CREATE TABLE IF NOT EXISTS lookup_audit (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       query_type TEXT NOT NULL,
@@ -162,7 +169,6 @@ export async function initDB(): Promise<void> {
       checked_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE INDEX IF NOT EXISTS idx_la_checked ON lookup_audit(checked_at)`,
-
     // URL Categories table - stores domain->category mappings from UT1
     `CREATE TABLE IF NOT EXISTS url_categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,9 +181,7 @@ export async function initDB(): Promise<void> {
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_urlcat_domain_source ON url_categories(domain, source)`,
     `CREATE INDEX IF NOT EXISTS idx_urlcat_domain ON url_categories(domain)`,
     `CREATE INDEX IF NOT EXISTS idx_urlcat_category ON url_categories(category)`,
-
     // === P0-3: NEW SWG Policy Tables ===
-
     // Custom URL categories (admin-defined allow/block lists)
     `CREATE TABLE IF NOT EXISTS custom_url_categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,7 +192,6 @@ export async function initDB(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-
     `CREATE TABLE IF NOT EXISTS custom_url_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_id INTEGER NOT NULL,
@@ -198,7 +201,6 @@ export async function initDB(): Promise<void> {
       FOREIGN KEY (category_id) REFERENCES custom_url_categories(id)
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_cue_domain_cat ON custom_url_entries(domain, category_id)`,
-
     // URL policy overrides (per-domain allow/block)
     `CREATE TABLE IF NOT EXISTS url_policy_overrides (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -209,7 +211,6 @@ export async function initDB(): Promise<void> {
       expires_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-
     // Group-based policies (Zscaler-style per-user/group rules)
     `CREATE TABLE IF NOT EXISTS url_policy_groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -219,7 +220,6 @@ export async function initDB(): Promise<void> {
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-
     `CREATE TABLE IF NOT EXISTS url_policy_group_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       group_id INTEGER NOT NULL,
@@ -227,7 +227,6 @@ export async function initDB(): Promise<void> {
       action TEXT NOT NULL CHECK(action IN ('Block','Warn','Allow','Isolate')),
       FOREIGN KEY (group_id) REFERENCES url_policy_groups(id)
     )`,
-
     `CREATE TABLE IF NOT EXISTS url_policy_user_assignments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -236,7 +235,6 @@ export async function initDB(): Promise<void> {
       FOREIGN KEY (group_id) REFERENCES url_policy_groups(id)
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_upa_user_group ON url_policy_user_assignments(user_id, group_id)`,
-
     `CREATE TABLE IF NOT EXISTS url_policy_schedules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       group_id INTEGER NOT NULL,
@@ -246,7 +244,6 @@ export async function initDB(): Promise<void> {
       is_active INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (group_id) REFERENCES url_policy_groups(id)
     )`,
-
     // Evaluation log for SWG dashboard analytics
     `CREATE TABLE IF NOT EXISTS url_policy_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -259,9 +256,7 @@ export async function initDB(): Promise<void> {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_upl_evaluated ON url_policy_log(evaluated_at)`,
     `CREATE INDEX IF NOT EXISTS idx_upl_domain ON url_policy_log(domain)`,
-
   ], 'write');
-
   // Run migrations to add missing columns to existing tables
   await runMigrations(db);
   // Seed default feed configurations
