@@ -7,6 +7,24 @@ const ACTION_PRIORITY: Record<string, number> = { 'Block': 4, 'Warn': 3, 'Isolat
 const RISK_HIGH_CATEGORIES = ['malware', 'phishing', 'botnet/c2', 'exploit/attack tools', 'scam/fraud', 'ransomware', 'cryptojacking', 'spyware']
 const RISK_MEDIUM_CATEGORIES = ['suspicious', 'proxy/anonymizer', 'vpn services', 'dynamic dns', 'newly registered domain', 'parked/for sale', 'adult', 'gambling', 'cryptocurrency', 'dns over HTTPS']
 const SUSPICIOUS_TLDS = ['xyz','top','club','buzz','tk','ml','ga','cf','gq','icu','cam','rest','click','link']
+
+// P1 FIX: In-memory cache to avoid repeated DB queries for same domain
+const domainCache = new Map<string, { data: any; ts: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+function getCached(domain: string) {
+  const entry = domainCache.get(domain);
+  if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;
+  domainCache.delete(domain);
+  return null;
+}
+function setCache(domain: string, data: any) {
+  if (domainCache.size > 1000) {
+    const oldest = domainCache.keys().next().value;
+    if (oldest) domainCache.delete(oldest);
+  }
+  domainCache.set(domain, { data, ts: Date.now() });
+}
+
 function computeRiskLevel(categories: string[], domain: string, isMalicious: boolean, confidence: number): { riskLevel: 'high' | 'medium' | 'low' | 'none'; riskScore: number; riskFactors: string[] } {
  const factors: string[] = []; let score = 0
  if (isMalicious) { score += 100; factors.push('confirmed-malicious') }
@@ -32,9 +50,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
  try { const body = await request.json(); const userId = body.userId || null; if (Array.isArray(body.urls)) { const results = await Promise.all(body.urls.slice(0, 50).map((u: string) => evaluateUrl(u, userId))); return NextResponse.json({ results, count: results.length }); } if (body.url) return NextResponse.json(await evaluateUrl(body.url, userId)); return NextResponse.json({ error: 'url or urls required' }, { status: 400 }); } catch (e: unknown) { return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
 }
-// P0 FIX v4: Use transaction for single-connection pipelined queries
+// P1 FIX v5: Sequential queries (stable) + in-memory cache for repeat lookups
 async function evaluateUrl(inputUrl: string, userId: string | null = null) {
  const domain = normalizeDomain(inputUrl); const startTime = Date.now();
+ const cached = getCached(domain);
+ if (cached) { return { ...cached, evalMs: Date.now() - startTime, cached: true, timestamp: new Date().toISOString() }; }
  const staticCategories = categorizeUrl(inputUrl);
  const dgaResult = detectDGA(domain);
  const apex = domain.split('.').length > 2 ? domain.split('.').slice(-2).join('.') : null;
@@ -44,22 +64,16 @@ async function evaluateUrl(inputUrl: string, userId: string | null = null) {
  let threatIntel = { isMalicious: false, riskLevel: 'unknown', threatType: null as string | null };
  try {
  const db = getDB();
- const tx = await db.transaction('read');
- try {
- const [r0, r1, r2, r3] = await Promise.all([
- tx.execute({ sql: `SELECT action FROM url_policy_overrides WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`, args: [domain] }),
- tx.execute({ sql: `SELECT cc.name as category, cc.action FROM custom_url_entries cue JOIN custom_url_categories cc ON cc.id = cue.category_id WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`, args: [domain] }),
- tx.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [domain] }),
- tx.execute({ sql: 'SELECT risk_level, categories FROM indicators WHERE value_normalized = ? AND is_active = 1 ORDER BY confidence DESC LIMIT 1', args: [domain] }),
- ]);
+ const r0 = await db.execute({ sql: `SELECT action FROM url_policy_overrides WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now')) LIMIT 1`, args: [domain] });
  if (r0.rows.length > 0) override = { action: r0.rows[0].action as string };
+ const r1 = await db.execute({ sql: `SELECT cc.name as category, cc.action FROM custom_url_entries cue JOIN custom_url_categories cc ON cc.id = cue.category_id WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`, args: [domain] });
  if (r1.rows.length > 0) customMatch = { category: r1.rows[0].category as string, action: r1.rows[0].action as string };
+ const r2 = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [domain] });
  if (r2.rows.length > 0) { dbCategory = r2.rows[0].category as string; }
- else if (apex) { const ra = await tx.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] }); if (ra.rows.length > 0) dbCategory = ra.rows[0].category as string; }
+ else if (apex) { const ra = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] }); if (ra.rows.length > 0) dbCategory = ra.rows[0].category as string; }
+ const r3 = await db.execute({ sql: 'SELECT risk_level, categories FROM indicators WHERE value_normalized = ? AND is_active = 1 ORDER BY confidence DESC LIMIT 1', args: [domain] });
  if (r3.rows.length > 0) { const risk = r3.rows[0].risk_level as string; let cats: string[] = []; try { cats = JSON.parse((r3.rows[0].categories as string) || '[]'); } catch {} threatIntel = { isMalicious: ['known_malicious','high_risk'].includes(risk), riskLevel: risk, threatType: cats[0] || null }; }
- tx.close();
- } catch (txErr) { try { tx.close(); } catch {} throw txErr; }
- } catch (e) { console.error('Transaction query error:', e); }
+ } catch (e) { console.error('DB query error:', e); }
  const allCategories = [...staticCategories]; let categorySource = 'static-taxonomy'; let confidence = staticCategories.length > 0 && staticCategories[0] !== 'Uncategorized' ? 80 : 40;
  if (dbCategory && !allCategories.includes(dbCategory)) { allCategories.push(dbCategory); categorySource = 'database'; confidence = Math.min(confidence + 15, 95); }
  if (threatIntel.isMalicious) { const tc = threatIntel.threatType || 'Malware'; if (!allCategories.includes(tc)) allCategories.push(tc); categorySource = 'threat-intel'; confidence = 99; }
@@ -76,5 +90,7 @@ async function evaluateUrl(inputUrl: string, userId: string | null = null) {
  const taxonomyEntries = Object.values(URL_TAXONOMY) as Array<{slug:string;name:string;group:string;defaultAction:string}>;
  const te = taxonomyEntries.find(t => staticCategories.some(c => c.toLowerCase() === t.name.toLowerCase() || c.toLowerCase() === t.slug.toLowerCase()));
  try { const db = getDB(); db.execute({ sql: `INSERT OR IGNORE INTO url_policy_log (domain, action, category, risk_level, user_id, evaluated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`, args: [domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel, userId || null] }); } catch {}
- return { url: inputUrl, domain, action, confidence, categorySource, categories: allCategories, primaryCategory: allCategories[0] || 'Uncategorized', group: te?.group || null, defaultAction: te?.defaultAction || null, riskLevel: riskAssessment.riskLevel, riskScore: riskAssessment.riskScore, riskFactors: riskAssessment.riskFactors, threatIntel, dbCategoryMatch: dbCategory, customCategoryMatch: customCategory, overrideApplied, groupPolicyApplied, userId, dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors }, evalMs: Date.now() - startTime, aiClassified, timestamp: new Date().toISOString() };
+ const result = { url: inputUrl, domain, action, confidence, categorySource, categories: allCategories, primaryCategory: allCategories[0] || 'Uncategorized', group: te?.group || null, defaultAction: te?.defaultAction || null, riskLevel: riskAssessment.riskLevel, riskScore: riskAssessment.riskScore, riskFactors: riskAssessment.riskFactors, threatIntel, dbCategoryMatch: dbCategory, customCategoryMatch: customCategory, overrideApplied, groupPolicyApplied, userId, dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors }, evalMs: Date.now() - startTime, aiClassified, cached: false, timestamp: new Date().toISOString() };
+ setCache(domain, result);
+ return result;
 }
