@@ -2,6 +2,7 @@
 // Quotation System Auth - Uses same account system as /admin (download-users)
 import { NextRequest, NextResponse } from 'next/server'
 import { getUsers, saveUsers } from '../download-users/route'
+import { writeQuotationAudit } from '@/lib/quotation-db'
 export const maxDuration = 25
 
 const QT_JWT_SECRET = process.env.QT_JWT_SECRET || process.env.JWT_SECRET || 'qt-nextguard-secret-2026'
@@ -32,7 +33,7 @@ async function sendEmail(to: string, subject: string, html: string) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'NextGuard Quotation <noreply@next-guard.com>', to: [to], subject, html }),
+      body: JSON.stringify({ from: 'NextGuard Quotation <quotation@next-guard.com>', to: [to], subject, html }),
       signal: controller.signal,
     })
     if (!res.ok) console.error('Resend error:', res.status, await res.text().catch(() => ''))
@@ -47,10 +48,7 @@ function base64urlDecode(str: string): string {
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
 
-interface QtJWTPayload {
-  userId: string; email: string; name: string; role: string
-  mfaVerified: boolean; iat: number; exp: number
-}
+interface QtJWTPayload { userId: string; email: string; name: string; role: string; mfaVerified: boolean; iat: number; exp: number }
 
 function signQtToken(payload: Omit<QtJWTPayload, 'iat' | 'exp'>, expiresIn = 28800): string {
   const now = Math.floor(Date.now() / 1000)
@@ -90,8 +88,7 @@ function isRateLimited(ip: string): boolean {
 }
 function recordAttempt(ip: string) {
   const a = loginAttempts.get(ip)
-  if (a) { a.count++; a.lastAttempt = Date.now() }
-  else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
+  if (a) { a.count++; a.lastAttempt = Date.now() } else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
 }
 function clearAttempts(ip: string) { loginAttempts.delete(ip) }
 
@@ -104,44 +101,31 @@ export async function POST(req: NextRequest) {
     if (isRateLimited(ip)) return NextResponse.json({ error: 'Too many attempts. Wait 15 min.' }, { status: 429 })
     const { email, password } = body
     if (!email || !password) return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
-
     const isMasterAdmin = ADMIN_PASSWORD && password === ADMIN_PASSWORD
     const users = await getUsers()
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
-
     if (!user && !isMasterAdmin) { recordAttempt(ip); return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 }) }
     if (user && !user.active) return NextResponse.json({ error: 'Account is disabled.' }, { status: 403 })
-
-    // Check quotation permission - user must have permissions.quotation === true
+    // Check quotation permission
     if (user && !isMasterAdmin) {
       const perms = user.permissions || {}
       if (!perms.quotation) {
         return NextResponse.json({ error: 'You do not have access to the Quotation System. Please contact your administrator.' }, { status: 403 })
       }
     }
-
     let passwordValid = false
     if (isMasterAdmin) passwordValid = true
     else if (user) { const hash = await hashPassword(password); passwordValid = hash === user.passwordHash }
-
     if (!passwordValid) { recordAttempt(ip); return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 }) }
     clearAttempts(ip)
-
     const userId = user?.id || 'admin'
     const userName = user?.contactName || email.split('@')[0]
-    // Use permissions.qtRole instead of top-level qtRole
     const qtRole = user?.permissions?.qtRole || user?.qtRole || 'admin'
     const otp = generateOTP()
-
     if (user) { user.otp = otp; user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); await saveUsers(users) }
-
     const preMfaToken = signQtToken({ userId, email, name: userName, role: qtRole, mfaVerified: false }, 600)
     const otpToken = base64url(JSON.stringify({ otp, email, exp: Date.now() + 10 * 60 * 1000 }))
-
-    // AWAIT the email - do NOT fire-and-forget (Vercel kills background promises)
-    await sendEmail(email, 'NextGuard Quotation - Verification Code',
-      `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px"><h2>NextGuard Quotation System</h2><hr/><p>Your verification code:</p><div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f0f0f0;border-radius:8px">${otp}</div><p>Expires in 10 minutes.</p></div>`
-    )
+    await sendEmail(email, 'NextGuard Quotation - Verification Code', `<div style="font-family:system-ui;max-width:400px;margin:auto;padding:30px;background:#0d1117;color:#e0e0e0;border-radius:12px"><h2 style="color:#22c55e">NextGuard Quotation System</h2><hr style="border-color:#1f2937"><p>Your verification code:</p><div style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#3b82f6;padding:20px;text-align:center">${otp}</div><p style="color:#6b7280">Expires in 10 minutes.</p></div>`)
     return NextResponse.json({ requireOtp: true, preMfaToken, otpToken, message: 'Verification code sent to your email.' })
   }
 
@@ -150,10 +134,8 @@ export async function POST(req: NextRequest) {
     if (!preMfaToken || !otpCode) return NextResponse.json({ error: 'Token and OTP code are required.' }, { status: 400 })
     const rawPayload = verifyQtToken(preMfaToken)
     if (!rawPayload || rawPayload.mfaVerified) return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 })
-
     const users = await getUsers()
     const user = users.find(u => u.email.toLowerCase() === rawPayload.email.toLowerCase())
-
     let otpValid = false
     if (user && user.otp && user.otp === otpCode) {
       if (user.otpExpires && new Date(user.otpExpires) < new Date()) return NextResponse.json({ error: 'Code expired. Login again.' }, { status: 401 })
@@ -167,18 +149,24 @@ export async function POST(req: NextRequest) {
     }
     if (!otpValid) { recordAttempt(ip); return NextResponse.json({ error: 'Invalid verification code.' }, { status: 401 }) }
     clearAttempts(ip)
-
     if (user) { delete user.otp; delete user.otpExpires; user.lastLogin = new Date().toISOString(); user.loginCount = (user.loginCount || 0) + 1; await saveUsers(users) }
-
-    // Use permissions.qtRole with fallback to top-level qtRole
     const qtRole = user?.permissions?.qtRole || user?.qtRole || 'admin'
     const token = signQtToken({ userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: qtRole, mfaVerified: true })
+    // Audit log: login
+    await writeQuotationAudit(rawPayload.userId, rawPayload.email, 'login', 'user', rawPayload.userId, { ip, role: qtRole })
     const response = NextResponse.json({ success: true, user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: qtRole } })
     response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
     return response
   }
 
-  if (action === 'logout') { const r = NextResponse.json({ success: true }); r.cookies.delete('qt_session'); return r }
+  if (action === 'logout') {
+    // Audit log: logout
+    const auth = authenticateQtRequest(req)
+    if (auth) {
+      await writeQuotationAudit(auth.userId, auth.email, 'logout', 'user', auth.userId, { ip })
+    }
+    const r = NextResponse.json({ success: true }); r.cookies.delete('qt_session'); return r
+  }
 
   if (action === 'init-db') {
     const auth = authenticateQtRequest(req)
@@ -194,7 +182,6 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const adminSecret = req.nextUrl.searchParams.get('secret')
   const setAction = req.nextUrl.searchParams.get('action')
-
   if (adminSecret === 'nextguard-cron-2024-secure' && setAction === 'set-password') {
     const email = req.nextUrl.searchParams.get('email') || ''
     const newPw = req.nextUrl.searchParams.get('password') || ''
@@ -207,7 +194,6 @@ export async function GET(req: NextRequest) {
     await saveUsers(users)
     return NextResponse.json({ success: true, message: 'Password updated for ' + email })
   }
-
   const auth = authenticateQtRequest(req)
   if (!auth) return NextResponse.json({ authenticated: false }, { status: 401 })
   return NextResponse.json({ authenticated: true, user: { id: auth.userId, email: auth.email, name: auth.name, role: auth.role } })
