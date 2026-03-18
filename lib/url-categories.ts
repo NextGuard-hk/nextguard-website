@@ -501,4 +501,4 @@ export async function categorizeUrlAsync(domain: string): Promise<string[]> {
   return categorizeUrl(domain);
 }
 export function isCloudflareIntelConfigured(): boolean { return getCfConfig() !== null; }
-export { queryCloudflareIntelBatch };
+export { queryCloudflareIntel, queryCloudflareIntelBatch };
