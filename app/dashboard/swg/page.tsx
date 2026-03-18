@@ -2,7 +2,7 @@
 // SWG Dashboard - Secure Web Gateway Management Console (P1 Enhanced)
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { ExportButton } from './export-button'
+import { ExportButton } from './export-button'; import { GroupManager } from './group-manager'
 
 interface SummaryData {
   period: string; totalEvaluations: number; blocked: number;
