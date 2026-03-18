@@ -82,7 +82,7 @@ export default function ProductManagement() {
   useEffect(() => {
     fetch('/api/qt-auth').then(r=>r.json()).then(d => {
       if (!d.authenticated) { router.replace('/qt-login'); return }
-      if (d.user?.role !== 'admin') { setError('Admin access required'); setLoading(false); return }
+      if (!['admin','product_manager'].includes(d.user?.role)) { setError('Admin or Product Manager access required'); setLoading(false); return }
       setRole(d.user.role)
       loadData()
     }).catch(() => router.replace('/qt-login'))
