@@ -3,7 +3,7 @@
 import { NextRequest } from 'next/server'
 import { getDb } from '@/lib/db'
 
-export const runtime = 'edge'
+// runtime = 'edge' disabled for libSQL
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
