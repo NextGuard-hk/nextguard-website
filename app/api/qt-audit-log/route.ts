@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
   const where: string[] = []
 
   if (action) { where.push(`action = ?`); args.push(action) }
-  if (userId) { where.push(`user_id = ?`); args.push(userId) }
+  // Fix: userId filter now checks both user_id and user_email
+  if (userId) { where.push(`(user_id = ? OR user_email = ?)`); args.push(userId, userId) }
   if (entityType) { where.push(`entity_type = ?`); args.push(entityType) }
   if (search) {
     where.push(`(user_email LIKE ? OR action LIKE ? OR entity_id LIKE ? OR details LIKE ?)`)
