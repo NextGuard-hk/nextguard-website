@@ -40,7 +40,7 @@ export interface DownloadUser {
   lastLogin?: string
   loginCount: number
   mustResetPassword?: boolean
-  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean }
+  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean; quotation?: boolean; qtRole?: string }
     qtRole?: string
 }
 async function writeLog(entry: Record<string, any>) {
@@ -264,7 +264,7 @@ export async function GET(req: NextRequest) {
       loginCount: u.loginCount || 0,
       mustResetPassword: u.mustResetPassword || false,
             qtRole: u.qtRole || undefined,
-      permissions: u.permissions || { kb: false, download: true, socReview: false, projectAccess: false },
+      permissions: u.permissions || { kb: false, download: true, socReview: false, projectAccess: false, quotation: false, qtRole: 'viewer' },
     }))
     return NextResponse.json({ users: safeUsers })
   } catch {
@@ -361,7 +361,7 @@ export async function PUT(req: NextRequest) {
         active: true,
         emailVerified: true,
         loginCount: 0,
-        permissions: permissions || { kb: false, download: true, socReview: false, projectAccess: false },
+        permissions: permissions || { kb: false, download: true, socReview: false, projectAccess: false, quotation: false, qtRole: 'viewer' },
       }
       users.push(newUser)
       await saveUsers(users)
