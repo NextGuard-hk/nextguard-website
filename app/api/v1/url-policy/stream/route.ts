@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
       try {
         await initDB(); await initDB(); const db = getDB()
         const [sumRows, recentRows] = await Promise.all([
-          db.execute('SELECT COUNT(*) as total, SUM(CASE WHEN action="block" THEN 1 ELSE 0 END) as blocked, SUM(CASE WHEN action="warn" THEN 1 ELSE 0 END) as warned FROM ai_url_cache WHERE evaluated_at > datetime("now","-24 hours")'),
-          db.execute('SELECT domain, action, category, risk_level, evaluated_at FROM ai_url_cache ORDER BY evaluated_at DESC LIMIT 5'),
+          db.execute('SELECT COUNT(*) as total, SUM(CASE WHEN action="block" THEN 1 ELSE 0 END) as blocked, SUM(CASE WHEN action="warn" THEN 1 ELSE 0 END) as warned FROM url_policy_log WHERE evaluated_at > datetime("now","-24 hours")'),
+          db.execute('SELECT domain, action, category, risk_level, evaluated_at FROM url_policy_log ORDER BY evaluated_at DESC LIMIT 5'),
         ])
         const s = sumRows.rows[0] as any
         send('snapshot', {
@@ -41,8 +41,8 @@ export async function GET(req: NextRequest) {
         try {
           await initDB(); await initDB(); const db = getDB()
           const [sumRows, recentRows] = await Promise.all([
-            db.execute('SELECT COUNT(*) as total, SUM(CASE WHEN action="block" THEN 1 ELSE 0 END) as blocked, SUM(CASE WHEN action="warn" THEN 1 ELSE 0 END) as warned FROM ai_url_cache WHERE evaluated_at > datetime("now","-24 hours")'),
-            db.execute('SELECT domain, action, category, risk_level, evaluated_at FROM ai_url_cache ORDER BY evaluated_at DESC LIMIT 5'),
+            db.execute('SELECT COUNT(*) as total, SUM(CASE WHEN action="block" THEN 1 ELSE 0 END) as blocked, SUM(CASE WHEN action="warn" THEN 1 ELSE 0 END) as warned FROM url_policy_log WHERE evaluated_at > datetime("now","-24 hours")'),
+            db.execute('SELECT domain, action, category, risk_level, evaluated_at FROM url_policy_log ORDER BY evaluated_at DESC LIMIT 5'),
           ])
           const s = sumRows.rows[0] as any
           send('update', {
