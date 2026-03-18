@@ -1,7 +1,7 @@
 // app/api/v1/url-policy/stream/route.ts
 // SSE endpoint for real-time SWG dashboard updates (P2-6)
 import { NextRequest } from 'next/server'
-import { getDb } from '@/lib/db'
+import { getDB, initDB } from '@/lib/db'
 
 // runtime = 'edge' disabled for libSQL
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
       // Send initial snapshot
       try {
-        const db = getDb()
+        await initDB(); await initDB(); const db = getDB()
         const [sumRows, recentRows] = await Promise.all([
           db.execute('SELECT COUNT(*) as total, SUM(CASE WHEN action="block" THEN 1 ELSE 0 END) as blocked, SUM(CASE WHEN action="warn" THEN 1 ELSE 0 END) as warned FROM ai_url_cache WHERE evaluated_at > datetime("now","-24 hours")'),
           db.execute('SELECT domain, action, category, risk_level, evaluated_at FROM ai_url_cache ORDER BY evaluated_at DESC LIMIT 5'),
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       const interval = setInterval(async () => {
         if (closed) { clearInterval(interval); return }
         try {
-          const db = getDb()
+          await initDB(); await initDB(); const db = getDB()
           const [sumRows, recentRows] = await Promise.all([
             db.execute('SELECT COUNT(*) as total, SUM(CASE WHEN action="block" THEN 1 ELSE 0 END) as blocked, SUM(CASE WHEN action="warn" THEN 1 ELSE 0 END) as warned FROM ai_url_cache WHERE evaluated_at > datetime("now","-24 hours")'),
             db.execute('SELECT domain, action, category, risk_level, evaluated_at FROM ai_url_cache ORDER BY evaluated_at DESC LIMIT 5'),
