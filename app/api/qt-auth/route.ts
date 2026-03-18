@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     const userName = user?.contactName || email.split('@')[0]
     const otp = generateOTP()
     if (user) { user.otp = otp; user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); await saveUsers(users) }
-    const preMfaToken = signQtToken({ userId, email, name: userName, role: 'admin', mfaVerified: false }, 600)
+    const preMfaToken = signQtToken({ userId, email, name: userName, role: user?.qtRole || 'admin', mfaVerified: false }, 600)
     const otpToken = base64url(JSON.stringify({ otp, email, exp: Date.now() + 10 * 60 * 1000 }))
     // AWAIT the email - do NOT fire-and-forget (Vercel kills background promises)
     await sendEmail(email, 'NextGuard Quotation - Verification Code',
@@ -149,8 +149,8 @@ export async function POST(req: NextRequest) {
     if (!otpValid) { recordAttempt(ip); return NextResponse.json({ error: 'Invalid verification code.' }, { status: 401 }) }
     clearAttempts(ip)
     if (user) { delete user.otp; delete user.otpExpires; user.lastLogin = new Date().toISOString(); user.loginCount = (user.loginCount || 0) + 1; await saveUsers(users) }
-    const token = signQtToken({ userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin', mfaVerified: true })
-    const response = NextResponse.json({ success: true, user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: 'admin' } })
+    const token = signQtToken({ userId: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: user?.qtRole || 'admin', mfaVerified: true })
+    const response = NextResponse.json({ success: true, user: { id: rawPayload.userId, email: rawPayload.email, name: rawPayload.name, role: user?.qtRole || 'admin' } })
     response.cookies.set('qt_session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 28800, path: '/' })
     return response
   }
