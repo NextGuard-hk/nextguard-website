@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const type = searchParams.get('type')
   const categoryId = searchParams.get('categoryId')
-  const includeInactive = searchParams.get('includeInactive') === 'true' && auth.role === 'admin'
+  const includeInactive = searchParams.get('includeInactive') === 'true' && ['admin','product_manager'].includes(auth.role)
 
   let sql = `SELECT p.*, GROUP_CONCAT(pr.id) as price_ids FROM qt_products p LEFT JOIN qt_prices pr ON pr.product_id = p.id`
   const args: string[] = []
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const auth = authenticateQtRequest(req)
-  if (!auth || auth.role !== 'admin') return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  if (!auth || !['admin','product_manager'].includes(auth.role)) return NextResponse.json({ error: 'Admin or Product Manager access required' }, { status: 403 })
   const body = await req.json().catch(() => ({}))
   const { action } = body
   const db = getDB()
