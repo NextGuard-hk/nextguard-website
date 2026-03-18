@@ -36,7 +36,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       body: JSON.stringify({ from: 'NextGuard Quotation <noreply@next-guard.com>', to: [to], subject, html }),
       signal: controller.signal,
     })
-    if (!res.ok) { console.error('Resend error:', res.status, await res.text().catch(() => '')) }
+    if (!res.ok) console.error('Resend error:', res.status, await res.text().catch(() => ''))
   } catch (e: any) { console.error('sendEmail error:', e.message) } finally { clearTimeout(timeout) }
 }
 
@@ -121,13 +121,10 @@ export async function POST(req: NextRequest) {
     if (user) { user.otp = otp; user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); await saveUsers(users) }
     const preMfaToken = signQtToken({ userId, email, name: userName, role: 'admin', mfaVerified: false }, 600)
     const otpToken = base64url(JSON.stringify({ otp, email, exp: Date.now() + 10 * 60 * 1000 }))
-    sendEmail(email, 'NextGuard Quotation - Verification Code',
-      `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px">
-        <h2>NextGuard Quotation System</h2><hr/>
-        <p>Your verification code:</p>
-        <div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f0f0f0;border-radius:8px">${otp}</div>
-        <p>Expires in 10 minutes.</p></div>`
-    ).catch(e => console.error('Background email error:', e))
+    // AWAIT the email - do NOT fire-and-forget (Vercel kills background promises)
+    await sendEmail(email, 'NextGuard Quotation - Verification Code',
+      `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px"><h2>NextGuard Quotation System</h2><hr/><p>Your verification code:</p><div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f0f0f0;border-radius:8px">${otp}</div><p>Expires in 10 minutes.</p></div>`
+    )
     return NextResponse.json({ requireOtp: true, preMfaToken, otpToken, message: 'Verification code sent to your email.' })
   }
 
