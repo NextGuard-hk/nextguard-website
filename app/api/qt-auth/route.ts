@@ -2,7 +2,6 @@
 // Quotation System Auth - Uses same account system as /admin (download-users)
 import { NextRequest, NextResponse } from 'next/server'
 import { getUsers, saveUsers } from '../download-users/route'
-import { initQuotationDB, seedDefaultProducts } from '@/lib/quotation-db'
 
 export const maxDuration = 25
 
@@ -38,11 +37,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       signal: controller.signal,
     })
     if (!res.ok) { console.error('Resend error:', res.status, await res.text().catch(() => '')) }
-  } catch (e: any) {
-    console.error('sendEmail error:', e.message)
-  } finally {
-    clearTimeout(timeout)
-  }
+  } catch (e: any) { console.error('sendEmail error:', e.message) } finally { clearTimeout(timeout) }
 }
 
 function base64url(str: string): string {
@@ -52,10 +47,12 @@ function base64urlDecode(str: string): string {
   const padded = str + '=='.slice(0, (4 - str.length % 4) % 4)
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
+
 interface QtJWTPayload {
   userId: string; email: string; name: string; role: string
   mfaVerified: boolean; iat: number; exp: number
 }
+
 function signQtToken(payload: Omit<QtJWTPayload, 'iat' | 'exp'>, expiresIn = 28800): string {
   const now = Math.floor(Date.now() / 1000)
   const full: QtJWTPayload = { ...payload, iat: now, exp: now + expiresIn }
@@ -64,6 +61,7 @@ function signQtToken(payload: Omit<QtJWTPayload, 'iat' | 'exp'>, expiresIn = 288
   const sig = base64url(QT_JWT_SECRET + '.qt.' + header + '.' + body)
   return header + '.' + body + '.' + sig
 }
+
 function verifyQtToken(token: string): QtJWTPayload | null {
   try {
     const parts = token.split('.')
@@ -75,6 +73,7 @@ function verifyQtToken(token: string): QtJWTPayload | null {
     return payload
   } catch { return null }
 }
+
 export function authenticateQtRequest(req: NextRequest): QtJWTPayload | null {
   const cookie = req.cookies.get('qt_session')?.value
   if (!cookie) return null
@@ -92,7 +91,8 @@ function isRateLimited(ip: string): boolean {
 }
 function recordAttempt(ip: string) {
   const a = loginAttempts.get(ip)
-  if (a) { a.count++; a.lastAttempt = Date.now() } else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
+  if (a) { a.count++; a.lastAttempt = Date.now() }
+  else loginAttempts.set(ip, { count: 1, lastAttempt: Date.now() })
 }
 function clearAttempts(ip: string) { loginAttempts.delete(ip) }
 
@@ -100,7 +100,6 @@ export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
   const body = await req.json().catch(() => ({}))
   const { action } = body
-  await initQuotationDB().catch(() => {})
 
   if (action === 'login') {
     if (isRateLimited(ip)) return NextResponse.json({ error: 'Too many attempts. Wait 15 min.' }, { status: 429 })
@@ -122,9 +121,12 @@ export async function POST(req: NextRequest) {
     if (user) { user.otp = otp; user.otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); await saveUsers(users) }
     const preMfaToken = signQtToken({ userId, email, name: userName, role: 'admin', mfaVerified: false }, 600)
     const otpToken = base64url(JSON.stringify({ otp, email, exp: Date.now() + 10 * 60 * 1000 }))
-    // Fire-and-forget email - don't block response
     sendEmail(email, 'NextGuard Quotation - Verification Code',
-      `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:20px"><h2 style="color:#22c55e">NextGuard Quotation System</h2><hr/><p>Your verification code:</p><div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f0f0f0;border-radius:8px">${otp}</div><p style="color:#666">Expires in 10 minutes.</p></div>`
+      `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px">
+        <h2>NextGuard Quotation System</h2><hr/>
+        <p>Your verification code:</p>
+        <div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:20px;background:#f0f0f0;border-radius:8px">${otp}</div>
+        <p>Expires in 10 minutes.</p></div>`
     ).catch(e => console.error('Background email error:', e))
     return NextResponse.json({ requireOtp: true, preMfaToken, otpToken, message: 'Verification code sent to your email.' })
   }
@@ -161,6 +163,7 @@ export async function POST(req: NextRequest) {
   if (action === 'init-db') {
     const auth = authenticateQtRequest(req)
     if (!auth) return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
+    const { initQuotationDB, seedDefaultProducts } = await import('@/lib/quotation-db')
     await initQuotationDB(); await seedDefaultProducts()
     return NextResponse.json({ success: true, message: 'DB initialized and products seeded.' })
   }
