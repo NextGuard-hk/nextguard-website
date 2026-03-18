@@ -41,6 +41,7 @@ export interface DownloadUser {
   loginCount: number
   mustResetPassword?: boolean
   permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean }
+    qtRole?: string
 }
 async function writeLog(entry: Record<string, any>) {
   try {
@@ -262,6 +263,7 @@ export async function GET(req: NextRequest) {
       lastLogin: u.lastLogin || null,
       loginCount: u.loginCount || 0,
       mustResetPassword: u.mustResetPassword || false,
+            qtRole: u.qtRole || undefined,
       permissions: u.permissions || { kb: false, download: true, socReview: false, projectAccess: false },
     }))
     return NextResponse.json({ users: safeUsers })
