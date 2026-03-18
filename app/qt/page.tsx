@@ -128,7 +128,7 @@ export default function QtDashboard() {
           {user.name}
           {user.role==='admin'&& <span className="qt-badge" style={{background:'#3b82f6'}}>Admin</span>}
           <button onClick={logout} className="qt-btn-sm">Logout</button>
-                  {user.role==='admin' && <button onClick={() => router.push('/qt/products')} className="qt-btn-sm" style={{background:'#8b5cf6',color:'#fff',border:'none'}}>Products</button>}
+                              {['admin','product_manager'].includes(user.role) && <button onClick={()=>router.push('/qt/products')} className="qt-btn-sm" style={{background:'#8b5cf6',color:'#fff',border:'none'}}>Products</button>}
 </div>
       </div>
 
