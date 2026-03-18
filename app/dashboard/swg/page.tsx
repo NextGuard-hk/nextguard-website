@@ -2,6 +2,7 @@
 // SWG Dashboard - Secure Web Gateway Management Console (P1 Enhanced)
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { ExportButton } from './export-button'
 
 interface SummaryData {
   period: string; totalEvaluations: number; blocked: number;
@@ -157,7 +158,7 @@ export default function SWGDashboard() {
           </div>
           <div className="flex items-center gap-3">
             {lastRefresh && <span className="text-xs text-gray-500">Updated: {lastRefresh}</span>}
-            <button onClick={() => { setLoading(true); fetchData() }} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition w-fit">Refresh</button>
+            <button onClick={() => { setLoading(true); fetchData() }} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition w-fit">Refresh</button><ExportButton />
           </div>
         </div>
         <div className="mb-4 sm:mb-6 -mx-3 sm:mx-0 px-3 sm:px-0 overflow-x-auto">
