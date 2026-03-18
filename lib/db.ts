@@ -1,6 +1,6 @@
 // lib/db.ts
 // Turso (libSQL) database client for NextGuard Threat Intelligence
-// v3.0: Fast-path initDB - probe first, create only if needed
+// v3.1: Added ai_url_cache + firewall_rules tables
 import { createClient, type Client } from '@libsql/client';
 
 let client: Client | null = null;
@@ -19,7 +19,6 @@ export function getDB(): Client {
 
 export const getDb = getDB;
 
-// Fast init: single probe query, skip creation if tables exist
 export async function initDB(): Promise<void> {
   if (dbReady) return;
   if (dbInitPromise) return dbInitPromise;
@@ -30,13 +29,10 @@ export async function initDB(): Promise<void> {
 async function doInit(): Promise<void> {
   const db = getDB();
   try {
-    // Fast probe: if this works, tables exist, skip everything
-    await db.execute('SELECT 1 FROM url_policy_log LIMIT 0');
+    await db.execute('SELECT 1 FROM ai_url_cache LIMIT 0');
     dbReady = true;
     return;
-  } catch {
-    // Tables don't exist, create them
-  }
+  } catch {}
   const stmts = [
     `CREATE TABLE IF NOT EXISTS indicators (id TEXT PRIMARY KEY, type TEXT NOT NULL, value TEXT NOT NULL, value_normalized TEXT NOT NULL, risk_level TEXT NOT NULL DEFAULT 'unknown', confidence INTEGER NOT NULL DEFAULT 50, tlp TEXT NOT NULL DEFAULT 'white', categories TEXT DEFAULT '[]', tags TEXT DEFAULT '[]', description TEXT, source_feed TEXT NOT NULL, source_ref TEXT, first_seen TEXT NOT NULL DEFAULT (datetime('now')), last_seen TEXT NOT NULL DEFAULT (datetime('now')), valid_from TEXT NOT NULL DEFAULT (datetime('now')), valid_until TEXT, kill_chain_phase TEXT, threat_actor TEXT, campaign TEXT, hit_count INTEGER NOT NULL DEFAULT 0, last_hit_at TEXT, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     `CREATE INDEX IF NOT EXISTS idx_indicators_value ON indicators(value_normalized)`,
@@ -78,6 +74,10 @@ async function doInit(): Promise<void> {
     `CREATE TABLE IF NOT EXISTS url_policy_log (id INTEGER PRIMARY KEY AUTOINCREMENT, domain TEXT NOT NULL, action TEXT NOT NULL, category TEXT, risk_level TEXT, user_id TEXT, evaluated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     `CREATE INDEX IF NOT EXISTS idx_upl_evaluated ON url_policy_log(evaluated_at)`,
     `CREATE INDEX IF NOT EXISTS idx_upl_domain ON url_policy_log(domain)`,
+    `CREATE TABLE IF NOT EXISTS ai_url_cache (url TEXT PRIMARY KEY, category TEXT NOT NULL, confidence INTEGER DEFAULT 0, source TEXT DEFAULT 'fallback', created_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS firewall_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, rule_type TEXT NOT NULL DEFAULT 'ip', value TEXT NOT NULL, action TEXT NOT NULL DEFAULT 'block', priority INTEGER NOT NULL DEFAULT 100, is_active INTEGER NOT NULL DEFAULT 1, description TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    `CREATE INDEX IF NOT EXISTS idx_fw_active ON firewall_rules(is_active)`,
+    `CREATE INDEX IF NOT EXISTS idx_fw_type ON firewall_rules(rule_type)`,
   ];
   try {
     for (const sql of stmts) { await db.execute(sql); }
