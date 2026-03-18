@@ -1,7 +1,7 @@
 // app/dashboard/swg/page.tsx
 // SWG Dashboard - Secure Web Gateway Management Console (P1 Enhanced)
 'use client'
-import { useState, useEffect, useCallback } from 'react' import { ExportButton } from './export-button'
+import { useState, useEffect, useCallback } from 'react'
 
 interface SummaryData {
   period: string; totalEvaluations: number; blocked: number;
@@ -184,7 +184,7 @@ export default function SWGDashboard() {
           </div>
         </div>)}
         {tab === 'recent' && (<div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-gray-800 flex items-center justify-between"><h3 className="text-base sm:text-lg font-semibold">Recent URL Evaluations</h3><ExportButton /></div>
+          <div className="p-4 border-b border-gray-800"><h3 className="text-base sm:text-lg font-semibold">Recent URL Evaluations</h3></div>
           <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-800/50"><tr><th className="text-left px-4 py-3 text-gray-400 font-medium">Domain</th><th className="text-left px-4 py-3 text-gray-400 font-medium">Action</th><th className="text-left px-4 py-3 text-gray-400 font-medium">Category</th><th className="text-left px-4 py-3 text-gray-400 font-medium">Risk</th><th className="text-left px-4 py-3 text-gray-400 font-medium">Time</th></tr></thead><tbody>{recent.map((r, i) => (<tr key={i} className="border-t border-gray-800 hover:bg-gray-800/30"><td className="px-4 py-3 font-mono text-blue-400 text-xs">{r.domain}</td><td className="px-4 py-3">{actionBadge(r.action)}</td><td className="px-4 py-3 text-gray-300">{r.category}</td><td className="px-4 py-3">{riskBadge(r.risk_level)}</td><td className="px-4 py-3 text-gray-500 text-xs">{r.evaluated_at}</td></tr>))}</tbody></table></div>
           <div className="md:hidden divide-y divide-gray-800">{recent.map((r, i) => (<div key={i} className="p-3 space-y-2"><div className="font-mono text-blue-400 text-sm truncate">{r.domain}</div><div className="flex items-center gap-2 flex-wrap">{actionBadge(r.action)} {riskBadge(r.risk_level)}<span className="text-xs text-gray-500">{r.category}</span></div><div className="text-xs text-gray-600">{r.evaluated_at}</div></div>))}</div>
         </div>)}
