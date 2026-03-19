@@ -1,5 +1,5 @@
 // Unified permission definitions for NextGuard portal access control
-// Used by: admin/page.tsx, admin/AccountPermissions.tsx, check-permission/route.ts
+// Used by: admin/page.tsx, admin/AccountPermissions.tsx, check-permission/route.ts, download-users/route.ts
 
 export interface PermissionDef {
   key: string
@@ -27,9 +27,15 @@ export const PERMISSION_DEFS: PermissionDef[] = [
 
 export const VALID_PERMISSION_KEYS = PERMISSION_DEFS.map(p => p.key)
 
+// Default permissions for new users: only 'download' is granted
 export const DEFAULT_PERMISSIONS: Record<string, boolean> = Object.fromEntries(
   PERMISSION_DEFS.map(p => [p.key, p.key === 'download'])
 )
+
+// Build permissions object with qtRole for npoint storage
+export function buildDefaultPermissionsWithRole(qtRole = 'viewer'): Record<string, any> {
+  return { ...DEFAULT_PERMISSIONS, qtRole }
+}
 
 export function getPermissionsByGroup(): { group: typeof PERMISSION_GROUPS[number]; permissions: PermissionDef[] }[] {
   return PERMISSION_GROUPS.map(group => ({
@@ -42,4 +48,18 @@ export function countGranted(permissions: Record<string, boolean> | undefined): 
   const perms = permissions || DEFAULT_PERMISSIONS
   const granted = PERMISSION_DEFS.filter(p => perms[p.key] === true).length
   return { granted, total: PERMISSION_DEFS.length }
+}
+
+// Sanitize permissions: ensure all defined keys exist, strip unknown keys
+export function sanitizePermissions(raw?: Record<string, any>): Record<string, boolean> {
+  const result: Record<string, boolean> = {}
+  PERMISSION_DEFS.forEach(p => {
+    result[p.key] = raw?.[p.key] === true
+  })
+  return result
+}
+
+// Validate that a permission key is valid
+export function isValidPermissionKey(key: string): boolean {
+  return VALID_PERMISSION_KEYS.includes(key)
 }
