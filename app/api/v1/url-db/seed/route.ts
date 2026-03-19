@@ -64,7 +64,7 @@ async function batchUpsert(entries: { domain: string; categories: string; source
 async function seedTranco(limit: number = 5000, offset: number = 0) {
   const listRes = await fetch('https://tranco-list.eu/top-1m-id', { redirect: 'follow', signal: AbortSignal.timeout(5000) }).catch(() => null)
   const listId = listRes?.ok ? (await listRes.text()).trim() : 'L76X4'
-  const maxRank = Math.min(offset + limit + 1000, 10000)
+  const maxRank = Math.min(offset + limit + 1000, 50000)
   const csvRes = await fetch(`https://tranco-list.eu/download/${listId}/${maxRank}`, { signal: AbortSignal.timeout(30000) })
   if (!csvRes.ok) throw new Error(`Failed to fetch Tranco CSV: ${csvRes.status}`)
   const text = await csvRes.text()
@@ -87,7 +87,7 @@ async function seedTranco(limit: number = 5000, offset: number = 0) {
 }
 
 // OISD blocklist — ads/tracking domains
-async function seedOISD(limit: number = 10000) {
+async function seedOISD(limit: number = 50000) {
   const res = await fetch('https://small.oisd.nl/domainswild', { signal: AbortSignal.timeout(15000) })
   if (!res.ok) throw new Error('OISD fetch failed')
   const text = await res.text()
@@ -233,7 +233,7 @@ async function recategorize(limit: number = 500) {
 
 // Seed OpenPhish (additional phishing feed)
 async function seedOpenPhish() {
-  const res = await fetch('https://openphish.com/feed.txt', { signal: AbortSignal.timeout(10000) })
+  const res = await fetch('https://openphish.com/feed.txt', { signal: AbortSignal.timeout(50000) })
   if (!res.ok) throw new Error('OpenPhish fetch failed')
   const text = await res.text()
   const lines = text.split('\n').filter(l => l.trim() && l.startsWith('http'))
