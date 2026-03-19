@@ -65,6 +65,26 @@ export default function QuotationPDF() {
   const [qt, setQt] = useState<any>(null)
   const [lines, setLines] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+    const [logoSrc, setLogoSrc] = useState('/images/nextguard-logo.png')
+
+    useEffect(() => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const c = document.createElement('canvas')
+      c.width = img.width; c.height = img.height
+      const ctx = c.getContext('2d')!
+      ctx.drawImage(img, 0, 0)
+      const d = ctx.getImageData(0, 0, c.width, c.height)
+      for (let i = 0; i < d.data.length; i += 4) {
+        const r = d.data[i], g = d.data[i+1], b = d.data[i+2]
+        if (r < 30 && g < 30 && b < 30) d.data[i+3] = 0
+      }
+      ctx.putImageData(d, 0, 0)
+      setLogoSrc(c.toDataURL('image/png'))
+    }
+    img.src = '/images/nextguard-logo.png'
+  }, [])
 
   useEffect(() => {
     fetch('/api/qt-auth').then(r=>r.json()).then(d => {
@@ -100,7 +120,7 @@ export default function QuotationPDF() {
         <div className="pdf-doc">
           <div className="pdf-header">
             <div>
-              <img src="/images/nextguard-logo.png" alt="NextGuard" style={{height:'40px'}} />
+              <img src={logoSrc} alt="NextGuard" style={{height:'40px'}} />
               <div className="pdf-logo-sub">NextGuard Technology Limited</div>
               <div className="pdf-logo-sub">Re-think Data Security</div>
             </div>
