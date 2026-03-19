@@ -4,6 +4,7 @@ import { queryCloudflareIntel, isCloudflareIntelConfigured } from '@/lib/url-cat
 import { getDB } from '@/lib/db'
 import { classifyUrlWithAI, isAIClassificationAvailable } from '@/lib/ai-url-classifier'
 import { detectDGA } from '@/lib/dga-detector'
+import { isRedisConfigured, getUrlCache, setUrlCache, getCfIntelCache, setCfIntelCache } from '@/lib/redis'
 
 const ACTION_PRIORITY: Record<string, number> = {
   'Block': 5, 'Override': 4, 'Continue': 3, 'Warn': 2, 'Isolate': 2, 'Allow': 1
@@ -15,11 +16,9 @@ const SUSPICIOUS_TLDS = ['xyz','top','club','buzz','tk','ml','ga','cf','gq','icu
 const domainCache = new Map<string, { data: any; ts: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const MAX_CACHE = 5000
-
 // L2: CF Intel result cache (avoid repeated API calls)
 const cfIntelCache = new Map<string, { data: any; ts: number }>()
 const CF_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
-
 function getCached(domain: string) {
   const entry = domainCache.get(domain)
   if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data
@@ -49,7 +48,9 @@ function setCFCache(domain: string, data: any) {
 function computeRiskLevel(categories: string[], domain: string, isMalicious: boolean, confidence: number): { riskLevel: 'high' | 'medium' | 'low' | 'none'; riskScore: number; riskFactors: string[] } {
   const factors: string[] = []; let score = 0
   if (isMalicious) { score += 100; factors.push('confirmed-malicious') }
-  for (const cat of categories) { const c = cat.toLowerCase(); if (RISK_HIGH_CATEGORIES.includes(c)) { score += 80; factors.push(`high-risk-category:${cat}`) } else if (RISK_MEDIUM_CATEGORIES.includes(c)) { score += 40; factors.push(`medium-risk-category:${cat}`) } }
+  for (const cat of categories) {
+    const c = cat.toLowerCase(); if (RISK_HIGH_CATEGORIES.includes(c)) { score += 80; factors.push(`high-risk-category:${cat}`) } else if (RISK_MEDIUM_CATEGORIES.includes(c)) { score += 40; factors.push(`medium-risk-category:${cat}`) }
+  }
   const tld = domain.split('.').pop() || ''
   if (SUSPICIOUS_TLDS.includes(tld)) { score += 25; factors.push(`suspicious-tld:.${tld}`) }
   if (categories.includes('Uncategorized') && confidence < 40) { score += 15; factors.push('uncategorized-low-confidence') }
@@ -65,50 +66,58 @@ const DEFAULT_POLICY: Record<string, string> = {
   'messaging': 'Warn', 'dynamic dns': 'Warn', 'ransomware': 'Block', 'cryptojacking': 'Block'
 };
 function getDefaultAction(cat: string): string { return DEFAULT_POLICY[cat.toLowerCase()] || 'Allow'; }
-function getHighestAction(categories: string[]): string { if (!categories.length) return 'Allow'; return categories.reduce((best, cat) => { const a = getDefaultAction(cat); return (ACTION_PRIORITY[a] || 0) > (ACTION_PRIORITY[best] || 0) ? a : best; }, 'Allow'); }
-function normalizeDomain(input: string): string { let d = input.toLowerCase().trim(); try { if (!d.startsWith('http')) d = 'https://' + d; d = new URL(d).hostname; } catch {} return d.replace(/^www\./, ''); }
-
+function getHighestAction(categories: string[]): string {
+  if (!categories.length) return 'Allow'; return categories.reduce((best, cat) => { const a = getDefaultAction(cat); return (ACTION_PRIORITY[a] || 0) > (ACTION_PRIORITY[best] || 0) ? a : best; }, 'Allow');
+}
+function normalizeDomain(input: string): string {
+  let d = input.toLowerCase().trim(); try { if (!d.startsWith('http')) d = 'https://' + d; d = new URL(d).hostname; } catch {} return d.replace(/^www\./, '');
+}
 async function queryGroupPolicy(userId: string | null, category: string): Promise<{ action: string; groupName: string } | null> {
-  if (!userId) return null;
-  try {
-    const db = getDB();
+  if (!userId) return null; try { const db = getDB();
     const r = await db.execute({ sql: `SELECT g.name as group_name, gr.action FROM url_policy_groups g JOIN url_policy_user_assignments a ON a.group_id = g.id JOIN url_policy_group_rules gr ON gr.group_id = g.id WHERE a.user_id = ? AND g.is_active = 1 AND LOWER(gr.category) = LOWER(?) ORDER BY g.priority ASC LIMIT 1`, args: [userId, category] });
     if (r.rows.length > 0) return { action: r.rows[0].action as string, groupName: r.rows[0].group_name as string };
   } catch {} return null;
 }
-// P0: Cloudflare Intel lookup with L2 cache
+// P0: Cloudflare Intel lookup with L2 cache (L1 in-memory + L2 Redis)
 async function queryCFIntelCached(domain: string): Promise<{ categories: string[]; isMalicious: boolean; riskLevel: string } | null> {
   const cached = getCFCached(domain)
   if (cached) return cached
+  if (isRedisConfigured()) {
+    const redisCached = await getCfIntelCache(domain)
+    if (redisCached) return redisCached
+  }
   if (!isCloudflareIntelConfigured()) return null
   try {
     const result = await queryCloudflareIntel(domain)
-    if (result) { setCFCache(domain, result); return result }
+    if (result) {
+      setCFCache(domain, result)
+      if (isRedisConfigured()) await setCfIntelCache(domain, result)
+      return result
+    }
   } catch (e) { console.error('CF Intel error:', e) }
   return null
 }
-
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url') || '';
   const userId = request.nextUrl.searchParams.get('userId') || null;
   if (!url) return NextResponse.json({ error: 'url parameter required' }, { status: 400 });
   try { return NextResponse.json(await evaluateUrl(url, userId)); } catch (e: unknown) { return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
 }
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json(); const userId = body.userId || null;
-    if (Array.isArray(body.urls)) {
-      const results = await Promise.all(body.urls.slice(0, 50).map((u: string) => evaluateUrl(u, userId)));
-      return NextResponse.json({ results, count: results.length });
-    }
+    if (Array.isArray(body.urls)) { const results = await Promise.all(body.urls.slice(0, 50).map((u: string) => evaluateUrl(u, userId))); return NextResponse.json({ results, count: results.length }); }
     if (body.url) return NextResponse.json(await evaluateUrl(body.url, userId));
     return NextResponse.json({ error: 'url or urls required' }, { status: 400 });
   } catch (e: unknown) { return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
 }
-// P0 Optimized: 5-layer evaluation with CF Intel + caching
+// P0 Optimized: 5-layer evaluation with CF Intel + Redis L2 caching
 async function evaluateUrl(inputUrl: string, userId: string | null = null) {
   const domain = normalizeDomain(inputUrl); const startTime = Date.now();
+  if (isRedisConfigured()) {
+    const redisResult = await getUrlCache(domain)
+    if (redisResult) return { ...redisResult, evalMs: Date.now() - startTime, cached: true, timestamp: new Date().toISOString() }
+  }
   const cached = getCached(domain);
   if (cached) { return { ...cached, evalMs: Date.now() - startTime, cached: true, timestamp: new Date().toISOString() }; }
   const staticCategories = categorizeUrl(inputUrl);
@@ -126,8 +135,7 @@ async function evaluateUrl(inputUrl: string, userId: string | null = null) {
     const r1 = await db.execute({ sql: `SELECT cc.name as category, cc.action FROM custom_url_entries cue JOIN custom_url_categories cc ON cc.id = cue.category_id WHERE cue.domain = ? AND cc.is_active = 1 LIMIT 1`, args: [domain] });
     if (r1.rows.length > 0) customMatch = { category: r1.rows[0].category as string, action: r1.rows[0].action as string };
     const r2 = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [domain] });
-    if (r2.rows.length > 0) { dbCategory = r2.rows[0].category as string; }
-    else if (apex) { const ra = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] }); if (ra.rows.length > 0) dbCategory = ra.rows[0].category as string; }
+    if (r2.rows.length > 0) { dbCategory = r2.rows[0].category as string; } else if (apex) { const ra = await db.execute({ sql: 'SELECT category FROM url_categories WHERE domain = ? LIMIT 1', args: [apex] }); if (ra.rows.length > 0) dbCategory = ra.rows[0].category as string; }
     const r3 = await db.execute({ sql: 'SELECT risk_level, categories FROM indicators WHERE value_normalized = ? AND is_active = 1 ORDER BY confidence DESC LIMIT 1', args: [domain] });
     if (r3.rows.length > 0) { const risk = r3.rows[0].risk_level as string; let cats: string[] = []; try { cats = JSON.parse((r3.rows[0].categories as string) || '[]'); } catch {} threatIntel = { isMalicious: ['known_malicious','high_risk'].includes(risk), riskLevel: risk, threatType: cats[0] || null }; }
   } catch (e) { console.error('DB query error:', e); }
@@ -148,17 +156,29 @@ async function evaluateUrl(inputUrl: string, userId: string | null = null) {
     try { const aiResult = await classifyUrlWithAI(domain); if (aiResult.primaryCategory && aiResult.primaryCategory !== 'Uncategorized' && aiResult.confidence >= 50) { allCategories.push(aiResult.primaryCategory); categorySource = 'ai-' + aiResult.source; confidence = aiResult.confidence; aiClassified = true; } } catch {}
   }
   const riskAssessment = computeRiskLevel(allCategories, domain, threatIntel.isMalicious, confidence);
-  let action = getHighestAction(allCategories); if (threatIntel.isMalicious) action = 'Block'; if (dgaResult.isDGA && ACTION_PRIORITY[action] < ACTION_PRIORITY['Warn']) action = 'Warn';
+  let action = getHighestAction(allCategories);
+  if (threatIntel.isMalicious) action = 'Block';
+  if (dgaResult.isDGA && ACTION_PRIORITY[action] < ACTION_PRIORITY['Warn']) action = 'Warn';
   let groupPolicyApplied: string | null = null;
   if (userId) { for (const cat of allCategories) { const gp = await queryGroupPolicy(userId, cat); if (gp) { action = gp.action; groupPolicyApplied = gp.groupName; categorySource = 'group-policy'; break; } } }
   let customCategory: string | null = null;
   if (customMatch) { customCategory = customMatch.category; if (!allCategories.includes(customCategory)) allCategories.unshift(customCategory); action = customMatch.action; categorySource = 'custom'; confidence = 100; }
-  let overrideApplied = false; if (override) { action = override.action; overrideApplied = true; if (categorySource !== 'custom') categorySource = 'override'; }
+  let overrideApplied = false;
+  if (override) { action = override.action; overrideApplied = true; if (categorySource !== 'custom') categorySource = 'override'; }
   const taxonomyEntries = Object.values(URL_TAXONOMY) as Array<{slug:string;name:string;group:string;defaultAction:string}>;
   const te = taxonomyEntries.find(t => staticCategories.some(c => c.toLowerCase() === t.name.toLowerCase() || c.toLowerCase() === t.slug.toLowerCase()));
   // P0: Full URL logging with all fields
   try { const db = getDB(); db.execute({ sql: `INSERT OR IGNORE INTO url_policy_log (domain, action, category, risk_level, risk_score, category_source, user_id, cf_intel_used, evaluated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`, args: [domain, action, allCategories[0] || 'Uncategorized', riskAssessment.riskLevel, riskAssessment.riskScore, categorySource, userId || null, cfIntelResult ? 1 : 0] }); } catch {}
-  const result = { url: inputUrl, domain, action, confidence, categorySource, categories: allCategories, primaryCategory: allCategories[0] || 'Uncategorized', group: te?.group || null, defaultAction: te?.defaultAction || null, riskLevel: riskAssessment.riskLevel, riskScore: riskAssessment.riskScore, riskFactors: riskAssessment.riskFactors, threatIntel, cfIntel: cfIntelResult ? { used: true, categories: cfIntelResult.categories, isMalicious: cfIntelResult.isMalicious } : { used: false }, dbCategoryMatch: dbCategory, customCategoryMatch: customCategory, overrideApplied, groupPolicyApplied, userId, dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors }, evalMs: Date.now() - startTime, aiClassified, cached: false, timestamp: new Date().toISOString() };
+  const result = {
+    url: inputUrl, domain, action, confidence, categorySource, categories: allCategories,
+    primaryCategory: allCategories[0] || 'Uncategorized', group: te?.group || null, defaultAction: te?.defaultAction || null,
+    riskLevel: riskAssessment.riskLevel, riskScore: riskAssessment.riskScore, riskFactors: riskAssessment.riskFactors,
+    threatIntel, cfIntel: cfIntelResult ? { used: true, categories: cfIntelResult.categories, isMalicious: cfIntelResult.isMalicious } : { used: false },
+    dbCategoryMatch: dbCategory, customCategoryMatch: customCategory, overrideApplied, groupPolicyApplied, userId,
+    dga: { isDGA: dgaResult.isDGA, score: dgaResult.score, factors: dgaResult.factors },
+    evalMs: Date.now() - startTime, aiClassified, cached: false, timestamp: new Date().toISOString()
+  };
   setCache(domain, result);
+  if (isRedisConfigured()) await setUrlCache(domain, result)
   return result;
 }
