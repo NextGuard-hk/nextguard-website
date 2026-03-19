@@ -261,7 +261,7 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization")
   const url = new URL(request.url)
   const secret = url.searchParams.get("secret")
-  if (authHeader !== `Bearer ${COLLECT_SECRET}` && secret !== COLLECT_SECRET) {
+  if (authHeader !== `Bearer ${COLLECT_SECRET}` && secret !== COLLECT_SECRET && !(request.cookies.get('contact_admin_token')?.value && request.cookies.get('contact_admin_token')?.value === process.env.CONTACT_SESSION_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
