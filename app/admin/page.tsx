@@ -147,7 +147,7 @@ export default function AdminPage() {
   }
 
   async function fetchRsvps() {
-    try { const r = await fetch("/api/rsvp?password=NextGuard123"); const d = await r.json(); if (d.status === "success") setRsvps(d.registrations || []) } catch {}
+    try { const r = await fetch("/api/rsvp "); const d = await r.json(); if (d.status === "success") setRsvps(d.registrations || []) } catch {}
   }
 
   async function fetchDownloads(prefix = "") {
@@ -304,7 +304,7 @@ export default function AdminPage() {
   async function fetchNews() {
     setNewsLoading(true)
     try {
-      const r = await fetch("/api/news-feed/collect?secret=nextguard-cron-2024-secure")
+      const r = await fetch("/api/news-feed/collect")
       const collectData = await r.json()
       const nr = await fetch("/api/news-feed/admin")
       if (nr.ok) {
@@ -353,7 +353,7 @@ export default function AdminPage() {
   async function triggerCollect() {
     setNewsLoading(true)
     try {
-      const r = await fetch('/api/news-feed/collect?secret=nextguard-cron-2024-secure', { method: 'POST' })
+      const r = await fetch('/api/news-feed/collect', { method: 'POST' })
       if (r.ok) { await fetchNews() }
     } catch {} finally { setNewsLoading(false) }
   }
@@ -448,14 +448,14 @@ export default function AdminPage() {
     async function fetchAccounts() {
     setAccountsLoading(true)
     try {
-      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure')
+      const r = await fetch('/api/download-users')
       if (r.ok) { const d = await r.json(); setAccounts(d.users || []) }
     } catch {} finally { setAccountsLoading(false) }
   }
 
   async function toggleAccountActive(id: string) {
     try {
-      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=toggle-active&id=' + encodeURIComponent(id), { method: 'PUT' })
+      const r = await fetch('/api/download-users?action=toggle-active&id=' + encodeURIComponent(id), { method: 'PUT' })
       if (r.ok) fetchAccounts()
     } catch {}
   }
@@ -463,7 +463,7 @@ export default function AdminPage() {
   async function deleteAccount(id: string) {
     if (!confirm('Delete this account permanently?')) return
     try {
-      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=delete&id=' + encodeURIComponent(id), { method: 'PUT' })
+      const r = await fetch('/api/download-users?action=delete&id=' + encodeURIComponent(id), { method: 'PUT' })
       if (r.ok) fetchAccounts()
     } catch {}
   }
@@ -477,7 +477,7 @@ export default function AdminPage() {
     async function resetAccountPassword(id: string) {
     if (!confirm('Reset this account password? A temporary password will be emailed to the user.')) return
     try {
-      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=reset-password&id=' + id, { method: 'PUT' })
+      const r = await fetch('/api/download-users?action=reset-password&id=' + id, { method: 'PUT' })
       const data = await r.json()
       if (r.ok) {
         alert(data.message || 'Password reset successfully')
@@ -492,7 +492,7 @@ export default function AdminPage() {
     if (!newAccName || !newAccEmail || !newAccPassword || !newAccCompany) { alert('All fields required'); return }
     setCreateAccLoading(true)
     try {
-      const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=admin-create&email=' + encodeURIComponent(newAccEmail) + '&contactName=' + encodeURIComponent(newAccName) + '&company=' + encodeURIComponent(newAccCompany) + '&role=' + encodeURIComponent(newAccRole) + '&password=' + encodeURIComponent(newAccPassword), { method: 'PUT' })
+      const r = await fetch('/api/download-users?action=admin-create&email=' + encodeURIComponent(newAccEmail) + '&contactName=' + encodeURIComponent(newAccName) + '&company=' + encodeURIComponent(newAccCompany) + '&role=' + encodeURIComponent(newAccRole) + '&password=' + encodeURIComponent(newAccPassword), { method: 'PUT' })
       const d = await r.json()
       if (r.ok) { alert(d.message || 'Account created'); setShowCreateAccount(false); setNewAccName(''); setNewAccEmail(''); setNewAccPassword(''); setNewAccCompany(''); setNewAccRole('User'); fetchAccounts() }
       else alert(d.error || 'Failed to create account')
@@ -612,13 +612,12 @@ export default function AdminPage() {
                 <tbody>{contacts.length === 0 ? <tr><td colSpan={5} className="py-8 text-center text-zinc-500">No contacts yet</td></tr> : contacts.slice().reverse().map((c: any) => (<tr key={c.id} className="border-b border-zinc-800/50"><td className="py-3 pr-4 text-white">{c.fullName}</td><td className="py-3 pr-4 text-cyan-400">{c.email}</td><td className="py-3 pr-4 text-zinc-300">{c.company || "-"}</td><td className="py-3 pr-4 text-zinc-400 max-w-xs truncate">{c.message}</td><td className="py-3 text-zinc-500">{c.timestamp ? new Date(c.timestamp).toLocaleDateString() : "-"}</td></tr>))}</tbody>
               </table>
             </div>
-          </div>
         )}
 
         {tab === "rsvp" && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <div className="flex justify-end mb-4">
-              <button onClick={() => window.open("/api/rsvp?password=NextGuard123&format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
+              <button onClick={() => window.open("/api/rsvp? format=csv", "_blank")} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -938,11 +937,11 @@ export default function AdminPage() {
                       <td className="py-3 pr-4 text-zinc-300">{a.loginCount || 0}</td>
                       <td className="py-3 pr-4 text-zinc-300 text-xs">{a.lastLogin ? new Date(a.lastLogin).toLocaleString() : "-"}</td>
                       <td className="py-3 pr-4 text-zinc-300 text-xs">{new Date(a.createdAt).toLocaleDateString()}</td>
-                <td className="py-3 pr-4"><AccountPermissions account={a} onSave={async (id, perms) => { const r = await fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=set-permissions&id=' + encodeURIComponent(id) + '&permissions=' + encodeURIComponent(JSON.stringify(perms)), {method:'PUT'}); if(r.ok) fetchAccounts(); else throw new Error('Failed') }} /></td>
+                <td className="py-3 pr-4"><AccountPermissions account={a} onSave={async (id, perms) => { const r = await fetch('/api/download-users?action=set-permissions&id=' + encodeURIComponent(id) + '&permissions=' + encodeURIComponent(JSON.stringify(perms)), {method:'PUT'}); if(r.ok) fetchAccounts(); else throw new Error('Failed') }} /></td>
                       <td className="py-3">
                         <button onClick={() => toggleAccountActive(a.id)} className={(a.active ? "bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400" : "bg-green-600/20 hover:bg-green-600/30 text-green-400") + " px-2 py-1 rounded text-xs mr-1"}>{a.active ? "Disable" : "Enable"}</button>
                         <button onClick={() => deleteAccount(a.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-2 py-1 rounded text-xs">Delete</button>
-                                              <button onClick={() => resetAccountPassword(a.id)} className="bg-yellow-600 hover:bg-yellow-500 text-white text-xs px-2 py-1 rounded">Reset PW</button><select value={a.permissions?.qtRole || 'viewer'} onChange={(e) => { const perms = a.permissions || {}; const updated = {...perms, qtRole: e.target.value}; setAccounts((prev: any) => prev.map((acc: any) => acc.id === a.id ? {...acc, permissions: updated} : acc)); fetch('/api/download-users?secret=nextguard-cron-2024-secure&action=set-permissions&id=' + encodeURIComponent(a.id) + '&permissions=' + encodeURIComponent(JSON.stringify(updated)), {method:'PUT'}).then(r => { if(r.ok) fetchAccounts() }) }} className="bg-zinc-800 border border-zinc-700 rounded text-xs text-white px-1 py-0.5 mt-1"><option value="admin">QT:Admin</option><option value="sales">QT:Sales</option><option value="viewer">QT:Viewer</option></select>
+                                              <button onClick={() => resetAccountPassword(a.id)} className="bg-yellow-600 hover:bg-yellow-500 text-white text-xs px-2 py-1 rounded">Reset PW</button><select value={a.permissions?.qtRole || 'viewer'} onChange={(e) => { const perms = a.permissions || {}; const updated = {...perms, qtRole: e.target.value}; setAccounts((prev: any) => prev.map((acc: any) => acc.id === a.id ? {...acc, permissions: updated} : acc)); fetch('/api/download-users?action=set-permissions&id=' + encodeURIComponent(a.id) + '&permissions=' + encodeURIComponent(JSON.stringify(updated)), {method:'PUT'}).then(r => { if(r.ok) fetchAccounts() }) }} className="bg-zinc-800 border border-zinc-700 rounded text-xs text-white px-1 py-0.5 mt-1"><option value="admin">QT:Admin</option><option value="sales">QT:Sales</option><option value="viewer">QT:Viewer</option></select>
                       </td>
                     </tr>
                   ))}</tbody>
