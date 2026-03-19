@@ -71,6 +71,51 @@ jobs:
           fi
           echo "Turso DB integrity verified"
 
+      - name: Backup Quotation System DB (integrity check)
+        run: |
+          echo "Running Quotation System DB integrity check..."
+          RESPONSE=$(curl -s -o qt-backup.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+            "https://www.next-guard.com/api/qt-backup")
+          echo "HTTP Status: $RESPONSE"
+          cat qt-backup.json | jq .
+          if [ "$RESPONSE" != "200" ]; then
+            echo "::error::QT DB backup failed with HTTP $RESPONSE"
+            exit 1
+          fi
+          QT_ERRORS=$(cat qt-backup.json | jq '.integrity.errors | length')
+          if [ "$QT_ERRORS" != "0" ]; then
+            echo "::error::QT DB integrity check found $QT_ERRORS errors"
+            exit 1
+          fi
+          echo "Quotation System DB integrity verified"
+
+      - name: Export Quotation System tables
+        run: |
+          echo "Exporting Quotation System data..."
+          DATE=$(date +'%Y-%m-%d')
+          mkdir -p backups/qt-export
+          for TABLE in qt_admin_users qt_products qt_prices qt_quotations qt_lines qt_files qt_audit_log; do
+            echo "  Exporting $TABLE..."
+            PAGE=1
+            TOTAL=0
+            while true; do
+              curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+                "https://www.next-guard.com/api/qt-backup?table=${TABLE}&page=${PAGE}&limit=500" \
+                > backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json
+              ROWS=$(cat backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json | jq -r '.export.rows_in_page // "0"')
+              HAS_MORE=$(cat backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json | jq -r '.export.has_more // "false"')
+              TOTAL=$((TOTAL + ROWS))
+              if [ "$HAS_MORE" != "true" ]; then
+                break
+              fi
+              PAGE=$((PAGE + 1))
+              sleep 1
+            done
+            echo "  $TABLE: $TOTAL rows exported"
+          done
+          echo "QT export complete"
+
       - name: Full data export (paginated)
         if: github.event.inputs.full_export == 'true'
         run: |
@@ -122,11 +167,16 @@ jobs:
           curl -s "${{ secrets.NPOINT_RSVP_URL }}" > backups/rsvp-${DATE}.json
           curl -s "${{ secrets.NPOINT_LOGS_URL }}" > backups/logs-${DATE}.json
           cp turso-backup.json backups/turso-integrity-${DATE}.json
+          cp qt-backup.json backups/qt-integrity-${DATE}.json
           echo "Database backups saved:"
           ls -la backups/
           if [ -d "backups/full-export" ]; then
             echo "Full export files:"
             ls -la backups/full-export/
+          fi
+          if [ -d "backups/qt-export" ]; then
+            echo "QT export files:"
+            ls -la backups/qt-export/
           fi
 
       - name: Upload database backups as artifact
@@ -152,7 +202,7 @@ jobs:
             -d '{
               "run_id": "${{ github.run_id }}",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "error_message": "Daily backup workflow failed. Check the run logs for details."
+              "error_message": "Daily backup workflow failed (includes Threat Intel + Quotation System). Check the run logs for details."
             }' \
             "https://www.next-guard.com/api/v1/threat-intel/backup-alert")
           echo "Alert API Response (HTTP $RESPONSE):"
