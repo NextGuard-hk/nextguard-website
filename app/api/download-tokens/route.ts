@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
-  // Create new token - admin only
+  // Toggle token active - admin only   if (body.action === 'toggle') {     if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })     const tokens = await getTokens()     const found = tokens.find(t => t.id === body.id)     if (!found) return NextResponse.json({ error: 'Not found' }, { status: 404 })     found.active = body.active     await saveTokens(tokens)     return NextResponse.json({ success: true })   }   // Delete token - admin only   if (body.action === 'delete') {     if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })     const tokens = await getTokens()     const filtered = tokens.filter(t => t.id !== body.id)     await saveTokens(filtered)     return NextResponse.json({ success: true })   }   // Create new token - admin only
   if (!isAdmin(req)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   const { company, contact, email, type, scope, expiresInDays } = body
   if (!company || !contact || !email) {
