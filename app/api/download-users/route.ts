@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { buildDefaultPermissionsWithRole } from '@/lib/permissions-config'
 const USERS_NPOINT_URL = process.env.NPOINT_DOWNLOAD_USERS_URL || ''
-const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '' function isAdmin(req: NextRequest): boolean {   const sessionSecret = process.env.CONTACT_SESSION_SECRET   if (!sessionSecret) return false   const token = req.cookies.get('contact_admin_token')   return token?.value === sessionSecret }
 const LOG_NPOINT_URL = process.env.NPOINT_LOGS_URL || ''
 
 // Free email domains blacklist - reject these during registration
