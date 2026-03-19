@@ -136,7 +136,7 @@ export default function AdminPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setError(""); setLoading(true)
     try {
-      const r = await fetch("/api/contact/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, totpCode }) })
+      const r = await fetch("/api/contact/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, totpCode, adminEmail }) })
       const d = await r.json()
       if (r.ok) { setIsAuth(true); fetchContacts(); fetchRsvps(); fetchAccounts() } else setError(d.message || "Login failed")
     } catch { setError("Network error") } finally { setLoading(false) }
