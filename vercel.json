@@ -182,7 +182,8 @@
     },
     {
       "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=lingerie",
-      "schedule": "30 6 * * *",
+      "schedule": "30 6 * * *"
+          },
     {
       "path": "/api/v1/url-db/seed?action=cron&secret=nextguard-cron-2024-secure",
       "schedule": "0 1 * * *"
