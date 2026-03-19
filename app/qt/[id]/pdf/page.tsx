@@ -120,7 +120,7 @@ export default function QuotationPDF() {
         <div className="pdf-doc">
           <div className="pdf-header">
             <div>
-              <img src={logoSrc} alt="NextGuard" style={{height:'55px'}} />
+              <img src="/images/nextguard-logo.png" alt="NextGuard" style={{height:'60px',filter:'invert(1) grayscale(1)'}} />
               <div className="pdf-logo-sub">NextGuard Technology Limited</div>
               <div className="pdf-logo-sub">Re-think Data Security</div>
             </div>
