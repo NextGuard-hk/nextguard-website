@@ -612,6 +612,7 @@ export default function AdminPage() {
                 <tbody>{contacts.length === 0 ? <tr><td colSpan={5} className="py-8 text-center text-zinc-500">No contacts yet</td></tr> : contacts.slice().reverse().map((c: any) => (<tr key={c.id} className="border-b border-zinc-800/50"><td className="py-3 pr-4 text-white">{c.fullName}</td><td className="py-3 pr-4 text-cyan-400">{c.email}</td><td className="py-3 pr-4 text-zinc-300">{c.company || "-"}</td><td className="py-3 pr-4 text-zinc-400 max-w-xs truncate">{c.message}</td><td className="py-3 text-zinc-500">{c.timestamp ? new Date(c.timestamp).toLocaleDateString() : "-"}</td></tr>))}</tbody>
               </table>
             </div>
+                      </div>
         )}
 
         {tab === "rsvp" && (
