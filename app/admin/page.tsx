@@ -147,7 +147,7 @@ export default function AdminPage() {
   }
 
   async function fetchRsvps() {
-    try { const r = await fetch("/api/rsvp "); const d = await r.json(); if (d.status === "success") setRsvps(d.registrations || []) } catch {}
+    try { const r = await fetch("/api/rsvp"); const d = await r.json(); if (d.status === "success") setRsvps(d.registrations || []) } catch {}
   }
 
   async function fetchDownloads(prefix = "") {
