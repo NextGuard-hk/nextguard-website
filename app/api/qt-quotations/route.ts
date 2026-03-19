@@ -11,7 +11,7 @@ async function ensureQtUser(auth: { userId: string; email: string; name?: string
   const db = getDB()
   await db.execute({
     sql: `INSERT OR IGNORE INTO qt_admin_users (id, email, password_hash, name, role, is_active)
-          VALUES (?, ?, 'synced_from_admin', ?, ?, 1)`,
+            VALUES (?, ?, 'synced_from_admin', ?, ?, 1)`,
     args: [auth.userId, auth.email, auth.name || auth.email.split('@')[0], auth.role || 'sales'],
   })
 }
@@ -19,12 +19,14 @@ async function ensureQtUser(auth: { userId: string; email: string; name?: string
 export async function GET(req: NextRequest) {
   const auth = authenticateQtRequest(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const db = getDB()
   const { searchParams } = req.nextUrl
   const status = searchParams.get('status')
   const search = searchParams.get('search')
   const limit = parseInt(searchParams.get('limit') || '50')
   const offset = parseInt(searchParams.get('offset') || '0')
+
   let sql = `SELECT q.*, u.name as created_by_name, u.email as created_by_email
     FROM qt_quotations q
     LEFT JOIN qt_admin_users u ON u.id = q.created_by`
@@ -40,11 +42,13 @@ export async function GET(req: NextRequest) {
   if (where.length > 0) sql += ` WHERE ` + where.join(' AND ')
   sql += ` ORDER BY q.created_at DESC LIMIT ? OFFSET ?`
   args.push(limit, offset)
+
   const result = await db.execute({ sql, args })
   const countResult = await db.execute({
     sql: `SELECT COUNT(*) as total FROM qt_quotations q ${where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''}`,
     args: args.slice(0, args.length - 2),
   })
+
   return NextResponse.json({
     quotations: result.rows,
     total: (countResult.rows[0] as any).total,
@@ -57,6 +61,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = authenticateQtRequest(req)
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const body = await req.json().catch(() => ({}))
     const db = getDB()
 
@@ -65,14 +70,16 @@ export async function POST(req: NextRequest) {
 
     const {
       customerName, partnerName, endUserName, projectName, customerType,
-      termYears, paymentModel, currency,
-      includePs, includeAnnualService, psDescription, annualServiceDescription,
-      validityDays, leadTime, deliveryLocation, remarks,
-      lines, discountPercent, targetFinalPrice,
+      termYears, paymentModel, currency, includePs, includeAnnualService,
+      psDescription, annualServiceDescription, validityDays, leadTime,
+      deliveryLocation, remarks, lines, discountPercent, targetFinalPrice,
+      previewOnly,
     } = body
+
     if (!customerName || !termYears) {
       return NextResponse.json({ error: 'customerName and termYears are required' }, { status: 400 })
     }
+
     // Filter out empty lines (no product selected)
     const validLines = (lines || []).filter((l: any) => l.productId || l.product_id || l.productCode || l.product_code)
     const lineInputs: PriceLineInput[] = validLines.map((l: any) => ({
@@ -86,6 +93,7 @@ export async function POST(req: NextRequest) {
       notes: l.notes || '',
       sortOrder: l.sortOrder || 0,
     }))
+
     const pricing = await computePricing({
       lines: lineInputs,
       termYears: parseInt(termYears),
@@ -93,6 +101,12 @@ export async function POST(req: NextRequest) {
       targetFinalPrice: targetFinalPrice ? parseFloat(targetFinalPrice) : undefined,
       currency: currency || 'HKD',
     })
+
+    // Preview mode: return pricing without saving to database
+    if (previewOnly) {
+      return NextResponse.json({ pricing, previewOnly: true })
+    }
+
     const finalRemarks = remarks || generateDefaultRemarks(
       parseInt(termYears),
       validityDays || 30,
@@ -102,49 +116,58 @@ export async function POST(req: NextRequest) {
       !!includeAnnualService,
       paymentModel || 'one_off'
     )
+
     const quotationId = generateId('qt')
     const refNumber = generateQuotationRef()
     const expiresAt = new Date(Date.now() + (validityDays || 30) * 24 * 60 * 60 * 1000).toISOString()
+
     await db.execute({
       sql: `INSERT INTO qt_quotations (
-        id, ref_number, customer_name, partner_name, end_user_name, project_name, customer_type,
-        term_years, payment_model, currency, status,
+        id, ref_number, customer_name, partner_name, end_user_name, project_name,
+        customer_type, term_years, payment_model, currency, status,
         include_ps, include_annual_service, ps_description, annual_service_description,
         appliance_total, license_total, service_total, grand_total,
         discount_percent, discount_amount, final_price,
-        remarks, validity_days, lead_time, delivery_location,
-        version, created_by, expires_at
+        remarks, validity_days, lead_time, delivery_location, version, created_by, expires_at
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
-        quotationId, refNumber, customerName, partnerName || null, endUserName || null, projectName || null, customerType || 'end_user',
-        parseInt(termYears), paymentModel || 'one_off', currency || 'HKD', 'draft',
-        includePs ? 1 : 0, includeAnnualService ? 1 : 0, psDescription || null, annualServiceDescription || null,
-        pricing.totals.applianceTotal, pricing.totals.licenseTotal, pricing.totals.serviceTotal, pricing.totals.grandTotal,
+        quotationId, refNumber, customerName, partnerName || null, endUserName || null,
+        projectName || null, customerType || 'end_user', parseInt(termYears),
+        paymentModel || 'one_off', currency || 'HKD', 'draft',
+        includePs ? 1 : 0, includeAnnualService ? 1 : 0,
+        psDescription || null, annualServiceDescription || null,
+        pricing.totals.applianceTotal, pricing.totals.licenseTotal,
+        pricing.totals.serviceTotal, pricing.totals.grandTotal,
         pricing.discountPercent, pricing.totals.discountAmount, pricing.totals.finalPrice,
-        finalRemarks, validityDays || 30, leadTime || '2-6 weeks', deliveryLocation || 'Customer Site',
-        1, auth.userId, expiresAt,
+        finalRemarks, validityDays || 30, leadTime || '2-6 weeks',
+        deliveryLocation || 'Customer Site', 1, auth.userId, expiresAt,
       ],
     })
+
     for (const pl of pricing.lines) {
       const lineId = generateId('line')
       await db.execute({
         sql: `INSERT INTO qt_lines (
-          id, quotation_id, site_type, product_id, product_code, description, qty,
-          appliance_unit_price, appliance_total, license_unit_price,
+          id, quotation_id, site_type, product_id, product_code, description,
+          qty, appliance_unit_price, appliance_total, license_unit_price,
           year1_fee, year2_fee, year3_fee, year4_fee, year5_fee,
           line_total, is_included, notes, sort_order
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         args: [
-          lineId, quotationId, pl.siteType, pl.productId || null, pl.productCode, pl.description, pl.qty,
-          pl.applianceUnitPrice, pl.applianceTotal, pl.licenseUnitPrice,
-          pl.year1Fee, pl.year2Fee, pl.year3Fee, pl.year4Fee, pl.year5Fee,
-          pl.lineTotal, pl.isIncluded ? 1 : 0, pl.notes, pl.sortOrder,
+          lineId, quotationId, pl.siteType, pl.productId || null, pl.productCode,
+          pl.description, pl.qty, pl.applianceUnitPrice, pl.applianceTotal,
+          pl.licenseUnitPrice, pl.year1Fee, pl.year2Fee, pl.year3Fee,
+          pl.year4Fee, pl.year5Fee, pl.lineTotal, pl.isIncluded ? 1 : 0,
+          pl.notes, pl.sortOrder,
         ],
       })
     }
+
     await writeQuotationAudit(auth.userId, auth.email, 'quotation_created', 'quotation', quotationId, { refNumber, customerName })
+
     const created = await db.execute({ sql: `SELECT * FROM qt_quotations WHERE id = ?`, args: [quotationId] })
     const linesResult = await db.execute({ sql: `SELECT * FROM qt_lines WHERE quotation_id = ? ORDER BY sort_order`, args: [quotationId] })
+
     return NextResponse.json({
       quotation: created.rows[0],
       lines: linesResult.rows,
