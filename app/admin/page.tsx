@@ -305,7 +305,7 @@ export default function AdminPage() {
     setNewsLoading(true)
     try {
       const r = await fetch("/api/news-feed/collect")
-      const collectData = await r.json()
+      // collect response handled above
       const nr = await fetch("/api/news-feed/admin")
       if (nr.ok) {
         const data = await nr.json()
@@ -492,7 +492,7 @@ export default function AdminPage() {
     if (!newAccName || !newAccEmail || !newAccPassword || !newAccCompany) { alert('All fields required'); return }
     setCreateAccLoading(true)
     try {
-      const r = await fetch('/api/download-users?action=admin-create&email=' + encodeURIComponent(newAccEmail) + '&contactName=' + encodeURIComponent(newAccName) + '&company=' + encodeURIComponent(newAccCompany) + '&role=' + encodeURIComponent(newAccRole) + '&password=' + encodeURIComponent(newAccPassword), { method: 'PUT' })
+      const r = await fetch('/api/download-users?action=admin-create&email=' + encodeURIComponent(newAccEmail) + '&contactName=' + encodeURIComponent(newAccName) + '&company=' + encodeURIComponent(newAccCompany) + '&role=' + encodeURIComponent(newAccRole), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: newAccPassword }) })
       const d = await r.json()
       if (r.ok) { alert(d.message || 'Account created'); setShowCreateAccount(false); setNewAccName(''); setNewAccEmail(''); setNewAccPassword(''); setNewAccCompany(''); setNewAccRole('User'); fetchAccounts() }
       else alert(d.error || 'Failed to create account')
