@@ -116,7 +116,7 @@ export default function NewQuotation() {
     updateLine(lid, { qty, applianceUnitPrice: app, licenseUnitPrice: lic })
   }
   function buildPayload(po = false) {
-    return { customerName, partnerName: partnerName || undefined, endUserName: endUserName || undefined, projectName: projectName || undefined, customerType, termYears, paymentModel, currency, includePs, includeAnnualService, validityDays, leadTime, deliveryLocation, remarks: remarks || undefined, discountPercent: discountPercent || undefined, targetFinalPrice: targetPrice ? parseFloat(targetPrice) : undefined, lines: lines.map(l => ({ productId: l.productId, productCode: l.productCode, siteType: l.siteType, qty: l.qty, applianceUnitPrice: l.applianceUnitPrice, licenseUnitPrice: l.licenseUnitPrice, isIncluded: l.isIncluded, notes: l.notes })) }
+    return { customerName, partnerName: partnerName || undefined, endUserName: endUserName || undefined, projectName: projectName || undefined, customerType, termYears, paymentModel, currency, includePs, includeAnnualService, validityDays, leadTime, deliveryLocation, remarks: remarks || undefined, discountPercent: discountPercent || undefined, targetFinalPrice: targetPrice ? parseFloat(targetPrice) : undefined, previewOnly: po || undefined, lines: lines.map(l => ({ productId: l.productId, productCode: l.productCode, siteType: l.siteType, qty: l.qty, applianceUnitPrice: l.applianceUnitPrice, licenseUnitPrice: l.licenseUnitPrice, isIncluded: l.isIncluded, notes: l.notes })) }
   }
   async function calcPreview() {
     setLoading(true); setError('')
