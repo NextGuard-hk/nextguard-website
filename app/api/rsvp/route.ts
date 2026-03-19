@@ -81,7 +81,10 @@ export async function GET(request: NextRequest) {
   const password = searchParams.get('password');
   const format = searchParams.get('format');
 
-  if (password !== 'NextGuard123') {
+  const cookieToken = request.cookies.get('contact_admin_token')?.value;
+    const sessionSecret = process.env.CONTACT_SESSION_SECRET;
+    const isAdminAuth = cookieToken && sessionSecret && cookieToken === sessionSecret;
+  if (!isAdminAuth && password !== 'NextGuard123') {
     return NextResponse.json(
       { status: 'error', message: 'Unauthorized' },
       { status: 401 }
