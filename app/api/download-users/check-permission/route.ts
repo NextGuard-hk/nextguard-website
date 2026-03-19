@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { VALID_PERMISSION_KEYS, DEFAULT_PERMISSIONS } from '@/lib/permissions-config'
 const USERS_NPOINT_URL = process.env.NPOINT_DOWNLOAD_USERS_URL || ''
 interface DownloadUser {
   id: string
   email: string
   active: boolean
   emailVerified: boolean
-  permissions?: { kb?: boolean; download?: boolean; socReview?: boolean; projectAccess?: boolean; quotation?: boolean; pocLicense?: boolean; productionLicense?: boolean }
+  permissions?: Record<string, boolean>
 }
 async function getUsers(): Promise<DownloadUser[]> {
   if (!USERS_NPOINT_URL) return []
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
   }
   const page = req.nextUrl.searchParams.get('page')
-  if (!page || !['kb', 'download', 'socReview', 'projectAccess', 'quotation', 'pocLicense', 'productionLicense'].includes(page)) {
+  if (!page || !VALID_PERMISSION_KEYS.includes(page)) {
     return NextResponse.json({ error: 'Invalid page parameter' }, { status: 400 })
   }
   const users = await getUsers()
@@ -33,8 +34,8 @@ export async function GET(req: NextRequest) {
   if (!user.active) {
     return NextResponse.json({ error: 'Account deactivated' }, { status: 403 })
   }
-  const permissions = user.permissions || { kb: false, download: true, socReview: false }
-  const hasPermission = permissions[page as keyof typeof permissions] === true
+  const permissions = user.permissions || DEFAULT_PERMISSIONS
+  const hasPermission = permissions[page] === true
   return NextResponse.json({
     hasPermission,
     email: user.email,
