@@ -1,16 +1,18 @@
 // app/api/qt-backup/route.ts
-// Quotation System Backup API v1.0
+// Quotation System Backup API v1.1
 // Default: integrity check + row counts for all QT tables
 // Paginated export: ?table=qt_quotations&page=1&limit=100
-// Protected by CRON_SECRET or TI_ADMIN_KEY
+// Protected by CRON_SECRET, TI_ADMIN_KEY, or QT session auth
 import { NextRequest, NextResponse } from 'next/server';
 import { getDB } from '@/lib/db';
 import { initQuotationDB } from '@/lib/quotation-db';
+import { authenticateQtRequest } from '@/lib/quotation-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-function isAuthorized(request: NextRequest): boolean {
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  // Check API key auth (for cron/GitHub Actions)
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true;
@@ -18,6 +20,9 @@ function isAuthorized(request: NextRequest): boolean {
   const adminKey = process.env.TI_ADMIN_KEY;
   if (adminKey && key === adminKey) return true;
   if (!cronSecret && !adminKey) return true;
+  // Check QT session auth (for monitoring page)
+  const auth = authenticateQtRequest(request);
+  if (auth) return true;
   return false;
 }
 
@@ -42,7 +47,7 @@ const QT_TABLE_COLUMNS: Record<string, string> = {
 };
 
 export async function GET(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -73,7 +78,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({
-        version: '1.0',
+        version: '1.1',
         system: 'quotation',
         export: {
           table,
@@ -100,7 +105,6 @@ export async function GET(request: NextRequest) {
         const count = Number(result.rows[0]?.cnt ?? 0);
         counts[t] = count;
         checks.push(`${t}: ${count} rows`);
-        // qt_products and qt_admin_users should not be empty
         if ((t === 'qt_products' || t === 'qt_admin_users') && count === 0) {
           errors.push(`${t} is empty (critical)`);
         }
@@ -131,7 +135,7 @@ export async function GET(request: NextRequest) {
     } catch { /* audit log write is best-effort */ }
 
     return NextResponse.json({
-      version: '1.0',
+      version: '1.1',
       system: 'quotation',
       timestamp: new Date().toISOString(),
       duration_ms: Date.now() - startTime,
