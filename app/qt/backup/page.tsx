@@ -1,227 +1,195 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface BackupResult {
   version: string;
   system: string;
   timestamp: string;
   duration_ms: number;
-  integrity: {
-    status: string;
-    checks: string[];
-    errors: string[];
-  };
+  integrity: { status: string; checks: string[]; errors: string[] };
   data: { counts: Record<string, number> };
 }
 
-interface AuditEntry {
-  id: number;
-  action: string;
-  details: string;
-  created_at: string;
-}
+interface User { id: string; email: string; name: string; role: string }
+
+const CSS = `
+.bk-root { min-height:100vh; background:#0a0f1a; color:#e0e0e0; font-family:system-ui,sans-serif; }
+.bk-header { display:flex; align-items:center; padding:14px 24px; background:#0d1117; border-bottom:1px solid #1f2937; flex-wrap:wrap; gap:8px; }
+.bk-logo { font-size:18px; font-weight:700; color:#fff; letter-spacing:1px; }
+.bk-logo span { color:#22c55e; }
+.bk-header-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.bk-container { max-width:900px; margin:0 auto; padding:24px 16px; }
+.bk-title-row { display:flex; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+.bk-title { font-size:22px; font-weight:700; color:#f9fafb; }
+.bk-subtitle { font-size:13px; color:#6b7280; margin-top:2px; }
+.bk-actions { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+.bk-btn { padding:9px 18px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.bk-btn-primary { background:#22c55e; color:#fff; }
+.bk-btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+.bk-btn-secondary { background:#1f2937; color:#9ca3af; border:1px solid #374151; }
+.bk-btn-sm { background:#1f2937; border:1px solid #374151; color:#9ca3af; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.bk-card { background:#0d1117; border:1px solid #1f2937; border-radius:12px; padding:20px; margin-bottom:16px; }
+.bk-card-title { font-size:15px; font-weight:600; color:#f9fafb; margin-bottom:14px; }
+.bk-error { background:rgba(239,68,68,0.15); border:1px solid #7f1d1d; border-radius:8px; padding:12px 16px; color:#fca5a5; margin-bottom:16px; font-size:13px; }
+.bk-status-healthy { color:#22c55e; font-weight:700; font-size:16px; }
+.bk-status-degraded { color:#ef4444; font-weight:700; font-size:16px; }
+.bk-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin-bottom:14px; }
+.bk-stat { background:#111827; border-radius:8px; padding:12px; }
+.bk-stat-label { font-size:11px; color:#6b7280; margin-bottom:4px; }
+.bk-stat-val { font-size:20px; font-weight:700; color:#f9fafb; }
+.bk-check { font-size:13px; color:#22c55e; margin-bottom:4px; }
+.bk-check-err { font-size:13px; color:#ef4444; margin-bottom:4px; }
+.bk-run { display:flex; align-items:center; justify-content:space-between; background:#111827; border-radius:8px; padding:10px 14px; margin-bottom:8px; }
+.bk-run-ok { font-weight:600; color:#22c55e; }
+.bk-run-fail { font-weight:600; color:#ef4444; }
+.bk-run-pending { font-weight:600; color:#f59e0b; }
+.bk-run-date { font-size:12px; color:#6b7280; }
+.bk-arch-row { display:flex; gap:12px; margin-bottom:10px; font-size:13px; }
+.bk-arch-key { color:#3b82f6; font-family:monospace; min-width:80px; }
+.bk-arch-val { color:#d1d5db; }
+.bk-ts { font-size:11px; color:#4b5563; margin-bottom:14px; }
+`;
 
 export default function BackupMonitorPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [result, setResult] = useState<BackupResult | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
+  const [ghRuns, setGhRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [ghStatus, setGhStatus] = useState<any>(null);
   const [ghLoading, setGhLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/qt-auth').then(r => r.json()).then(d => {
+      if (!d.authenticated) { router.replace('/qt-login'); return; }
+      if (d.user.role !== 'admin') { router.replace('/qt'); return; }
+      setUser(d.user);
+    }).catch(() => router.replace('/qt-login'));
+  }, [router]);
 
   const runCheck = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await fetch('/api/qt-backup');
+      if (res.status === 401) { router.replace('/qt-login'); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setResult(data);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+      setResult(await res.json());
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
-  const loadAuditLogs = async () => {
-    try {
-      const res = await fetch('/api/qt-backup?table=qt_audit_log&limit=20');
-      if (!res.ok) return;
-      const data = await res.json();
-      const backupLogs = (data.rows || []).filter((r: any) => r.action === 'backup_check');
-      setAuditLogs(backupLogs.slice(0, 10));
-    } catch { /* ignore */ }
-  };
-
-  const checkGitHubActions = async () => {
+  const checkGH = async () => {
     setGhLoading(true);
     try {
-      const res = await fetch('https://api.github.com/repos/NextGuard-hk/nextguard-website/actions/workflows/daily-backup.yml/runs?per_page=5');
-      if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
-      const data = await res.json();
-      setGhStatus(data.workflow_runs || []);
-    } catch (e: any) {
-      setGhStatus([]);
-    } finally {
-      setGhLoading(false);
-    }
+      const res = await fetch('https://api.github.com/repos/NextGuard-hk/nextguard-website/actions/workflows/daily-backup.yml/runs?per_page=7');
+      const d = await res.json();
+      setGhRuns(d.workflow_runs || []);
+    } catch { setGhRuns([]); }
+    finally { setGhLoading(false); }
   };
 
-  const statusColor = (s: string) => {
-    if (s === 'healthy' || s === 'success' || s === 'completed') return 'text-green-400';
-    if (s === 'degraded' || s === 'failure') return 'text-red-400';
-    return 'text-yellow-400';
+  const runClass = (r: any) => {
+    const c = r.conclusion || r.status;
+    if (c === 'success') return 'bk-run-ok';
+    if (c === 'failure') return 'bk-run-fail';
+    return 'bk-run-pending';
   };
+
+  async function logout() {
+    await fetch('/api/qt-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) });
+    router.replace('/qt-login');
+  }
+
+  if (!user) return <div style={{minHeight:'100vh',background:'#0a0f1a',display:'flex',alignItems:'center',justifyContent:'center',color:'#6b7280'}}>Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <div className="bk-root">
+      <style>{CSS}</style>
+      <header className="bk-header">
+        <div className="bk-logo">NEXT<span>GUARD</span>&nbsp;&nbsp;|&nbsp;&nbsp;Backup Monitor</div>
+        <div className="bk-header-right">
+          <span style={{fontSize:13,color:'#9ca3af'}}>{user.name}</span>
+          <span style={{fontSize:11,background:'#7c3aed',color:'#fff',padding:'2px 8px',borderRadius:4}}>Admin</span>
+          <button onClick={() => router.push('/qt')} className="bk-btn-sm">&#8592; Dashboard</button>
+          <button onClick={logout} className="bk-btn-sm">Logout</button>
+        </div>
+      </header>
+      <div className="bk-container">
+        <div className="bk-title-row">
           <div>
-            <h1 className="text-2xl font-bold">Backup Monitor</h1>
-            <p className="text-gray-400 text-sm mt-1">Quotation System Database Backup Status</p>
+            <div className="bk-title">&#128274; Backup Monitor</div>
+            <div className="bk-subtitle">Quotation System Database Backup Status &mdash; Admin Only</div>
           </div>
-          <a href="/qt" className="text-blue-400 hover:underline text-sm">&larr; Back to QT</a>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex gap-3 mb-6">
-          <button onClick={() => { runCheck(); loadAuditLogs(); }} disabled={loading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded font-medium">
-            {loading ? 'Checking...' : 'Run Integrity Check'}
+        <div className="bk-actions">
+          <button className="bk-btn bk-btn-primary" onClick={runCheck} disabled={loading}>
+            {loading ? 'Checking...' : '&#9654; Run Integrity Check'}
           </button>
-          <button onClick={checkGitHubActions} disabled={ghLoading}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded font-medium">
-            {ghLoading ? 'Loading...' : 'Check GitHub Actions'}
+          <button className="bk-btn bk-btn-secondary" onClick={checkGH} disabled={ghLoading}>
+            {ghLoading ? 'Loading...' : '&#9654; Check GitHub Actions'}
           </button>
           <a href="https://github.com/NextGuard-hk/nextguard-website/actions/workflows/daily-backup.yml"
             target="_blank" rel="noopener noreferrer"
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium inline-flex items-center gap-1">
-            View Workflow Runs &rarr;
+            className="bk-btn bk-btn-secondary" style={{textDecoration:'none',display:'inline-flex',alignItems:'center'}}>
+            View All Runs &#8599;
           </a>
         </div>
 
-        {error && <div className="bg-red-900/50 border border-red-700 rounded p-4 mb-6 text-red-300">{error}</div>}
+        {error && <div className="bk-error">⚠️ {error}</div>}
 
-        {/* Integrity Check Result */}
         {result && (
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Integrity Check Result</h2>
-              <span className={`font-bold text-lg ${statusColor(result.integrity.status)}`}>
-                {result.integrity.status.toUpperCase()}
+          <div className="bk-card">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div className="bk-card-title" style={{margin:0}}>Integrity Check</div>
+              <span className={result.integrity.status === 'healthy' ? 'bk-status-healthy' : 'bk-status-degraded'}>
+                {result.integrity.status === 'healthy' ? '&#10003; HEALTHY' : '&#10007; DEGRADED'}
               </span>
             </div>
-            <div className="text-xs text-gray-500 mb-4">
-              {result.timestamp} | {result.duration_ms}ms
-            </div>
-
-            {/* Table Counts */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {Object.entries(result.data.counts).map(([table, count]) => (
-                <div key={table} className="bg-gray-800 rounded p-3">
-                  <div className="text-xs text-gray-400">{table.replace('qt_', '')}</div>
-                  <div className="text-xl font-bold">{count}</div>
+            <div className="bk-ts">{result.timestamp} &nbsp;&bull;&nbsp; {result.duration_ms}ms</div>
+            <div className="bk-grid">
+              {Object.entries(result.data.counts).map(([t, n]) => (
+                <div key={t} className="bk-stat">
+                  <div className="bk-stat-label">{t.replace('qt_', '')}</div>
+                  <div className="bk-stat-val">{n}</div>
                 </div>
               ))}
             </div>
-
-            {/* Checks */}
-            <div className="space-y-1">
-              {result.integrity.checks.map((c, i) => (
-                <div key={i} className="text-sm text-green-400">&#10003; {c}</div>
-              ))}
-              {result.integrity.errors.map((e, i) => (
-                <div key={i} className="text-sm text-red-400">&#10007; {e}</div>
-              ))}
+            <div>
+              {result.integrity.checks.map((c, i) => <div key={i} className="bk-check">&#10003; {c}</div>)}
+              {result.integrity.errors.map((e, i) => <div key={i} className="bk-check-err">&#10007; {e}</div>)}
             </div>
           </div>
         )}
 
-        {/* GitHub Actions Status */}
-        {ghStatus && (
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Recent GitHub Actions Runs</h2>
-            {ghStatus.length === 0 ? (
-              <p className="text-gray-400 text-sm">No runs found (repo may be private - check GitHub directly)</p>
-            ) : (
-              <div className="space-y-2">
-                {ghStatus.map((run: any) => (
-                  <div key={run.id} className="flex items-center justify-between bg-gray-800 rounded p-3">
-                    <div>
-                      <span className={`font-medium ${statusColor(run.conclusion || run.status)}`}>
-                        {(run.conclusion || run.status || 'unknown').toUpperCase()}
-                      </span>
-                      <span className="text-gray-400 text-sm ml-2">#{run.run_number}</span>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(run.created_at).toLocaleString()}
-                    </div>
-                    <a href={run.html_url} target="_blank" rel="noopener noreferrer"
-                      className="text-blue-400 text-sm hover:underline">View</a>
-                  </div>
-                ))}
+        {ghRuns.length > 0 && (
+          <div className="bk-card">
+            <div className="bk-card-title">Recent GitHub Actions Runs</div>
+            {ghRuns.map((r: any) => (
+              <div key={r.id} className="bk-run">
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span className={runClass(r)}>
+                    {(r.conclusion || r.status || 'pending').toUpperCase()}
+                  </span>
+                  <span style={{fontSize:12,color:'#9ca3af'}}>#{r.run_number}</span>
+                </div>
+                <span className="bk-run-date">{new Date(r.created_at).toLocaleString('en-HK')}</span>
+                <a href={r.html_url} target="_blank" rel="noopener noreferrer"
+                  style={{fontSize:12,color:'#3b82f6',textDecoration:'none'}}>View &#8599;</a>
               </div>
-            )}
+            ))}
           </div>
         )}
 
-        {/* Backup History from Audit Log */}
-        {auditLogs.length > 0 && (
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Recent Backup Checks</h2>
-            <div className="space-y-2">
-              {auditLogs.map((log) => {
-                let details: any = {};
-                try { details = JSON.parse(log.details || '{}'); } catch {}
-                return (
-                  <div key={log.id} className="flex items-center justify-between bg-gray-800 rounded p-3">
-                    <div>
-                      <span className={details.errors_count === 0 ? 'text-green-400' : 'text-red-400'}>
-                        {details.errors_count === 0 ? 'HEALTHY' : 'DEGRADED'}
-                      </span>
-                      <span className="text-gray-400 text-sm ml-2">
-                        {Object.entries(details.counts || {}).map(([k, v]) => `${k.replace('qt_', '')}:${v}`).join(' | ')}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500">{log.created_at}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Architecture Info */}
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold mb-4">Backup Architecture</h2>
-          <div className="space-y-3 text-sm text-gray-300">
-            <div className="flex items-start gap-3">
-              <span className="text-blue-400 font-mono w-24 shrink-0">Schedule</span>
-              <span>Daily at midnight HKT (4PM UTC) via GitHub Actions</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-blue-400 font-mono w-24 shrink-0">Retention</span>
-              <span>7 days (git tags + GitHub Artifacts)</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-blue-400 font-mono w-24 shrink-0">Scope</span>
-              <span>All 7 QT tables: admin_users, products, prices, quotations, lines, files, audit_log</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-blue-400 font-mono w-24 shrink-0">Method</span>
-              <span>1) Integrity check via /api/qt-backup 2) Paginated JSON export of all tables 3) Stored as GitHub Artifacts</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-blue-400 font-mono w-24 shrink-0">Alerts</span>
-              <span>Email alert to oscar@next-guard.com via Resend API on failure</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-blue-400 font-mono w-24 shrink-0">Monitor</span>
-              <span>Each backup check is logged in qt_audit_log for history tracking</span>
-            </div>
-          </div>
+        <div className="bk-card">
+          <div className="bk-card-title">Backup Architecture</div>
+          <div className="bk-arch-row"><span className="bk-arch-key">Schedule</span><span className="bk-arch-val">Daily midnight HKT (4PM UTC) via GitHub Actions</span></div>
+          <div className="bk-arch-row"><span className="bk-arch-key">Retention</span><span className="bk-arch-val">7 days &mdash; git tags + GitHub Artifacts</span></div>
+          <div className="bk-arch-row"><span className="bk-arch-key">Scope</span><span className="bk-arch-val">All 7 QT tables: admin_users, products, prices, quotations, lines, files, audit_log</span></div>
+          <div className="bk-arch-row"><span className="bk-arch-key">Method</span><span className="bk-arch-val">Integrity check + paginated JSON export stored as GitHub Artifacts</span></div>
+          <div className="bk-arch-row"><span className="bk-arch-key">Alerts</span><span className="bk-arch-val">Email to oscar@next-guard.com via Resend API on failure</span></div>
+          <div className="bk-arch-row"><span className="bk-arch-key">Audit</span><span className="bk-arch-val">Each check logged in qt_audit_log</span></div>
         </div>
       </div>
     </div>
