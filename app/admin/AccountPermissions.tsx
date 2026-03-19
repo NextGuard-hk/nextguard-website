@@ -1,6 +1,6 @@
 "use client"
-import { useState } from "react"
-import { getPermissionsByGroup, countGranted, DEFAULT_PERMISSIONS, PERMISSION_DEFS } from "@/lib/permissions-config"
+import { useState, useEffect, useMemo } from "react"
+import { getPermissionsByGroup, countGranted, DEFAULT_PERMISSIONS, PERMISSION_DEFS, sanitizePermissions } from "@/lib/permissions-config"
 
 interface AccountPermissionsProps {
   account: any
@@ -10,21 +10,33 @@ interface AccountPermissionsProps {
 export default function AccountPermissions({ account, onSave }: AccountPermissionsProps) {
   const [expanded, setExpanded] = useState(false)
   const [localPerms, setLocalPerms] = useState<Record<string, boolean>>(
-    () => {
-      const perms = account.permissions || DEFAULT_PERMISSIONS
-      const result: Record<string, boolean> = {}
-      PERMISSION_DEFS.forEach(p => { result[p.key] = perms[p.key] === true })
-      return result
-    }
+    () => sanitizePermissions(account.permissions)
   )
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  const { granted, total } = countGranted(account.permissions)
+  // Sync localPerms when account.permissions changes externally (e.g. after save)
+  useEffect(() => {
+    if (!dirty) {
+      setLocalPerms(sanitizePermissions(account.permissions))
+    }
+  }, [account.permissions])
+
+  // Use localPerms for badge count so it reflects unsaved changes
+  const { granted, total } = useMemo(() => countGranted(localPerms), [localPerms])
   const grouped = getPermissionsByGroup()
 
   function togglePerm(key: string) {
     setLocalPerms(prev => ({ ...prev, [key]: !prev[key] }))
+    setDirty(true)
+  }
+
+  function toggleGroup(groupId: string) {
+    const groupPerms = PERMISSION_DEFS.filter(p => p.group === groupId)
+    const allTrue = groupPerms.every(p => localPerms[p.key])
+    const updated = { ...localPerms }
+    groupPerms.forEach(p => { updated[p.key] = !allTrue })
+    setLocalPerms(updated)
     setDirty(true)
   }
 
@@ -43,10 +55,7 @@ export default function AccountPermissions({ account, onSave }: AccountPermissio
   }
 
   function handleCancel() {
-    const perms = account.permissions || DEFAULT_PERMISSIONS
-    const result: Record<string, boolean> = {}
-    PERMISSION_DEFS.forEach(p => { result[p.key] = perms[p.key] === true })
-    setLocalPerms(result)
+    setLocalPerms(sanitizePermissions(account.permissions))
     setDirty(false)
     setExpanded(false)
   }
@@ -89,34 +98,44 @@ export default function AccountPermissions({ account, onSave }: AccountPermissio
           </div>
 
           <div className="space-y-3">
-            {grouped.map(({ group, permissions }) => (
-              <div key={group.id}>
-                <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                  <span>{group.icon}</span>
-                  <span>{group.label}</span>
+            {grouped.map(({ group, permissions }) => {
+              const groupAllChecked = permissions.every(p => localPerms[p.key])
+              const groupSomeChecked = permissions.some(p => localPerms[p.key]) && !groupAllChecked
+              return (
+                <div key={group.id}>
+                  <button
+                    onClick={() => toggleGroup(group.id)}
+                    className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5 hover:text-zinc-300 transition-colors w-full"
+                  >
+                    <span>{group.icon}</span>
+                    <span>{group.label}</span>
+                    <span className={"ml-auto text-[10px] px-1.5 py-0.5 rounded " + (groupAllChecked ? "bg-green-500/20 text-green-400" : groupSomeChecked ? "bg-yellow-500/20 text-yellow-400" : "bg-zinc-700 text-zinc-500")}>
+                      {permissions.filter(p => localPerms[p.key]).length}/{permissions.length}
+                    </span>
+                  </button>
+                  <div className="space-y-1">
+                    {permissions.map(perm => (
+                      <label
+                        key={perm.key}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-700/50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={localPerms[perm.key] || false}
+                          onChange={() => togglePerm(perm.key)}
+                          className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <span className={"text-sm " + (localPerms[perm.key] ? "text-white" : "text-zinc-400")}>{perm.label}</span>
+                          {perm.description && <p className="text-xs text-zinc-600">{perm.description}</p>}
+                        </div>
+                        <span className={"w-2 h-2 rounded-full " + (localPerms[perm.key] ? "bg-green-400" : "bg-zinc-600")} />
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  {permissions.map(perm => (
-                    <label
-                      key={perm.key}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-700/50 cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={localPerms[perm.key] || false}
-                        onChange={() => togglePerm(perm.key)}
-                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <span className={"text-sm " + (localPerms[perm.key] ? "text-white" : "text-zinc-400")}>{perm.label}</span>
-                        {perm.description && <p className="text-xs text-zinc-600">{perm.description}</p>}
-                      </div>
-                      <span className={"w-2 h-2 rounded-full " + (localPerms[perm.key] ? "bg-green-400" : "bg-zinc-600")} />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-700">
