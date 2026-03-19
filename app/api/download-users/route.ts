@@ -341,7 +341,7 @@ export async function PUT(req: NextRequest) {
     }
     if (action === 'admin-create') {
       const email = req.nextUrl.searchParams.get('email') || ''
-      const password = req.nextUrl.searchParams.get('password') || ''
+      let bodyData: any = {}; try { bodyData = await req.json() } catch {} const password = bodyData.password || req.nextUrl.searchParams.get('password') || ''
       const company = req.nextUrl.searchParams.get('company') || ''
       const contactName = req.nextUrl.searchParams.get('contactName') || ''
       const permStr = req.nextUrl.searchParams.get('permissions')
