@@ -38,23 +38,26 @@ async function initTable() {
   return { ok: true, message: 'Table url_category_db ready' }
 }
 
-// ===== Tranco seeding =====
-async function seedTranco(limit: number = 10000, cfEnrich: boolean = false) {
+// ===== Tranco seeding with offset pagination =====
+async function seedTranco(limit: number = 2000, offset: number = 0, cfEnrich: boolean = false) {
   const db = getDB()
-  // Tranco Top 1M CSV: rank,domain
-  const res = await fetch('https://tranco-list.eu/top-1m.csv.zip', {
-    signal: AbortSignal.timeout(30000)
-  })
-  if (!res.ok) throw new Error('Failed to fetch Tranco list')
+  // Use Tranco latest list redirect to get current list ID
+  const listRes = await fetch('https://tranco-list.eu/top-1m-id', {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(5000)
+  }).catch(() => null)
+  // Fallback to known good list ID
+  const listId = listRes?.ok ? (await listRes.text()).trim() : 'L76X4'
   
-  // Tranco serves plain CSV at this URL without zip
-  const csvRes = await fetch('https://tranco-list.eu/download/L76X4/1000000', {
-    signal: AbortSignal.timeout(60000)
+  // Fetch CSV - full download but process only offset..offset+limit
+  const csvRes = await fetch(`https://tranco-list.eu/download/${listId}/1000000`, {
+    signal: AbortSignal.timeout(55000)
   })
-  if (!csvRes.ok) throw new Error('Failed to fetch Tranco CSV')
+  if (!csvRes.ok) throw new Error(`Failed to fetch Tranco CSV: ${csvRes.status}`)
   
   const text = await csvRes.text()
-  const lines = text.trim().split('\n').slice(0, limit)
+  const allLines = text.trim().split('\n')
+  const lines = allLines.slice(offset, offset + limit)
   
   let inserted = 0
   let skipped = 0
@@ -70,11 +73,7 @@ async function seedTranco(limit: number = 10000, cfEnrich: boolean = false) {
       const rank = parseInt(parts[0])
       const domain = parts[1].trim().toLowerCase().replace(/^www\./, '')
       if (!domain || domain.length < 3) continue
-      
-      // Local categorization
       const cats = categorizeUrl(domain)
-      
-      // CF Intel enrichment (optional, rate-limited)
       let finalCats = cats
       if (cfEnrich && isCloudflareIntelConfigured() && cats.includes('Uncategorized')) {
         try {
@@ -82,81 +81,96 @@ async function seedTranco(limit: number = 10000, cfEnrich: boolean = false) {
           if (cfCats && cfCats.length > 0) finalCats = cfCats
         } catch {}
       }
-      
       entries.push({ domain, rank, cats: finalCats })
     }
     
-    // Batch upsert
     for (const e of entries) {
       try {
         await db.execute({
           sql: `INSERT INTO url_category_db (domain, categories, source, rank, confidence)
                 VALUES (?, ?, 'tranco', ?, 75)
-                ON CONFLICT(domain) DO UPDATE SET
-                  categories=excluded.categories,
-                  rank=excluded.rank,
-                  updated_at=datetime('now')`,
+                ON CONFLICT(domain) DO UPDATE SET categories=excluded.categories, rank=excluded.rank, updated_at=datetime('now')`,
           args: [e.domain, JSON.stringify(e.cats), e.rank]
         })
         inserted++
       } catch { skipped++ }
     }
-    
-    // Yield every 500 to avoid timeout
     if (i % 500 === 0 && i > 0) await new Promise(r => setTimeout(r, 10))
   }
   
-  return { ok: true, inserted, skipped, source: 'tranco', limit }
+  return { ok: true, inserted, skipped, source: 'tranco', listId, offset, limit, totalAvailable: allLines.length }
+}
+
+// ===== OISD blocklist (ads/tracking/malware domains) =====
+async function seedOISD() {
+  const db = getDB()
+  const res = await fetch('https://big.oisd.nl/domainswild', {
+    signal: AbortSignal.timeout(30000)
+  })
+  if (!res.ok) throw new Error('OISD fetch failed')
+  const text = await res.text()
+  const lines = text.split('\n').filter(l => l.trim() && !l.startsWith('#'))
+  let inserted = 0
+  let skipped = 0
+  // Process first 20000 domains
+  for (const line of lines.slice(0, 20000)) {
+    const domain = line.trim().replace(/^\*\./, '').toLowerCase()
+    if (!domain || domain.length < 3 || domain.includes(' ')) continue
+    const cats = categorizeUrl(domain)
+    const finalCats = cats.includes('Uncategorized') ? ['Ads/Tracking'] : cats
+    try {
+      await db.execute({
+        sql: `INSERT INTO url_category_db (domain, categories, source, is_malicious, threat_type, confidence)
+              VALUES (?, ?, 'oisd', 1, 'ads-tracking', 80)
+              ON CONFLICT(domain) DO UPDATE SET
+                categories=CASE WHEN url_category_db.source IN ('urlhaus','phishtank','threatfox') THEN url_category_db.categories ELSE excluded.categories END,
+                updated_at=datetime('now')`,
+        args: [domain, JSON.stringify(finalCats)]
+      })
+      inserted++
+    } catch { skipped++ }
+  }
+  return { ok: true, inserted, skipped, source: 'oisd' }
 }
 
 // ===== URLhaus threat feed =====
 async function seedURLhaus() {
   const db = getDB()
-  // URLhaus online CSV feed - only active malicious URLs
   const res = await fetch('https://urlhaus.abuse.ch/downloads/csv_online/', {
     signal: AbortSignal.timeout(30000)
   })
   if (!res.ok) throw new Error('URLhaus fetch failed')
   const text = await res.text()
-  
   const lines = text.split('\n').filter(l => !l.startsWith('#') && l.trim())
   let inserted = 0
   let skipped = 0
-  
   for (const line of lines.slice(0, 50000)) {
-    // Format: id,dateadded,url,url_status,last_online,threat,tags,urlhaus_link,reporter
     const parts = line.split(',')
     if (parts.length < 6) continue
     const url = parts[2]?.replace(/"/g, '').trim()
     const threat = parts[5]?.replace(/"/g, '').trim() || 'malware'
     if (!url || !url.startsWith('http')) continue
-    
     try {
       const domain = new URL(url).hostname.replace(/^www\./, '').toLowerCase()
       if (!domain) continue
-      const cats = threat.toLowerCase().includes('phish') 
+      const cats = threat.toLowerCase().includes('phish')
         ? JSON.stringify(['Phishing', 'Malware'])
         : JSON.stringify(['Malware'])
-      
       await db.execute({
         sql: `INSERT INTO url_category_db (domain, categories, source, is_malicious, threat_type, confidence)
               VALUES (?, ?, 'urlhaus', 1, ?, 95)
-              ON CONFLICT(domain) DO UPDATE SET
-                is_malicious=1, threat_type=excluded.threat_type,
-                categories=excluded.categories, updated_at=datetime('now')`,
+              ON CONFLICT(domain) DO UPDATE SET is_malicious=1, threat_type=excluded.threat_type, categories=excluded.categories, updated_at=datetime('now')`,
         args: [domain, cats, threat]
       })
       inserted++
     } catch { skipped++ }
   }
-  
   return { ok: true, inserted, skipped, source: 'urlhaus' }
 }
 
 // ===== PhishTank feed =====
 async function seedPhishTank() {
   const db = getDB()
-  // PhishTank verified phishing URLs (JSON)
   const res = await fetch('https://data.phishtank.com/data/online-valid.csv', {
     headers: { 'User-Agent': 'NextGuard-Security/1.0 (nextguard@nextguard.com)' },
     signal: AbortSignal.timeout(30000)
@@ -164,42 +178,32 @@ async function seedPhishTank() {
   if (!res.ok) throw new Error(`PhishTank fetch failed: ${res.status}`)
   const text = await res.text()
   const lines = text.split('\n').filter(l => l.trim() && !l.startsWith('phish_id'))
-  
   let inserted = 0
   let skipped = 0
-  
   for (const line of lines.slice(0, 30000)) {
-    // Format: phish_id,url,phish_detail_url,submission_time,verified,verification_time,online,target
     const parts = line.split(',')
     const url = parts[1]?.replace(/"/g, '').trim()
     if (!url || !url.startsWith('http')) continue
-    
     try {
       const domain = new URL(url).hostname.replace(/^www\./, '').toLowerCase()
       if (!domain) continue
-      
       await db.execute({
         sql: `INSERT INTO url_category_db (domain, categories, source, is_malicious, threat_type, confidence)
               VALUES (?, ?, 'phishtank', 1, 'phishing', 97)
-              ON CONFLICT(domain) DO UPDATE SET
-                is_malicious=1, threat_type='phishing',
-                categories=excluded.categories, updated_at=datetime('now')`,
+              ON CONFLICT(domain) DO UPDATE SET is_malicious=1, threat_type='phishing', categories=excluded.categories, updated_at=datetime('now')`,
         args: [domain, JSON.stringify(['Phishing', 'Scam/Fraud'])]
       })
       inserted++
     } catch { skipped++ }
   }
-  
   return { ok: true, inserted, skipped, source: 'phishtank' }
 }
 
-// ===== abuse.ch OISD + additional threat feeds =====
+// ===== abuse.ch ThreatFox =====
 async function seedAbuseFeeds() {
   const db = getDB()
   let inserted = 0
   let skipped = 0
-  
-  // abuse.ch ThreatFox - IOC feed (domains)
   try {
     const res = await fetch('https://threatfox.abuse.ch/export/csv/domains/recent/', {
       signal: AbortSignal.timeout(20000)
@@ -209,23 +213,18 @@ async function seedAbuseFeeds() {
       const lines = text.split('\n').filter(l => !l.startsWith('#') && l.trim())
       for (const line of lines.slice(0, 20000)) {
         const parts = line.split(',')
-        // first_seen, ioc_value, ioc_type, threat_type, malware, confidence, tags
         const domain = parts[1]?.replace(/"/g, '').trim().toLowerCase()
         const threat = parts[3]?.replace(/"/g, '').trim() || 'malware'
         const conf = parseInt(parts[5] || '80') || 80
         if (!domain || domain.length < 3 || domain.includes('/')) continue
-        
-        const cats = threat.toLowerCase().includes('botnet') 
+        const cats = threat.toLowerCase().includes('botnet')
           ? JSON.stringify(['Botnet/C2', 'Malware'])
           : JSON.stringify(['Malware'])
-        
         try {
           await db.execute({
             sql: `INSERT INTO url_category_db (domain, categories, source, is_malicious, threat_type, confidence)
                   VALUES (?, ?, 'threatfox', 1, ?, ?)
-                  ON CONFLICT(domain) DO UPDATE SET
-                    is_malicious=1, threat_type=excluded.threat_type,
-                    categories=excluded.categories, updated_at=datetime('now')`,
+                  ON CONFLICT(domain) DO UPDATE SET is_malicious=1, threat_type=excluded.threat_type, categories=excluded.categories, updated_at=datetime('now')`,
             args: [domain, cats, threat, conf]
           })
           inserted++
@@ -233,7 +232,6 @@ async function seedAbuseFeeds() {
       }
     }
   } catch {}
-  
   return { ok: true, inserted, skipped, sources: ['threatfox'] }
 }
 
@@ -241,11 +239,14 @@ async function seedAbuseFeeds() {
 async function getStats() {
   const db = getDB()
   const total = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM url_category_db', args: [] })
-  const bySource = await db.execute({ sql: 'SELECT source, COUNT(*) as cnt FROM url_category_db GROUP BY source ORDER BY cnt DESC', args: [] })
-  const malicious = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM url_category_db WHERE is_malicious=1', args: [] })
+  const bySource = await db.execute({
+    sql: 'SELECT source, COUNT(*) as cnt FROM url_category_db GROUP BY source ORDER BY cnt DESC', args: []
+  })
+  const malicious = await db.execute({
+    sql: 'SELECT COUNT(*) as cnt FROM url_category_db WHERE is_malicious=1', args: []
+  })
   const topCats = await db.execute({
-    sql: `SELECT categories, COUNT(*) as cnt FROM url_category_db GROUP BY categories ORDER BY cnt DESC LIMIT 20`,
-    args: []
+    sql: `SELECT categories, COUNT(*) as cnt FROM url_category_db GROUP BY categories ORDER BY cnt DESC LIMIT 20`, args: []
   })
   return {
     total: (total.rows[0] as any).cnt,
@@ -260,41 +261,46 @@ export async function GET(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  
+
   const action = req.nextUrl.searchParams.get('action') || 'stats'
-  const limit = parseInt(req.nextUrl.searchParams.get('limit') || '10000')
+  const limit = parseInt(req.nextUrl.searchParams.get('limit') || '2000')
+  const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0')
   const cfEnrich = req.nextUrl.searchParams.get('cf') === '1'
-  
+
   try {
     if (action === 'init') {
       const r = await initTable()
       return NextResponse.json(r)
     }
-    
+
     if (action === 'tranco') {
       await initTable()
-      const r = await seedTranco(limit, cfEnrich)
+      const r = await seedTranco(limit, offset, cfEnrich)
       return NextResponse.json(r)
     }
-    
+
     if (action === 'urlhaus') {
       await initTable()
       const r = await seedURLhaus()
       return NextResponse.json(r)
     }
-    
+
     if (action === 'phishtank') {
       await initTable()
       const r = await seedPhishTank()
       return NextResponse.json(r)
     }
-    
+
+    if (action === 'oisd') {
+      await initTable()
+      const r = await seedOISD()
+      return NextResponse.json(r)
+    }
+
     if (action === 'threats') {
       await initTable()
       const [urlhaus, phishtank, abuse] = await Promise.allSettled([
-        seedURLhaus(),
-        seedPhishTank(),
-        seedAbuseFeeds()
+        seedURLhaus(), seedPhishTank(), seedAbuseFeeds()
       ])
       return NextResponse.json({
         ok: true,
@@ -303,34 +309,46 @@ export async function GET(req: NextRequest) {
         threatfox: abuse.status === 'fulfilled' ? abuse.value : { error: String((abuse as any).reason) }
       })
     }
-    
+
     if (action === 'stats') {
       const r = await getStats()
       return NextResponse.json(r)
     }
-    
-    if (action === 'all') {
-      // Full seed: init + tranco top 50k + all threats
+
+    // Cron action: update threats + OISD (designed for scheduled runs)
+    if (action === 'cron') {
       await initTable()
-      const tranco = await seedTranco(limit, false)
-      const [urlhaus, phishtank, abuse] = await Promise.allSettled([
-        seedURLhaus(),
-        seedPhishTank(),
-        seedAbuseFeeds()
+      const [threats, oisd] = await Promise.allSettled([
+        Promise.allSettled([seedURLhaus(), seedPhishTank(), seedAbuseFeeds()]),
+        seedOISD()
       ])
       const stats = await getStats()
       return NextResponse.json({
         ok: true,
-        tranco,
-        urlhaus: urlhaus.status === 'fulfilled' ? urlhaus.value : { error: String((urlhaus as any).reason) },
-        phishtank: phishtank.status === 'fulfilled' ? phishtank.value : { error: String((phishtank as any).reason) },
-        threatfox: abuse.status === 'fulfilled' ? abuse.value : { error: String((abuse as any).reason) },
+        threats: threats.status === 'fulfilled' ? 'done' : 'failed',
+        oisd: oisd.status === 'fulfilled' ? oisd.value : { error: String((oisd as any).reason) },
         stats
       })
     }
-    
-    return NextResponse.json({ error: 'Unknown action', actions: ['init','tranco','urlhaus','phishtank','threats','all','stats'] }, { status: 400 })
-    
+
+    if (action === 'all') {
+      await initTable()
+      const tranco = await seedTranco(limit, offset, false)
+      const [urlhaus, phishtank, abuse, oisd] = await Promise.allSettled([
+        seedURLhaus(), seedPhishTank(), seedAbuseFeeds(), seedOISD()
+      ])
+      const stats = await getStats()
+      return NextResponse.json({
+        ok: true, tranco,
+        urlhaus: urlhaus.status === 'fulfilled' ? urlhaus.value : { error: String((urlhaus as any).reason) },
+        phishtank: phishtank.status === 'fulfilled' ? phishtank.value : { error: String((phishtank as any).reason) },
+        threatfox: abuse.status === 'fulfilled' ? abuse.value : { error: String((abuse as any).reason) },
+        oisd: oisd.status === 'fulfilled' ? oisd.value : { error: String((oisd as any).reason) },
+        stats
+      })
+    }
+
+    return NextResponse.json({ error: 'Unknown action', actions: ['init','tranco','urlhaus','phishtank','oisd','threats','cron','all','stats'] }, { status: 400 })
   } catch (e: any) {
     console.error('Seed error:', e)
     return NextResponse.json({ error: e.message || 'Internal error' }, { status: 500 })
