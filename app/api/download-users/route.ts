@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+import { buildDefaultPermissionsWithRole } from '@/lib/permissions-config'
 const USERS_NPOINT_URL = process.env.NPOINT_DOWNLOAD_USERS_URL || ''
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 const LOG_NPOINT_URL = process.env.NPOINT_LOGS_URL || ''
@@ -264,7 +265,7 @@ export async function GET(req: NextRequest) {
       loginCount: u.loginCount || 0,
       mustResetPassword: u.mustResetPassword || false,
             qtRole: u.qtRole || undefined,
-      permissions: u.permissions || { kb: false, download: true, socReview: false, projectAccess: false, quotation: false, pocLicense: false, productionLicense: false, qtRole: 'viewer' },
+      permissions: u.permissions || buildDefaultPermissionsWithRole(),
     }))
     return NextResponse.json({ users: safeUsers })
   } catch {
@@ -361,7 +362,7 @@ export async function PUT(req: NextRequest) {
         active: true,
         emailVerified: true,
         loginCount: 0,
-        permissions: permissions || { kb: false, download: true, socReview: false, projectAccess: false, quotation: false, pocLicense: false, productionLicense: false, qtRole: 'viewer' },
+        permissions: permissions || buildDefaultPermissionsWithRole(),
       }
       users.push(newUser)
       await saveUsers(users)
@@ -369,6 +370,8 @@ export async function PUT(req: NextRequest) {
       await notifyAdminNewUser(contactName, email, company, 'admin-create')
       await writeLog({ type: 'download-user', action: 'admin-create', email, company })
       return NextResponse.json({ success: true, message: 'Account created successfully' })
+
+          }
     if (action === 'set-password') {
       const targetEmail = req.nextUrl.searchParams.get('email') || ''
       const newPassword = req.nextUrl.searchParams.get('password') || ''
@@ -380,7 +383,6 @@ export async function PUT(req: NextRequest) {
       await saveUsers(users)
       await writeLog({ type: 'download-user', action: 'admin-set-password', email: user.email })
       return NextResponse.json({ success: true, message: 'Password updated successfully' })
-    }
     }
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch {
