@@ -182,7 +182,42 @@
     },
     {
       "path": "/api/v1/threat-intel/ingest-categories?key=nextguard-ti-admin-2024-secure&category=lingerie",
-      "schedule": "30 6 * * *"
+      "schedule": "30 6 * * *",
+    {
+      "path": "/api/v1/url-db/seed?action=cron&secret=nextguard-cron-2024-secure",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=recategorize&limit=500&secret=nextguard-cron-2024-secure",
+      "schedule": "30 1 * * *"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=0&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 0"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=5000&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=10000&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 2"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=15000&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 3"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=20000&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 4"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=25000&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 5"
+    },
+    {
+      "path": "/api/v1/url-db/seed?action=tranco&limit=5000&offset=30000&secret=nextguard-cron-2024-secure",
+      "schedule": "0 7 * * 6"
     }
   ]
 }
