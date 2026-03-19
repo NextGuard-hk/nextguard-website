@@ -78,7 +78,7 @@ export default function QuotationPDF() {
       const d = ctx.getImageData(0, 0, c.width, c.height)
       for (let i = 0; i < d.data.length; i += 4) {
         const r = d.data[i], g = d.data[i+1], b = d.data[i+2]
-        if (r < 30 && g < 30 && b < 30) d.data[i+3] = 0
+        if (r < 30 && g < 30 && b < 30) { d.data[i+3] = 0 } else if (r > 200 && g > 200 && b > 200) { d.data[i] = 17; d.data[i+1] = 24; d.data[i+2] = 39 }
       }
       ctx.putImageData(d, 0, 0)
       setLogoSrc(c.toDataURL('image/png'))
