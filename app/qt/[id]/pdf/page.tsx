@@ -81,7 +81,7 @@ export default function QuotationPDF() {
         if (r < 30 && g < 30 && b < 30) { d.data[i+3] = 0 } else if (r > 200 && g > 200 && b > 200) { d.data[i] = 17; d.data[i+1] = 24; d.data[i+2] = 39 }
       }
       ctx.putImageData(d, 0, 0)
-      void 0 // logo already set
+      setLogoSrc(c.toDataURL('image/png'))
     }
     img.src = '/images/nextguard-logo.png'
   }, [])
@@ -120,7 +120,7 @@ export default function QuotationPDF() {
         <div className="pdf-doc">
           <div className="pdf-header">
             <div>
-              <img src="/images/nextguard-logo.png" alt="NextGuard" style={{height:'55px',mixBlendMode:'multiply'}} />
+              <img src={logoSrc} alt="NextGuard" style={{height:'55px'}} />
               <div className="pdf-logo-sub">NextGuard Technology Limited</div>
               <div className="pdf-logo-sub">Re-think Data Security</div>
             </div>
