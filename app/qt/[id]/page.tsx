@@ -304,7 +304,7 @@ export default function QuotationDetail() {
             {qt.status==='sent' && <button onClick={()=>updateStatus('accepted')} disabled={statusUpdating} className="qd-b" style={{background:'#22c55e'}}>Accept</button>}
             {qt.status==='sent' && <button onClick={()=>updateStatus('rejected')} disabled={statusUpdating} className="qd-b" style={{background:'#ef4444'}}>Reject</button>}
             {['draft','sent'].includes(qt.status) && <button onClick={()=>updateStatus('cancelled')} disabled={statusUpdating} className="qd-b" style={{background:'#6b7280'}}>Cancel</button>}
-            <button onClick={()=>router.push(`/qt/${id}/pdf`)} className="qd-b" style={{background:'#374151'}}>PDF</button> <button onClick={()=>{if(confirm('Delete this quotation?')){fetch('/api/qt-quotations/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.success)router.push('/qt');else alert(d.error||'Failed')})}}} className="qd-b" style={{background:'#dc2626'}}>Delete</button>
+            <button onClick={()=>router.push(`/qt/${id}/pdf`)} className="qd-b" style={{background:'#374151'}}>PDF</button> <button onClick={() => router.push(`/qt/${id}/invoice`)} className="qd-b" style={{background:'#059669'}}>Invoice</button> <button onClick={() => router.push(`/qt/${id}/invoice`)} className="qd-b" style={{background:'#059669'}}>Invoice</button>
           </>}
         </div>
       </div>
