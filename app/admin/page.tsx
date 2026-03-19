@@ -388,7 +388,7 @@ export default function AdminPage() {
     if (!newToken.company || !newToken.contact || !newToken.email) { alert('All fields required'); return }
     setTokensLoading(true)
     try {
-      const r = await fetch('/api/download-tokens?action=create&company=' + encodeURIComponent(newToken.company) + '&contact=' + encodeURIComponent(newToken.contact) + '&email=' + encodeURIComponent(newToken.email) + '&type=' + encodeURIComponent(newToken.type))
+      const r = await fetch('/api/download-tokens', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'create',...newToken}))
       if (r.ok) {
         const d = await r.json()
         alert('Token created: ' + d.token.token)
@@ -401,7 +401,7 @@ export default function AdminPage() {
 
   async function toggleTokenActive(id: string, active: boolean) {
     try {
-      const r = await fetch('/api/download-tokens?action=toggle&id=' + encodeURIComponent(id) + '&active=' + (!active))
+      const r = await fetch('/api/download-tokens', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'toggle', id, active: !active}))
       if (r.ok) fetchTokens()
     } catch {}
   }
@@ -409,7 +409,7 @@ export default function AdminPage() {
   async function deleteTokenAction(id: string) {
     if (!confirm('Delete this token permanently?')) return
     try {
-      const r = await fetch('/api/download-tokens?action=delete&id=' + encodeURIComponent(id))
+      const r = await fetch('/api/download-tokens', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'delete', id}))
       if (r.ok) fetchTokens()
     } catch {}
   }
@@ -426,7 +426,7 @@ export default function AdminPage() {
   async function approveRequest(id: string) {
     if (!confirm('Approve this request and send token via email?')) return
     try {
-      const r = await fetch('/api/download-tokens/request?action=approve&id=' + encodeURIComponent(id))
+      const r = await fetch('/api/download-tokens/request', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'approve', id}))
       if (r.ok) {
         const d = await r.json()
         alert('Approved! Token: ' + d.token)
@@ -440,7 +440,7 @@ export default function AdminPage() {
     const reason = prompt('Rejection reason (optional):', 'Your request does not meet our current access criteria.')
     if (reason === null) return
     try {
-      const r = await fetch('/api/download-tokens/request?action=reject&id=' + encodeURIComponent(id) + '&reason=' + encodeURIComponent(reason))
+      const r = await fetch('/api/download-tokens/request', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'reject', id, reason}))
       if (r.ok) { fetchTokenRequests() }
     } catch {}
   }
@@ -492,7 +492,7 @@ export default function AdminPage() {
     if (!newAccName || !newAccEmail || !newAccPassword || !newAccCompany) { alert('All fields required'); return }
     setCreateAccLoading(true)
     try {
-      const r = await fetch('/api/download-users?action=admin-create&email=' + encodeURIComponent(newAccEmail) + '&contactName=' + encodeURIComponent(newAccName) + '&company=' + encodeURIComponent(newAccCompany) + '&role=' + encodeURIComponent(newAccRole), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: newAccPassword }) })
+      const r = await fetch('/api/download-users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'admin-create', email: newAccEmail, contactName: newAccName, company: newAccCompany, role: newAccRole, password: newAccPassword }) })
       const d = await r.json()
       if (r.ok) { alert(d.message || 'Account created'); setShowCreateAccount(false); setNewAccName(''); setNewAccEmail(''); setNewAccPassword(''); setNewAccCompany(''); setNewAccRole('User'); fetchAccounts() }
       else alert(d.error || 'Failed to create account')
@@ -938,11 +938,11 @@ export default function AdminPage() {
                       <td className="py-3 pr-4 text-zinc-300">{a.loginCount || 0}</td>
                       <td className="py-3 pr-4 text-zinc-300 text-xs">{a.lastLogin ? new Date(a.lastLogin).toLocaleString() : "-"}</td>
                       <td className="py-3 pr-4 text-zinc-300 text-xs">{new Date(a.createdAt).toLocaleDateString()}</td>
-                <td className="py-3 pr-4"><AccountPermissions account={a} onSave={async (id, perms) => { const r = await fetch('/api/download-users?action=set-permissions&id=' + encodeURIComponent(id) + '&permissions=' + encodeURIComponent(JSON.stringify(perms)), {method:'PUT'}); if(r.ok) fetchAccounts(); else throw new Error('Failed') }} /></td>
+                <td className="py-3 pr-4"><AccountPermissions account={a} onSave={async (id, perms) => { const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'set-permissions', id, permissions: perms})); if(r.ok) fetchAccounts(); else throw new Error('Failed') }} /></td>
                       <td className="py-3">
                         <button onClick={() => toggleAccountActive(a.id)} className={(a.active ? "bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400" : "bg-green-600/20 hover:bg-green-600/30 text-green-400") + " px-2 py-1 rounded text-xs mr-1"}>{a.active ? "Disable" : "Enable"}</button>
                         <button onClick={() => deleteAccount(a.id)} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-2 py-1 rounded text-xs">Delete</button>
-                                              <button onClick={() => resetAccountPassword(a.id)} className="bg-yellow-600 hover:bg-yellow-500 text-white text-xs px-2 py-1 rounded">Reset PW</button><select value={a.permissions?.qtRole || 'viewer'} onChange={(e) => { const perms = a.permissions || {}; const updated = {...perms, qtRole: e.target.value}; setAccounts((prev: any) => prev.map((acc: any) => acc.id === a.id ? {...acc, permissions: updated} : acc)); fetch('/api/download-users?action=set-permissions&id=' + encodeURIComponent(a.id) + '&permissions=' + encodeURIComponent(JSON.stringify(updated)), {method:'PUT'}).then(r => { if(r.ok) fetchAccounts() }) }} className="bg-zinc-800 border border-zinc-700 rounded text-xs text-white px-1 py-0.5 mt-1"><option value="admin">QT:Admin</option><option value="sales">QT:Sales</option><option value="viewer">QT:Viewer</option></select>
+                                              <button onClick={() => resetAccountPassword(a.id)} className="bg-yellow-600 hover:bg-yellow-500 text-white text-xs px-2 py-1 rounded">Reset PW</button><select value={a.permissions?.qtRole || 'viewer'} onChange={(e) => { const perms = a.permissions || {}; const updated = {...perms, qtRole: e.target.value}; setAccounts((prev: any) => prev.map((acc: any) => acc.id === a.id ? {...acc, permissions: updated} : acc)); fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'set-permissions', id: a.id, permissions: updated})).then(r => { if(r.ok) fetchAccounts() }) }} className="bg-zinc-800 border border-zinc-700 rounded text-xs text-white px-1 py-0.5 mt-1"><option value="admin">QT:Admin</option><option value="sales">QT:Sales</option><option value="viewer">QT:Viewer</option></select>
                       </td>
                     </tr>
                   ))}</tbody>
