@@ -48,7 +48,7 @@ async function seedTranco(limit: number = 10000, cfEnrich: boolean = false) {
   if (!res.ok) throw new Error('Failed to fetch Tranco list')
   
   // Tranco serves plain CSV at this URL without zip
-  const csvRes = await fetch('https://tranco-list.eu/download/Z66WW/1000000', {
+  const csvRes = await fetch('https://tranco-list.eu/download/L76X4/1000000', {
     signal: AbortSignal.timeout(60000)
   })
   if (!csvRes.ok) throw new Error('Failed to fetch Tranco CSV')
