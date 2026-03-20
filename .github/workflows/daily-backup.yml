@@ -73,10 +73,24 @@ jobs:
 
       - name: Backup Quotation System DB (integrity check)
         run: |
-          echo "Running Quotation System DB integrity check..."
-          RESPONSE=$(curl -s -o qt-backup.json -w "%{http_code}" \
+                    echo "Running Quotation System DB integrity check (with retry)..."
+          # Warm-up request to wake up serverless function
+          curl -s -o /dev/null --max-time 10 \
             -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-            "https://www.next-guard.com/api/qt-backup")
+            "https://www.next-guard.com/api/qt-backup" || true
+          sleep 3
+          # Actual backup request with retry (up to 3 attempts)
+          for ATTEMPT in 1 2 3; do
+            echo "Attempt $ATTEMPT of 3..."
+            RESPONSE=$(curl -s -o qt-backup.json -w "%{http_code}" --max-time 55 \
+              -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+              "https://www.next-guard.com/api/qt-backup")
+            if [ "$RESPONSE" = "200" ]; then
+              break
+            fi
+            echo "Attempt $ATTEMPT failed with HTTP $RESPONSE, retrying in 10s..."
+            sleep 10
+          done
           echo "HTTP Status: $RESPONSE"
           cat qt-backup.json | jq .
           if [ "$RESPONSE" != "200" ]; then
@@ -100,7 +114,7 @@ jobs:
             PAGE=1
             TOTAL=0
             while true; do
-              curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+              curl -s --max-time 55 -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
                 "https://www.next-guard.com/api/qt-backup?table=${TABLE}&page=${PAGE}&limit=500" \
                 > backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json
               ROWS=$(cat backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json | jq -r '.export.rows_in_page // "0"')
@@ -122,6 +136,7 @@ jobs:
           echo "Starting full paginated export..."
           DATE=$(date +'%Y-%m-%d')
           mkdir -p backups/full-export
+
           # Export feeds (small table)
           echo "Exporting feeds..."
           curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
@@ -130,6 +145,7 @@ jobs:
           FEED_ROWS=$(cat backups/full-export/feeds-${DATE}.json | jq -r '.export.total_rows // "error"')
           echo "Feeds exported: $FEED_ROWS rows"
           sleep 2
+
           # Export lookup_log
           echo "Exporting lookup_log..."
           curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
@@ -138,6 +154,7 @@ jobs:
           LOG_ROWS=$(cat backups/full-export/lookup_log-${DATE}.json | jq -r '.export.rows_in_page // "error"')
           echo "Lookup log exported: $LOG_ROWS rows"
           sleep 2
+
           # Export indicators (large table, paginated with 1000 rows per page)
           echo "Exporting indicators (paginated, 1000 rows/page)..."
           PAGE=1
