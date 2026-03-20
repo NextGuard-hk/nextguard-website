@@ -12,11 +12,11 @@ interface LineItem {
   id: string; productId: string; productCode: string; description: string
   categoryId: string; siteType: string; qty: number
   applianceUnitPrice: number; licenseUnitPrice: number
-  isIncluded: boolean; notes: string
+  isIncluded: boolean; notes: string; sku: string
 }
 
 function newLine(): LineItem {
-  return { id: Math.random().toString(36).slice(2), productId: '', productCode: '', description: '', categoryId: '', siteType: 'production', qty: 1, applianceUnitPrice: 0, licenseUnitPrice: 0, isIncluded: false, notes: '' }
+  return { id: Math.random().toString(36).slice(2), productId: '', productCode: '', description: '', categoryId: '', siteType: 'production', qty: 1, applianceUnitPrice: 0, licenseUnitPrice: 0, isIncluded: false, notes: '', sku: '' }
 }
 
 const STATUS_COLOR: Record<string,string> = {
@@ -176,7 +176,7 @@ export default function QuotationDetail() {
       applianceUnitPrice: l.appliance_unit_price || 0,
       licenseUnitPrice: l.license_unit_price || 0,
       isIncluded: !!l.is_included,
-      notes: l.notes || ''
+      notes: l.notes || '', sku: l.sku || ''
     }))
     // Try to find categoryId for each line
     for (const el of editLines) {
@@ -256,7 +256,7 @@ export default function QuotationDetail() {
             applianceUnitPrice: l.applianceUnitPrice,
             licenseUnitPrice: l.licenseUnitPrice,
             isIncluded: l.isIncluded,
-            notes: l.notes
+            notes: l.notes, sku: l.sku
           }))
         })
       })
@@ -363,13 +363,13 @@ export default function QuotationDetail() {
             {/* Edit mode - desktop table */}
             <div className="qd-tw">
               <table className="qd-tb">
-                <thead><tr>{['Category','Model','Site','Qty','Appliance','License/yr','Incl?','Notes',''].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Category','Model','SKU','Site','Qty','Appliance','License/yr','Incl?','Notes',''].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {eLines.map(line => (
                     <tr key={line.id}>
                       <td style={{minWidth:160}}><select value={line.categoryId} onChange={e=>onCategoryChange(line.id,e.target.value)} className="qd-ti"><option value=''>-- Category --</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></td>
-                      <td style={{minWidth:180}}><select value={line.productId} onChange={e=>onProductChange(line.id,e.target.value)} disabled={!line.categoryId} className="qd-ti"><option value=''>-- Model --</option>{line.categoryId && getModelsForCategory(line.categoryId).map(p=><option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></td>
-                      <td><select value={line.siteType} onChange={e=>updateLine(line.id,{siteType:e.target.value})} className="qd-ti"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option></select></td>
+                      <td style={{minWidth:180}}><select value={line.productId} onChange={e=>onProductChange(line.id,e.target.value)} disabled={!line.categoryId} className="qd-ti"><option value=''>-- Model --</option>{line.categoryId && getModelsForCategory(line.categoryId).map(p=><option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></td><td><input value={line.sku} onChange={e=>updateLine(line.id,{sku:e.target.value})} placeholder='SKU' className="qd-ti" style={{width:100}} /></td>
+                      <td><select value={line.siteType} onChange={e=>updateLine(line.id,{siteType:e.target.value})} className="qd-ti"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option><option value='na'>NA</option></select></td>
                       <td style={{width:60}}><input type='number' min='1' value={line.qty} onChange={e=>onQtyChange(line.id,parseInt(e.target.value)||1)} className="qd-ti" style={{width:55}} /></td>
                       <td style={{width:110}}><input type='number' value={line.applianceUnitPrice} onChange={e=>updateLine(line.id,{applianceUnitPrice:parseFloat(e.target.value)||0})} className="qd-ti" style={{width:100}} /></td>
                       <td style={{width:110}}><input type='number' value={line.licenseUnitPrice} onChange={e=>updateLine(line.id,{licenseUnitPrice:parseFloat(e.target.value)||0})} className="qd-ti" style={{width:100}} /></td>
@@ -389,7 +389,7 @@ export default function QuotationDetail() {
                   <div className="qd-f"><label className="qd-l">Category</label><select value={line.categoryId} onChange={e=>onCategoryChange(line.id,e.target.value)} className="qd-i"><option value=''>-- Select --</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                   {line.categoryId && <div className="qd-f"><label className="qd-l">Model</label><select value={line.productId} onChange={e=>onProductChange(line.id,e.target.value)} className="qd-i"><option value=''>-- Select --</option>{getModelsForCategory(line.categoryId).map(p=><option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></div>}
                   <div className="qd-g2">
-                    <div><label className="qd-l">Site</label><select value={line.siteType} onChange={e=>updateLine(line.id,{siteType:e.target.value})} className="qd-i"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option></select></div>
+                    <div><label className="qd-l">Site</label><select value={line.siteType} onChange={e=>updateLine(line.id,{siteType:e.target.value})} className="qd-i"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option><option value='na'>NA</option></select></div>
                     <div><label className="qd-l">Qty</label><input type='number' min='1' value={line.qty} onChange={e=>onQtyChange(line.id,parseInt(e.target.value)||1)} className="qd-i" /></div>
                     <div><label className="qd-l">Appliance</label><input type='number' value={line.applianceUnitPrice} onChange={e=>updateLine(line.id,{applianceUnitPrice:parseFloat(e.target.value)||0})} className="qd-i" /></div>
                     <div><label className="qd-l">License/yr</label><input type='number' value={line.licenseUnitPrice} onChange={e=>updateLine(line.id,{licenseUnitPrice:parseFloat(e.target.value)||0})} className="qd-i" /></div>
@@ -398,17 +398,18 @@ export default function QuotationDetail() {
                   <div style={{marginTop:8}}><input value={line.notes} onChange={e=>updateLine(line.id,{notes:e.target.value})} placeholder='Notes' className="qd-i" /></div>
                 </div>
               ))}
+            <div className="qd-f"><label className="qd-l">SKU</label><input value={line.sku} onChange={e=>updateLine(line.id,{sku:e.target.value})} placeholder='SKU' className="qd-i" /></div>
             </div>
           </> : <>
             {/* View mode - desktop table */}
             <div className="qd-tw">
               <table className="qd-tb">
-                <thead><tr><th>Product</th><th>Site</th><th>Qty</th><th>Appliance</th><th>App Total</th><th>License/yr</th>{Array.from({length:qt.term_years},(_,i)=><th key={i}>Yr {i+1}</th>)}<th>Line Total</th><th>Incl?</th></tr></thead>
+                <thead><tr><th>Product</th><th>SKU</th><th>Site</th><th>Qty</th><th>Appliance</th><th>App Total</th><th>License/yr</th>{Array.from({length:qt.term_years},(_,i)=><th key={i}>Yr {i+1}</th>)}<th>Line Total</th><th>Incl?</th></tr></thead>
                 <tbody>
                   {lines.map((line:any)=>(
                     <tr key={line.id}>
                       <td>{line.description||line.product_code}<br/><span style={{color:'#6b7280',fontSize:11}}>{line.product_code}</span></td>
-                      <td>{line.site_type}</td>
+                      <td>{<td>{line.sku || '-'}</td><td>{line.site_type}</td>
                       <td>{line.qty}</td>
                       <td>{fmt(line.appliance_unit_price)}</td>
                       <td>{fmt(line.appliance_total)}</td>
@@ -427,6 +428,7 @@ export default function QuotationDetail() {
                 <div key={line.id} className="qd-mc">
                   <div className="qd-mc-title">{line.description||line.product_code}</div>
                   <div className="qd-mc-row"><span className="qd-mc-label">Code</span><span className="qd-mc-val">{line.product_code}</span></div>
+                  <div className="qd-mc-row"><span className="qd-mc-label">SKU</span><span className="qd-mc-val">{line.sku || '-'}</span></div>
                   <div className="qd-mc-row"><span className="qd-mc-label">Site</span><span className="qd-mc-val">{line.site_type}</span></div>
                   <div className="qd-mc-row"><span className="qd-mc-label">Qty</span><span className="qd-mc-val">{line.qty}</span></div>
                   <div className="qd-mc-row"><span className="qd-mc-label">Appliance</span><span className="qd-mc-val">{fmt(line.appliance_unit_price)}</span></div>
