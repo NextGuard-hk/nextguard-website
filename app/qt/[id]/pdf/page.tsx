@@ -166,7 +166,7 @@ export default function QuotationPDF() {
                       {line.product_code && line.description && <div style={{fontSize:11,color:'#9ca3af'}}>{line.product_code}</div>}
                       {line.notes && <div style={{fontSize:11,color:'#6b7280',marginTop:2}}>{line.notes}</div>}
                     </td>
-                    <td>{<td>{line.sku || '-'}</td><td>{line.site_type}</td>
+                    <td>{line.sku || '-'}</td><td>{line.site_type}</td>
                     <td>{line.qty}</td>
                     <td>{fmt(line.appliance_unit_price)}</td>
                     <td>{fmt(line.appliance_total)}</td>
