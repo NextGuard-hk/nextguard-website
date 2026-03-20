@@ -196,7 +196,6 @@ notes: l.notes, sku: l.sku            </div>
             {lines.map((line, idx) => (
                           <div className="qn-f"><label className="qn-l">SKU</label><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-i" /></div>
               <div key={line.id} className="qn-mc">
-                <div className="qn-mh"><span style={{color:'#9ca3af',fontSize:13}}>Line {idx+1}</span><button onClick={() => removeLine(line.id)} className="qn-rb">✕</button></div>
                 <div className="qn-f"><label className="qn-l">Category</label><select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} className="qn-i"><option value=''>-- Select --</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 {line.categoryId && <div className="qn-f"><label className="qn-l">Model</label><select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} className="qn-i"><option value=''>-- Select --</option>{getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></div>}
                 <div className="qn-g2">
@@ -207,6 +206,7 @@ notes: l.notes, sku: l.sku            </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}><label className="qn-cl"><input type='checkbox' checked={line.isIncluded} onChange={e => updateLine(line.id, {isIncluded:e.target.checked})} /> Included (no charge)</label></div>
                 <div style={{marginTop:8}}><input value={line.notes} onChange={e => updateLine(line.id, {notes:e.target.value})} placeholder='Notes' className="qn-i" /></div>
+                            <div className="qn-f"><label className="qn-l">SKU</label><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-i" /></div>
               </div>
             ))}
           </div>
