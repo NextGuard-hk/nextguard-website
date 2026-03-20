@@ -409,7 +409,7 @@ export default function QuotationDetail() {
                   {lines.map((line:any)=>(
                     <tr key={line.id}>
                       <td>{line.description||line.product_code}<br/><span style={{color:'#6b7280',fontSize:11}}>{line.product_code}</span></td>
-                      <td>{<td>{line.sku || '-'}</td><td>{line.site_type}</td>
+                      <td>{line.sku || '-'}</td><td>{line.site_type}</td>
                       <td>{line.qty}</td>
                       <td>{fmt(line.appliance_unit_price)}</td>
                       <td>{fmt(line.appliance_total)}</td>
