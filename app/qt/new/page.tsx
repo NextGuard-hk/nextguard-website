@@ -11,10 +11,10 @@ interface LineItem {
   id: string; productId: string; productCode: string; description: string
   categoryId: string; siteType: string; qty: number
   applianceUnitPrice: number; licenseUnitPrice: number
-  isIncluded: boolean; notes: string
+  isIncluded: boolean; notes: string; sku: string
 }
 function newLine(): LineItem {
-  return { id: Math.random().toString(36).slice(2), productId: '', productCode: '', description: '', categoryId: '', siteType: 'production', qty: 1, applianceUnitPrice: 0, licenseUnitPrice: 0, isIncluded: false, notes: '' }
+  return { id: Math.random().toString(36).slice(2), productId: '', productCode: '', description: '', categoryId: '', siteType: 'production', qty: 1, applianceUnitPrice: 0, licenseUnitPrice: 0, isIncluded: false, notes: '', sku: '' }
 }
 const CSS = `
 .qn-root{min-height:100vh;background:#0a0e17;color:#e0e0e0;font-family:system-ui,sans-serif}
@@ -116,7 +116,7 @@ export default function NewQuotation() {
     updateLine(lid, { qty, applianceUnitPrice: app, licenseUnitPrice: lic })
   }
   function buildPayload(po = false) {
-    return { customerName, partnerName: partnerName || undefined, endUserName: endUserName || undefined, projectName: projectName || undefined, customerType, termYears, paymentModel, currency, includePs, includeAnnualService, validityDays, leadTime, deliveryLocation, remarks: remarks || undefined, discountPercent: discountPercent || undefined, targetFinalPrice: targetPrice ? parseFloat(targetPrice) : undefined, previewOnly: po || undefined, lines: lines.map(l => ({ productId: l.productId, productCode: l.productCode, siteType: l.siteType, qty: l.qty, applianceUnitPrice: l.applianceUnitPrice, licenseUnitPrice: l.licenseUnitPrice, isIncluded: l.isIncluded, notes: l.notes })) }
+    return { customerName, partnerName: partnerName || undefined, endUserName: endUserName || undefined, projectName: projectName || undefined, customerType, termYears, paymentModel, currency, includePs, includeAnnualService, validityDays, leadTime, deliveryLocation, remarks: remarks || undefined, discountPercent: discountPercent || undefined, targetFinalPrice: targetPrice ? parseFloat(targetPrice) : undefined, previewOnly: po || undefined, lines: lines.map(l => ({ productId: l.productId, productCode: l.productCode, siteType: l.siteType, qty: l.qty, applianceUnitPrice: l.applianceUnitPrice, licenseUnitPrice: l.licenseUnitPrice, isIncluded: l.isIncluded, notes: l.notes, sku: l.sku })) }
   }
   async function calcPreview() {
     setLoading(true); setError('')
@@ -180,12 +180,7 @@ export default function NewQuotation() {
           <div>
             <div className="qn-c">
               <div className="qn-ct">Pricing</div>
-              <div className="qn-g2" style={{marginBottom:12}}>
-                <div><label className="qn-l">Discount (%)</label><input type='number' min='0' max='100' step='0.5' value={discountPercent} onChange={e => { setDiscountPercent(parseFloat(e.target.value)||0); setTargetPrice('') }} className="qn-i" /></div>
-                <div><label className="qn-l">Target Final Price</label><input type='number' value={targetPrice} onChange={e => { setTargetPrice(e.target.value); setDiscountPercent(0) }} placeholder='Leave blank for discount%' className="qn-i" /></div>
-              </div>
-              {preview && <div className="qn-pb"><div style={{fontWeight:600,marginBottom:10,color:'#22c55e'}}>Pricing Preview</div><div className="qn-pg"><div className="qn-l">Appliance Total:</div><div>{fmt(preview.totals.applianceTotal)}</div><div className="qn-l">License Total:</div><div>{fmt(preview.totals.licenseTotal)}</div>{preview.totals.serviceTotal > 0 && <><div className="qn-l">Service Total:</div><div>{fmt(preview.totals.serviceTotal)}</div></>}<div className="qn-l">Grand Total:</div><div>{fmt(preview.totals.grandTotal)}</div>{preview.totals.discountAmount > 0 && <><div className="qn-l">Discount:</div><div style={{color:'#ef4444'}}>-{fmt(preview.totals.discountAmount)}</div></>}<div style={{color:'#f9fafb',fontWeight:700}}>FINAL PRICE:</div><div style={{color:'#22c55e',fontWeight:700,fontSize:16}}>{fmt(preview.totals.finalPrice)}</div></div></div>}
-            </div>
+notes: l.notes, sku: l.sku            </div>
             <div className="qn-c">
               <div className="qn-ct">Remarks</div>
               <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={5} placeholder='Remarks will be auto-generated if blank' className="qn-i" style={{resize:'vertical'}} />
@@ -204,7 +199,7 @@ export default function NewQuotation() {
                 <div className="qn-f"><label className="qn-l">Category</label><select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} className="qn-i"><option value=''>-- Select --</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 {line.categoryId && <div className="qn-f"><label className="qn-l">Model</label><select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} className="qn-i"><option value=''>-- Select --</option>{getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></div>}
                 <div className="qn-g2">
-                  <div><label className="qn-l">Site Type</label><select value={line.siteType} onChange={e => updateLine(line.id, {siteType:e.target.value})} className="qn-i"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option></select></div>
+                  <div><label className="qn-l">Site Type</label><select value={line.siteType} onChange={e => updateLine(line.id, {siteType:e.target.value})} className="qn-i"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option><option value='na'>NA</option></select></div>
                   <div><label className="qn-l">Qty</label><input type='number' min='1' value={line.qty} onChange={e => onQtyChange(line.id, parseInt(e.target.value)||1)} className="qn-i" /></div>
                   <div><label className="qn-l">Appliance</label><input type='number' value={line.applianceUnitPrice} onChange={e => updateLine(line.id, {applianceUnitPrice:parseFloat(e.target.value)||0})} className="qn-i" /></div>
                   <div><label className="qn-l">License/yr</label><input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, {licenseUnitPrice:parseFloat(e.target.value)||0})} className="qn-i" /></div>
@@ -216,13 +211,14 @@ export default function NewQuotation() {
           </div>
           <div className="qn-dt">
             <table className="qn-tb">
-              <thead><tr>{['Category','Model','Site','Qty','Appliance','License/yr','Incl?','Notes',''].map(h => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Category','Model','SKU','Site','Qty','Appliance','License/yr','Incl?','Notes',''].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                              <div className="qn-f"><label className="qn-l">SKU</label><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-i" /></div>
               <tbody>
                 {lines.map(line => (
                   <tr key={line.id} style={{borderBottom:'1px solid #1f2937'}}>
                     <td style={{minWidth:160}}><select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} className="qn-ti"><option value=''>-- Category --</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></td>
                     <td style={{minWidth:180}}><select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} disabled={!line.categoryId} className="qn-ti" style={{color:line.categoryId?'#e0e0e0':'#6b7280'}}><option value=''>-- Model --</option>{line.categoryId && getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></td>
-                    <td><select value={line.siteType} onChange={e => updateLine(line.id, {siteType:e.target.value})} className="qn-ti"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option></select></td>
+                    <td><select value={line.siteType} onChange={e => updateLine(line.id, {siteType:e.target.value})} className="qn-ti"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option><option value='na'>NA</option></select></td>
                     <td style={{width:60}}><input type='number' min='1' value={line.qty} onChange={e => onQtyChange(line.id, parseInt(e.target.value)||1)} className="qn-ti" style={{width:55}} /></td>
                     <td style={{width:110}}><input type='number' value={line.applianceUnitPrice} onChange={e => updateLine(line.id, {applianceUnitPrice:parseFloat(e.target.value)||0})} className="qn-ti" style={{width:100}} /></td>
                     <td style={{width:110}}><input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, {licenseUnitPrice:parseFloat(e.target.value)||0})} className="qn-ti" style={{width:100}} /></td>
