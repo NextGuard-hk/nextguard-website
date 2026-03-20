@@ -193,7 +193,7 @@ notes: l.notes, sku: l.sku            </div>
             <button onClick={addLine} className="qn-b" style={{background:'#1f2937',border:'1px solid #374151',fontSize:13,marginLeft:'auto'}}>+ Add Line</button>
           </div>
           <div className="qn-ml">
-                          <div className="qn-f"><label className="qn-l">SKU</label><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-i" /></div>
+                          {lines.map((line, idx) => (
               <div key={line.id} className="qn-mc">
                 <div className="qn-f"><label className="qn-l">Category</label><select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} className="qn-i"><option value=''>-- Select --</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 {line.categoryId && <div className="qn-f"><label className="qn-l">Model</label><select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} className="qn-i"><option value=''>-- Select --</option>{getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></div>}
