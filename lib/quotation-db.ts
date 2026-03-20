@@ -154,6 +154,7 @@ async function runQuotationMigrations(): Promise<void> {
     `ALTER TABLE qt_quotations ADD COLUMN include_annual_service INTEGER DEFAULT 0`,
     `ALTER TABLE qt_quotations ADD COLUMN ps_description TEXT`,
     `ALTER TABLE qt_quotations ADD COLUMN annual_service_description TEXT`,
+        `ALTER TABLE qt_lines ADD COLUMN sku TEXT DEFAULT ''`,
   ]
   for (const sql of migrations) {
     try { await db.execute(sql) } catch { /* column already exists */ }
