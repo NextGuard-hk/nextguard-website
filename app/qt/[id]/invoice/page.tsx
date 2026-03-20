@@ -42,7 +42,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #fff; color
 .inv-meta-item strong { display: block; font-size: 12px; color: #111; margin-bottom: 1px; }
 .inv-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 24px; }
 .inv-table thead th { text-align: left; padding: 10px 12px; background: #111; color: #fff; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-.inv-table thead th:last-child, .inv-table thead th:nth-child(4), .inv-table thead th:nth-child(5), .inv-table thead th:nth-child(6) { text-align: right; }
+.inv-table thead th:last-child, .inv-table thead th:nth-child(6), .inv-table thead th:nth-child(7), .inv-table thead th:nth-child(8) { text-align: right; }
 .inv-table tbody td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #374151; vertical-align: top; }
 .inv-table tbody td:last-child, .inv-table tbody td:nth-child(4), .inv-table tbody td:nth-child(5), .inv-table tbody td:nth-child(6) { text-align: right; font-variant-numeric: tabular-nums; }
 .inv-table tbody tr:last-child td { border-bottom: 2px solid #111; }
@@ -195,10 +195,10 @@ export default function InvoicePDF() {
             <thead>
               <tr>
                 <th style={{width:'5%'}}>#</th>
-                <th style={{width:'40%'}}>Description</th>
-                                    <th style={{width:'10%'}}>SKU</th>
+                <th style={{width:'40%'}}>Product</th>
+                                    <th style={{width:'10%'}}>SKU</th><th style={{width:'8%'}}>Site</th>
                 <th style={{width:'8%'}}>Qty</th>
-                <th style={{width:'15%'}}>Unit Price</th>
+                <th style={{width:'15%'}}>Appliance</th>
                 <th style={{width:'15%'}}>License/yr</th>
                 <th style={{width:'17%'}}>Amount</th>
               </tr>
@@ -211,9 +211,9 @@ export default function InvoicePDF() {
                     <div className="inv-desc-main">{line.description || line.product_code}</div>
                     {line.product_code && line.description && <div className="inv-desc-sub">{line.product_code}</div>}
                     {line.notes && <div className="inv-desc-sub">{line.notes}</div>}
-                    {line.site_type && <div className="inv-desc-sub">Site: {line.site_type}</div>}
+                     
                   </td>
-                  <td>{line.sku || '-'}</td><td>{line.qty}</td>
+                  <td>{line.sku || '-'}</td><td>{line.site_type}</td><td>{line.qty}</td>
                   <td>{fmt(line.appliance_unit_price)}</td>
                   <td>{fmt(line.license_unit_price)}</td>
                   <td>{line.is_included ? <em style={{color:'#22c55e',fontWeight:600}}>Included</em> : fmt(line.line_total)}</td>
