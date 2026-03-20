@@ -396,9 +396,9 @@ export default function QuotationDetail() {
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}><label className="qd-cl"><input type='checkbox' checked={line.isIncluded} onChange={e=>updateLine(line.id,{isIncluded:e.target.checked})} /> Included</label></div>
                   <div style={{marginTop:8}}><input value={line.notes} onChange={e=>updateLine(line.id,{notes:e.target.value})} placeholder='Notes' className="qd-i" /></div>
+                  <div className="qd-f"><label className="qd-l">SKU</label><input value={line.sku} onChange={e=>updateLine(line.id,{sku:e.target.value})} placeholder='SKU' className="qd-i" /></div>
                 </div>
               ))}
-            <div className="qd-f"><label className="qd-l">SKU</label><input value={line.sku} onChange={e=>updateLine(line.id,{sku:e.target.value})} placeholder='SKU' className="qd-i" /></div>
             </div>
           </> : <>
             {/* View mode - desktop table */}
