@@ -50,7 +50,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const lineInputs: PriceLineInput[] = lines.map((l: any) => ({
       productId: l.productId || l.product_id || '',
       productCode: l.productCode || l.product_code || '',
-feat: add SKU field to PUT API route for quotation lines      qty: parseInt(l.qty) || 1,
+      qty: parseInt(l.qty) || 1,
       customAppliancePrice: l.applianceUnitPrice !== undefined ? parseFloat(l.applianceUnitPrice) : undefined,
       customLicensePrice: l.licenseUnitPrice !== undefined ? parseFloat(l.licenseUnitPrice) : undefined,
       isIncluded: l.isIncluded || false,
