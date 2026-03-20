@@ -196,6 +196,7 @@ export default function InvoicePDF() {
               <tr>
                 <th style={{width:'5%'}}>#</th>
                 <th style={{width:'40%'}}>Description</th>
+                                    <th style={{width:'10%'}}>SKU</th>
                 <th style={{width:'8%'}}>Qty</th>
                 <th style={{width:'15%'}}>Unit Price</th>
                 <th style={{width:'15%'}}>License/yr</th>
@@ -212,7 +213,7 @@ export default function InvoicePDF() {
                     {line.notes && <div className="inv-desc-sub">{line.notes}</div>}
                     {line.site_type && <div className="inv-desc-sub">Site: {line.site_type}</div>}
                   </td>
-                  <td>{line.qty}</td>
+                  <td>{line.sku || '-'}</td><td>{line.qty}</td>
                   <td>{fmt(line.appliance_unit_price)}</td>
                   <td>{fmt(line.license_unit_price)}</td>
                   <td>{line.is_included ? <em style={{color:'#22c55e',fontWeight:600}}>Included</em> : fmt(line.line_total)}</td>
