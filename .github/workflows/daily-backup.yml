@@ -71,24 +71,18 @@ jobs:
           fi
           echo "Turso DB integrity verified"
 
-      - name: Backup Quotation System DB (integrity check)
+      - name: Backup Quotation System DB (integrity check with retry)
         run: |
-                    echo "Running Quotation System DB integrity check (with retry)..."
-          # Warm-up request to wake up serverless function
-          curl -s -o /dev/null --max-time 10 \
-            -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-            "https://www.next-guard.com/api/qt-backup" || true
+          echo "Running Quotation System DB integrity check..."
+          echo "Warm-up request..."
+          curl -s -o /dev/null --max-time 10 -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" "https://www.next-guard.com/api/qt-backup" || true
           sleep 3
-          # Actual backup request with retry (up to 3 attempts)
           for ATTEMPT in 1 2 3; do
             echo "Attempt $ATTEMPT of 3..."
-            RESPONSE=$(curl -s -o qt-backup.json -w "%{http_code}" --max-time 55 \
-              -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-              "https://www.next-guard.com/api/qt-backup")
-            if [ "$RESPONSE" = "200" ]; then
-              break
-            fi
-            echo "Attempt $ATTEMPT failed with HTTP $RESPONSE, retrying in 10s..."
+            RESPONSE=$(curl -s -o qt-backup.json -w "%{http_code}" --max-time 55 -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" "https://www.next-guard.com/api/qt-backup")
+            echo "HTTP $RESPONSE"
+            if [ "$RESPONSE" = "200" ]; then break; fi
+            echo "Retrying in 10s..."
             sleep 10
           done
           echo "HTTP Status: $RESPONSE"
@@ -114,15 +108,11 @@ jobs:
             PAGE=1
             TOTAL=0
             while true; do
-              curl -s --max-time 55 -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-                "https://www.next-guard.com/api/qt-backup?table=${TABLE}&page=${PAGE}&limit=500" \
-                > backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json
+              curl -s --max-time 55 -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" "https://www.next-guard.com/api/qt-backup?table=${TABLE}&page=${PAGE}&limit=500" > backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json
               ROWS=$(cat backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json | jq -r '.export.rows_in_page // "0"')
               HAS_MORE=$(cat backups/qt-export/${TABLE}-${DATE}-page${PAGE}.json | jq -r '.export.has_more // "false"')
               TOTAL=$((TOTAL + ROWS))
-              if [ "$HAS_MORE" != "true" ]; then
-                break
-              fi
+              if [ "$HAS_MORE" != "true" ]; then break; fi
               PAGE=$((PAGE + 1))
               sleep 1
             done
@@ -136,41 +126,27 @@ jobs:
           echo "Starting full paginated export..."
           DATE=$(date +'%Y-%m-%d')
           mkdir -p backups/full-export
-
-          # Export feeds (small table)
           echo "Exporting feeds..."
-          curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-            "https://www.next-guard.com/api/v1/threat-intel/backup?table=feeds" \
-            > backups/full-export/feeds-${DATE}.json
+          curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" "https://www.next-guard.com/api/v1/threat-intel/backup?table=feeds" > backups/full-export/feeds-${DATE}.json
           FEED_ROWS=$(cat backups/full-export/feeds-${DATE}.json | jq -r '.export.total_rows // "error"')
           echo "Feeds exported: $FEED_ROWS rows"
           sleep 2
-
-          # Export lookup_log
           echo "Exporting lookup_log..."
-          curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-            "https://www.next-guard.com/api/v1/threat-intel/backup?table=lookup_log&limit=1000" \
-            > backups/full-export/lookup_log-${DATE}.json
+          curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" "https://www.next-guard.com/api/v1/threat-intel/backup?table=lookup_log&limit=1000" > backups/full-export/lookup_log-${DATE}.json
           LOG_ROWS=$(cat backups/full-export/lookup_log-${DATE}.json | jq -r '.export.rows_in_page // "error"')
           echo "Lookup log exported: $LOG_ROWS rows"
           sleep 2
-
-          # Export indicators (large table, paginated with 1000 rows per page)
           echo "Exporting indicators (paginated, 1000 rows/page)..."
           PAGE=1
           TOTAL_EXPORTED=0
           while true; do
             echo "  Fetching page $PAGE..."
-            curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-              "https://www.next-guard.com/api/v1/threat-intel/backup?table=indicators&page=${PAGE}&limit=1000" \
-              > backups/full-export/indicators-${DATE}-page${PAGE}.json
+            curl -s -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" "https://www.next-guard.com/api/v1/threat-intel/backup?table=indicators&page=${PAGE}&limit=1000" > backups/full-export/indicators-${DATE}-page${PAGE}.json
             ROWS=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq -r '.export.rows_in_page // "0"')
             HAS_MORE=$(cat backups/full-export/indicators-${DATE}-page${PAGE}.json | jq -r '.export.has_more // "false"')
             TOTAL_EXPORTED=$((TOTAL_EXPORTED + ROWS))
             echo "  Page $PAGE: $ROWS rows (total so far: $TOTAL_EXPORTED)"
-            if [ "$HAS_MORE" != "true" ]; then
-              break
-            fi
+            if [ "$HAS_MORE" != "true" ]; then break; fi
             PAGE=$((PAGE + 1))
             sleep 2
           done
@@ -187,14 +163,8 @@ jobs:
           cp qt-backup.json backups/qt-integrity-${DATE}.json
           echo "Database backups saved:"
           ls -la backups/
-          if [ -d "backups/full-export" ]; then
-            echo "Full export files:"
-            ls -la backups/full-export/
-          fi
-          if [ -d "backups/qt-export" ]; then
-            echo "QT export files:"
-            ls -la backups/qt-export/
-          fi
+          if [ -d "backups/full-export" ]; then echo "Full export:"; ls -la backups/full-export/; fi
+          if [ -d "backups/qt-export" ]; then echo "QT export:"; ls -la backups/qt-export/; fi
 
       - name: Upload database backups as artifact
         uses: actions/upload-artifact@v4
@@ -203,7 +173,6 @@ jobs:
           path: backups/
           retention-days: 7
 
-  # Send alert email via NextGuard Resend API if backup fails
   notify-failure:
     runs-on: ubuntu-latest
     needs: backup
@@ -211,21 +180,8 @@ jobs:
     steps:
       - name: Send failure alert email via NextGuard API
         run: |
-          echo "Backup failed! Sending alert email to oscar@next-guard.com..."
-          RESPONSE=$(curl -s -o alert-response.json -w "%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "run_id": "${{ github.run_id }}",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "error_message": "Daily backup workflow failed (includes Threat Intel + Quotation System). Check the run logs for details."
-            }' \
-            "https://www.next-guard.com/api/v1/threat-intel/backup-alert")
+          echo "Backup failed! Sending alert..."
+          RESPONSE=$(curl -s -o alert-response.json -w "%{http_code}" -X POST -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" -H "Content-Type: application/json" -d '{"run_id":"${{ github.run_id }}","run_url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","error_message":"Daily backup workflow failed. Check logs."}' "https://www.next-guard.com/api/v1/threat-intel/backup-alert")
           echo "Alert API Response (HTTP $RESPONSE):"
           cat alert-response.json | jq . 2>/dev/null || cat alert-response.json
-          if [ "$RESPONSE" != "200" ]; then
-            echo "::warning::Failed to send alert email (HTTP $RESPONSE)"
-          else
-            echo "Alert email sent successfully to oscar@next-guard.com"
-          fi
+          if [ "$RESPONSE" != "200" ]; then echo "::warning::Failed to send alert (HTTP $RESPONSE)"; else echo "Alert sent to oscar@next-guard.com"; fi
