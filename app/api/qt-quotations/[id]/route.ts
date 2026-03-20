@@ -50,8 +50,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const lineInputs: PriceLineInput[] = lines.map((l: any) => ({
       productId: l.productId || l.product_id || '',
       productCode: l.productCode || l.product_code || '',
-      siteType: l.siteType || l.site_type || 'production',
-      qty: parseInt(l.qty) || 1,
+feat: add SKU field to PUT API route for quotation lines      qty: parseInt(l.qty) || 1,
       customAppliancePrice: l.applianceUnitPrice !== undefined ? parseFloat(l.applianceUnitPrice) : undefined,
       customLicensePrice: l.licenseUnitPrice !== undefined ? parseFloat(l.licenseUnitPrice) : undefined,
       isIncluded: l.isIncluded || false,
@@ -69,8 +68,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     for (const pl of pricing.lines) {
       const lineId = generateId('line')
       await db.execute({
-        sql: `INSERT INTO qt_lines (id, quotation_id, site_type, product_id, product_code, description, qty, appliance_unit_price, appliance_total, license_unit_price, year1_fee, year2_fee, year3_fee, year4_fee, year5_fee, line_total, is_included, notes, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        args: [lineId, id, pl.siteType, pl.productId, pl.productCode, pl.description, pl.qty, pl.applianceUnitPrice, pl.applianceTotal, pl.licenseUnitPrice, pl.year1Fee, pl.year2Fee, pl.year3Fee, pl.year4Fee, pl.year5Fee, pl.lineTotal, pl.isIncluded ? 1 : 0, pl.notes, pl.sortOrder],
+        sql: `INSERT INTO qt_lines (id, quotation_id, site_type, product_id, product_code, description, qty, appliance_unit_price, appliance_total, license_unit_price, year1_fee, year2_fee, year3_fee, year4_fee, year5_fee, line_total, is_included, notes, sort_order, sku) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [lineId, id, pl.siteType, pl.productId, pl.productCode, pl.description, pl.qty, pl.applianceUnitPrice, pl.applianceTotal, pl.licenseUnitPrice, pl.year1Fee, pl.year2Fee, pl.year3Fee, pl.year4Fee, pl.year5Fee, pl.lineTotal, pl.isIncluded ? 1 : 0, pl.notes, pl.sortOrder, lines[pricing.lines.indexOf(pl)]?.sku || ''],
       })
     }
   }
