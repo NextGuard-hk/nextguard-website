@@ -154,7 +154,7 @@ async function seedUT1(category: string = 'all', limit: number = 50000) {
     social: ['Social Networking'],
     vpn: ['Proxy/VPN']
   }
-  const ut1DirNames: Record<string, string> = { drugs: 'drogue', ads: 'publicite', cryptomining: 'cryptojacking', social: 'social_networks' }     const targets = category === 'all' ? Object.keys(ut1Categories) : [category]
+  const ut1DirNames: Record<string, string> = { drugs: 'drogue', ads: 'publicite', cryptomining: 'cryptojacking', social: 'social_networks' };     const targets = category === 'all' ? Object.keys(ut1Categories) : [category]
   let totalInserted = 0
   const results: Record<string, any> = {}
   for (const cat of targets) {
