@@ -152,7 +152,7 @@ export default function QuotationPDF() {
           <div className="pdf-table-wrap">
             <table className="pdf-table">
               <thead><tr>
-                <th>#</th><th>Description</th><th>Site</th><th>Qty</th>
+                <th>#</th><th>Description</th><th>SKU</th><th>Site</th><th>Qty</th>
                 <th>Appliance</th><th>App Total</th><th>License/yr</th>
                 {Array.from({length:qt.term_years},(_,i) => <th key={i}>Yr {i+1}</th>)}
                 <th>Total</th>
@@ -166,7 +166,7 @@ export default function QuotationPDF() {
                       {line.product_code && line.description && <div style={{fontSize:11,color:'#9ca3af'}}>{line.product_code}</div>}
                       {line.notes && <div style={{fontSize:11,color:'#6b7280',marginTop:2}}>{line.notes}</div>}
                     </td>
-                    <td>{line.site_type}</td>
+                    <td>{<td>{line.sku || '-'}</td><td>{line.site_type}</td>
                     <td>{line.qty}</td>
                     <td>{fmt(line.appliance_unit_price)}</td>
                     <td>{fmt(line.appliance_total)}</td>
