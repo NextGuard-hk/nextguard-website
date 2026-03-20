@@ -152,7 +152,7 @@ export default function QuotationPDF() {
           <div className="pdf-table-wrap">
             <table className="pdf-table">
               <thead><tr>
-                <th>#</th><th>Description</th><th>SKU</th><th>Site</th><th>Qty</th>
+                <th>#</th><th>Product</th><th>SKU</th><th>Site</th><th>Qty</th>
                 <th>Appliance</th><th>App Total</th><th>License/yr</th>
                 {Array.from({length:qt.term_years},(_,i) => <th key={i}>Yr {i+1}</th>)}
                 <th>Total</th>
