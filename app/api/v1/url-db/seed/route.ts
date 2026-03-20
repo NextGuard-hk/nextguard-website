@@ -154,16 +154,16 @@ async function seedUT1(category: string = 'all', limit: number = 50000) {
     social: ['Social Networking'],
     vpn: ['Proxy/VPN']
   }
-  const targets = category === 'all' ? Object.keys(ut1Categories) : [category]
+  const ut1DirNames: Record<string, string> = { drugs: 'drogue', ads: 'publicite', cryptomining: 'cryptojacking', social: 'social_networks' }     const targets = category === 'all' ? Object.keys(ut1Categories) : [category]
   let totalInserted = 0
   const results: Record<string, any> = {}
   for (const cat of targets) {
     try {
-      const url = `https://dsi.ut-capitole.fr/blacklists/download/${cat}.tar.gz`
+      const url = `https://dsi.ut-capitole.fr/blacklists/download/${ut1DirNames[cat] || cat}.tar.gz`
       const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
       if (!res.ok) { results[cat] = { error: `fetch failed: ${res.status}` }; continue }
       // tar.gz can't be parsed easily, try the plain domain list
-      const plainUrl = `https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/${cat}/domains`
+      const plainUrl = `https://raw.githubusercontent.com/olbat/ut1-blacklists/master/blacklists/${ut1DirNames[cat] || cat}/domains`
       const plainRes = await fetch(plainUrl, { signal: AbortSignal.timeout(15000) })
       if (!plainRes.ok) { results[cat] = { error: 'github mirror failed' }; continue }
       const text = await plainRes.text()
