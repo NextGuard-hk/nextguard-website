@@ -44,7 +44,12 @@ const CSS = `
 .qn-tb td{padding:6px 4px}
 .qn-ti{background:#111827;border:1px solid #1f2937;border-radius:6px;color:#e0e0e0;padding:6px 8px;font-size:13px;width:100%}
 .qn-rb{background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px}
-.qn-ml{display:none}
+.className="197
+197
+"
+
+
+{display:none}
 .qn-mc{background:#111827;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #1f2937}
 .qn-mh{display:flex;justify-content:space-between;margin-bottom:8px}
 .qn-pb{background:#111827;border-radius:8px;padding:16px}
@@ -56,7 +61,8 @@ const CSS = `
 .qn-g{grid-template-columns:1fr}
 .qn-c{padding:14px}
 .qn-dt{display:none}
-.qn-ml{display:block}
+.197
+{display:block}
 .qn-b{padding:8px 14px;font-size:13px}
 }
 @media(max-width:480px){
