@@ -151,14 +151,14 @@ export async function POST(req: NextRequest) {
           id, quotation_id, site_type, product_id, product_code, description,
           qty, appliance_unit_price, appliance_total, license_unit_price,
           year1_fee, year2_fee, year3_fee, year4_fee, year5_fee,
-          line_total, is_included, notes, sort_order
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          line_total, is_included, notes, sort_order, sku
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         args: [
           lineId, quotationId, pl.siteType, pl.productId || null, pl.productCode,
           pl.description, pl.qty, pl.applianceUnitPrice, pl.applianceTotal,
           pl.licenseUnitPrice, pl.year1Fee, pl.year2Fee, pl.year3Fee,
           pl.year4Fee, pl.year5Fee, pl.lineTotal, pl.isIncluded ? 1 : 0,
-          pl.notes, pl.sortOrder,
+          pl.notes, pl.sortOrder, validLines[pricing.lines.indexOf(pl)]?.sku || '',
         ],
       })
     }
