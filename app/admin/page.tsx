@@ -455,7 +455,7 @@ export default function AdminPage() {
 
   async function toggleAccountActive(id: string) {
     try {
-      const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'toggle-active', id}))
+      const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'toggle-active', id})})
       if (r.ok) fetchAccounts()
     } catch {}
   }
@@ -463,7 +463,7 @@ export default function AdminPage() {
   async function deleteAccount(id: string) {
     if (!confirm('Delete this account permanently?')) return
     try {
-      const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'delete', id}))
+      const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'delete', id})})
       if (r.ok) fetchAccounts()
     } catch {}
   }
@@ -477,7 +477,7 @@ export default function AdminPage() {
     async function resetAccountPassword(id: string) {
     if (!confirm('Reset this account password? A temporary password will be emailed to the user.')) return
     try {
-      const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'reset-password', id}))
+      const r = await fetch('/api/download-users', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'reset-password', id})})
       const data = await r.json()
       if (r.ok) {
         alert(data.message || 'Password reset successfully')
