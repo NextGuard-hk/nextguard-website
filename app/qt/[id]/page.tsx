@@ -363,7 +363,7 @@ export default function QuotationDetail() {
             {/* Edit mode - desktop table */}
             <div className="qd-tw">
               <table className="qd-tb">
-                <thead><tr>{['Category','Model','SKU','Site','Qty','Appliance','License/yr','Incl?','Notes',''].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Category','Model','SKU','Description','Site','Qty','Appliance','License/yr','Incl?',''].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {eLines.map(line => (
                     <tr key={line.id}>
@@ -374,7 +374,7 @@ export default function QuotationDetail() {
                       <td style={{width:110}}><input type='number' value={line.applianceUnitPrice} onChange={e=>updateLine(line.id,{applianceUnitPrice:parseFloat(e.target.value)||0})} className="qd-ti" style={{width:100}} /></td>
                       <td style={{width:110}}><input type='number' value={line.licenseUnitPrice} onChange={e=>updateLine(line.id,{licenseUnitPrice:parseFloat(e.target.value)||0})} className="qd-ti" style={{width:100}} /></td>
                       <td style={{textAlign:'center'}}><input type='checkbox' checked={line.isIncluded} onChange={e=>updateLine(line.id,{isIncluded:e.target.checked})} /></td>
-                      <td style={{minWidth:100}}><input value={line.notes} onChange={e=>updateLine(line.id,{notes:e.target.value})} placeholder='Notes' className="qd-ti" /></td>
+                      <td style={{minWidth:100}}><input value={line.notes} onChange={e=>updateLine(line.id,{notes:e.target.value})} placeholder='Description' className="qd-ti" /></td>
                       <td><button onClick={()=>removeLine(line.id)} className="qd-rb">✕</button></td>
                     </tr>
                   ))}
@@ -395,7 +395,7 @@ export default function QuotationDetail() {
                     <div><label className="qd-l">License/yr</label><input type='number' value={line.licenseUnitPrice} onChange={e=>updateLine(line.id,{licenseUnitPrice:parseFloat(e.target.value)||0})} className="qd-i" /></div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}><label className="qd-cl"><input type='checkbox' checked={line.isIncluded} onChange={e=>updateLine(line.id,{isIncluded:e.target.checked})} /> Included</label></div>
-                  <div style={{marginTop:8}}><input value={line.notes} onChange={e=>updateLine(line.id,{notes:e.target.value})} placeholder='Notes' className="qd-i" /></div>
+                  <div style={{marginTop:8}}><input value={line.notes} onChange={e=>updateLine(line.id,{notes:e.target.value})} placeholder='Description' className="qd-i" /></div>
                   <div className="qd-f"><label className="qd-l">SKU</label><input value={line.sku} onChange={e=>updateLine(line.id,{sku:e.target.value})} placeholder='SKU' className="qd-i" /></div>
                 </div>
               ))}
