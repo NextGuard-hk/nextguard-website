@@ -210,26 +210,26 @@ notes: l.notes, sku: l.sku            </div>
                   <div><label className="qn-l">License/yr</label><input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, {licenseUnitPrice:parseFloat(e.target.value)||0})} className="qn-i" /></div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}><label className="qn-cl"><input type='checkbox' checked={line.isIncluded} onChange={e => updateLine(line.id, {isIncluded:e.target.checked})} /> Included (no charge)</label></div>
-                <div style={{marginTop:8}}><input value={line.notes} onChange={e => updateLine(line.id, {notes:e.target.value})} placeholder='Notes' className="qn-i" /></div>
+                <div style={{marginTop:8}}><input value={line.notes} onChange={e => updateLine(line.id, {notes:e.target.value})} placeholder='Description' className="qn-i" /></div>
                             <div className="qn-f"><label className="qn-l">SKU</label><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-i" /></div>
               </div>
             ))}
           </div>
           <div className="qn-dt">
             <table className="qn-tb">
-              <thead><tr>{['Category','Model','SKU','Site','Qty','Appliance','License/yr','Incl?','Notes',''].map(h => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Category','Model','SKU','Description','Site','Qty','Appliance','License/yr','Incl?',''].map(h => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {lines.map(line => (
                   <tr key={line.id} style={{borderBottom:'1px solid #1f2937'}}>
                     <td style={{minWidth:160}}><select value={line.categoryId} onChange={e => onCategoryChange(line.id, e.target.value)} className="qn-ti"><option value=''>-- Category --</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></td>
                     <td style={{minWidth:180}}><select value={line.productId} onChange={e => onProductChange(line.id, e.target.value)} disabled={!line.categoryId} className="qn-ti" style={{color:line.categoryId?'#e0e0e0':'#6b7280'}}><option value=''>-- Model --</option>{line.categoryId && getModelsForCategory(line.categoryId).map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></td>
-                                  <td><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-ti" style={{width:100}} /></td>
+                                  <td><input value={line.sku} onChange={e => updateLine(line.id, {sku:e.target.value})} placeholder='SKU' className="qn-ti" style={{width:100}} /></td>  <td style={{minWidth:100}}><input value={line.notes} onChange={e => updateLine(line.id, {notes:e.target.value})} placeholder='Description' className="qn-ti" /></td>
                     <td><select value={line.siteType} onChange={e => updateLine(line.id, {siteType:e.target.value})} className="qn-ti"><option value='production'>Prod</option><option value='dr'>DR</option><option value='test'>Test</option><option value='na'>NA</option></select></td>
                     <td style={{width:60}}><input type='number' min='1' value={line.qty} onChange={e => onQtyChange(line.id, parseInt(e.target.value)||1)} className="qn-ti" style={{width:55}} /></td>
                     <td style={{width:110}}><input type='number' value={line.applianceUnitPrice} onChange={e => updateLine(line.id, {applianceUnitPrice:parseFloat(e.target.value)||0})} className="qn-ti" style={{width:100}} /></td>
                     <td style={{width:110}}><input type='number' value={line.licenseUnitPrice} onChange={e => updateLine(line.id, {licenseUnitPrice:parseFloat(e.target.value)||0})} className="qn-ti" style={{width:100}} /></td>
                     <td style={{textAlign:'center'}}><input type='checkbox' checked={line.isIncluded} onChange={e => updateLine(line.id, {isIncluded:e.target.checked})} /></td>
-                    <td style={{minWidth:100}}><input value={line.notes} onChange={e => updateLine(line.id, {notes:e.target.value})} placeholder='Notes' className="qn-ti" /></td>
+                   
                     <td><button onClick={() => removeLine(line.id)} className="qn-rb">✕</button></td>
                   </tr>
                 ))}
